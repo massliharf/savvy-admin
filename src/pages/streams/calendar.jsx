@@ -15,10 +15,14 @@ import { StreamItem, logoHidden, useStreamSurface } from "./parts";
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const dayKey = (d) => d.format("YYYY-MM-DD");
 
-/** Small sample of a stream surface: its fill colour. */
-function Swatch({ bg }) {
+/** Small sample of a stream surface: its fill, with its strong colour as a dot so it shows on the page. */
+function Swatch({ bg, dot }) {
   const { tokens } = useTheme();
-  return <Box component="span" sx={{ width: 20, height: 14, borderRadius: `${tokens.shape.xs}px`, bgcolor: bg, flexShrink: 0 }} />;
+  return (
+    <Box component="span" sx={{ width: 20, height: 14, borderRadius: `${tokens.shape.xs}px`, bgcolor: bg, flexShrink: 0, display: "grid", placeItems: "center" }}>
+      <Box component="span" sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: dot }} />
+    </Box>
+  );
 }
 
 
@@ -27,16 +31,16 @@ export function StreamLegend() {
   const { m3: c, palette } = useTheme();
   // The same fills as the calendar's streams (useStreamSurface).
   const items = [
-    { label: "Scheduled", bg: c.primaryContainer },
-    { label: "Needs words", bg: palette.warning.container },
-    { label: "Live", bg: c.errorContainer },
-    { label: "Ended", bg: c.surfaceContainerHighest },
+    { label: "Scheduled", bg: c.primaryContainer, dot: c.primary },
+    { label: "Needs words", bg: palette.warning.container, dot: palette.warning.color },
+    { label: "Live", bg: c.errorContainer, dot: c.error },
+    { label: "Ended", bg: c.surface3, dot: c.outline },
   ];
   return (
     <Box sx={{ display: "flex", flexWrap: "wrap", columnGap: 2.5, rowGap: 1, typography: "labelMedium", color: "text.secondary" }}>
       {items.map((i) => (
         <Box key={i.label} component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.75 }}>
-          <Swatch bg={i.bg} />
+          <Swatch bg={i.bg} dot={i.dot} />
           {i.label}
         </Box>
       ))}

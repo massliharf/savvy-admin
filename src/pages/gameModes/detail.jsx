@@ -203,7 +203,7 @@ export function GameModeSettings({ id }) {
       {/* The same groups, in the same order, as a stream's page: it starts with these. */}
       <SectionGroup title="New streams start with">
           <FormSection id="game" title="Game" description="Points per round and the showdown prize.">
-            <ScoringFields control={control} subText={subText} roundCount={5} withStumper={false} />
+            <ScoringFields control={control} setValue={setValue} subText={subText} roundCount={5} withStumper={false} />
             {meta?.showdown && <ShowdownEditor control={control} setValue={setValue} name="showdown" word={false} note="Each stream gets its showdown word from its word set." />}
           </FormSection>
           <FormSection id="host" title="Host">

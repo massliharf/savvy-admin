@@ -40,7 +40,7 @@ export function ModeCards({ value, onChange, onSettings }) {
               display: "flex",
               alignItems: "center",
               borderRadius: `${theme.tokens.shape.md}px`,
-              bgcolor: theme.m3.surfaceContainerHigh,
+              bgcolor: theme.m3.surfaceCard,
               boxShadow: on ? `inset 0 0 0 2px ${theme.m3.primary}` : "none",
               transition: `background-color ${theme.tokens.motion.effects}`,
               "&:has(> .mode-pick:hover)": { bgcolor: theme.m3.hover },

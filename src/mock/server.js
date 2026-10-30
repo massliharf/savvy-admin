@@ -6,7 +6,7 @@ import { LOGO_URL } from "../assets";
 import { HOST_PICTURE_URL, MODE_LOGOS, STREAM_HERO_URL } from "../assets";
 
 const DB_KEY = "savvy-mock-db";
-const DB_VERSION = 47;
+const DB_VERSION = 48;
 
 // The demo data: one host (Scott) and one sponsor (Wendy's), and for each game mode a set of streams
 // that shows every state: ended (with its words), canceled, live now, upcoming with all its words
@@ -55,6 +55,7 @@ function populate(d) {
   d.hosts = d.hosts.some((h) => h.id === seed.SCOTT.id) ? d.hosts.filter((h) => h.id === seed.SCOTT.id) : [{ ...seed.SCOTT }];
   d.sponsors = (d.sponsors ?? []).some((sp) => sp.id === seed.WENDYS.id) ? d.sponsors.filter((sp) => sp.id === seed.WENDYS.id) : [{ ...seed.WENDYS }];
   d.users = (d.users ?? []).filter((u) => !gone.has(u.id));
+  d.cashWins = (d.cashWins ?? []).filter((r) => !gone.has(r.userId));
   Object.keys(d.claims ?? {}).forEach((id) => gone.has(id) && delete d.claims[id]);
   (d.gameModes ?? []).forEach((m) => {
     m.defaultHostId = seed.SCOTT.id;
@@ -459,6 +460,12 @@ function load() {
         // and 15 word sets per game mode; the other hosts, sponsors, streams and sets go.
         populate(parsed);
         parsed.version = 47;
+      }
+      if (parsed.version === 47) {
+        // v48: cashouts of the removed hosts go too (their accounts are gone).
+        const hostIds = ["hostMaya0000000000000000000006", "hostLeo00000000000000000000007", "hostNia00000000000000000000008"];
+        parsed.cashWins = (parsed.cashWins ?? []).filter((r) => !hostIds.includes(r.userId));
+        parsed.version = 48;
       }
       if (parsed.version === DB_VERSION) return parsed;
       // Older versions: add what's new and keep everything else.

@@ -387,7 +387,7 @@ export function WordsSection({ form, validateWord, onPickWords, frame }) {
 export function ScoringSection({ form, frame }) {
   return (
     <FormSection {...frame} id="game" title="Scoring">
-      <ScoringFields control={form.control} subText={baseOf(form.gameMode) === GameMode.SubText} roundCount={form.roundFields?.length ?? 5} withStumper={false} />
+      <ScoringFields control={form.control} setValue={form.setValue} subText={baseOf(form.gameMode) === GameMode.SubText} roundCount={form.roundFields?.length ?? 5} withStumper={false} />
     </FormSection>
   );
 }
@@ -441,7 +441,7 @@ const TIME_BONUS = Array.from({ length: 25 }, (_, i) => (i + 1) * 100);
 const xpRules = { validate: (v) => (v == null || Number.isNaN(v) ? "Required" : v < 0 ? "Min 0" : v > 10000 ? "Max 10,000" : true) };
 
 /** One editable number in the points table: plain text in the cell, a line under it while editing. */
-function ScoreCell({ control, name, label, disabled, rules, step }) {
+function ScoreCell({ control, name, label, disabled, rules, step, onValue }) {
   const { m3: c, tokens } = useTheme();
   if (disabled) {
     return (
@@ -459,7 +459,11 @@ function ScoreCell({ control, name, label, disabled, rules, step }) {
         <Tooltip title={fieldState.error?.message ?? ""} open={!!fieldState.error} placement="top" arrow>
           <InputBase
             value={field.value ?? ""}
-            onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))}
+            onChange={(e) => {
+              const v = e.target.value === "" ? null : Number(e.target.value);
+              field.onChange(v);
+              onValue?.(v);
+            }}
             onBlur={field.onBlur}
             inputRef={field.ref}
             type="number"
@@ -479,7 +483,11 @@ const timeRules = { validate: (v) => (v == null || Number.isNaN(v) ? "Required" 
  * Points per round as a data table: score kinds down, round brackets across, every number
  * editable in its cell (+ host stumper bonus when it applies).
  */
-export function ScoringFields({ control, subText, roundCount, prefix = "roundScoring", stumperName = "hostStumperBonusXp", withStumper = true }) {
+export function ScoringFields({ control, setValue, subText, roundCount, prefix = "roundScoring", stumperName = "hostStumperBonusXp", withStumper = true }) {
+  // Yellow follows green: half of it in rounds 1–4, none from round 5. Changing green sets it;
+  // yellow stays editable on its own.
+  const yellowFor = (bracket, green) => (bracket === "round5OrMore" || green == null ? 0 : Math.round(green / 2));
+  const followGreen = (bracket) => (v) => setValue?.(`${prefix}.${bracket}.yellowLetterXp`, yellowFor(bracket, v), { shouldDirty: true, shouldValidate: true });
   const { m3: c, tokens } = useTheme();
   const count = Math.max(roundCount, 1);
   const brackets = BRACKETS.filter((b) => count >= b.minRounds);
@@ -518,6 +526,7 @@ export function ScoringFields({ control, subText, roundCount, prefix = "roundSco
                     disabled={disabled(b.key, r.key)}
                     rules={r.key === "timeBonusXp" ? timeRules : xpRules}
                     step={r.key === "timeBonusXp" ? 100 : 1}
+                    onValue={r.key === "greenLetterXp" && !disabled(b.key, "yellowLetterXp") ? followGreen(b.key) : undefined}
                   />
                 </Box>
               ))}

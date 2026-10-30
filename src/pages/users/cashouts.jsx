@@ -69,8 +69,12 @@ function MoreMenu({ row, onStatus }) {
   );
 }
 
-/** One cashout. `user` adds the player column (omitted on the user's own page). */
-export function CashoutRow({ row, user, showUser = true, actions }) {
+/**
+ * One cashout: who, when, how much (numbers right-aligned), its status and actions. `user` fills
+ * the player column (omitted on the user's own page); `loaded` says the users have been fetched, so a
+ * missing one is a deleted account rather than still loading.
+ */
+export function CashoutRow({ row, user, loaded = false, showUser = true, actions }) {
   const { m3: c } = useTheme();
   const { formatDate } = useTimezoneFormat();
   const pending = row.status === "InProgress";
@@ -79,7 +83,7 @@ export function CashoutRow({ row, user, showUser = true, actions }) {
       sx={{
         display: "grid",
         // Fixed action column, so the status lines up whether or not a row has Decline / Approve.
-        gridTemplateColumns: showUser ? { xs: "1fr", md: "88px minmax(0,1.6fr) minmax(0,1fr) 96px 196px" } : { xs: "1fr", md: "88px minmax(0,1fr) 96px 196px" },
+        gridTemplateColumns: showUser ? { xs: "1fr", md: "minmax(0,1.6fr) minmax(0,1fr) 96px 104px 196px" } : { xs: "1fr", md: "minmax(0,1fr) 96px 104px 196px" },
         alignItems: "center",
         columnGap: 2,
         rowGap: 1,
@@ -88,7 +92,8 @@ export function CashoutRow({ row, user, showUser = true, actions }) {
         "&:not(:last-of-type)": { borderBottom: `1px solid ${c.border}` },
       }}
     >
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+      {/* Phones lead with the amount and status; wide screens read who → when → how much. */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, justifyContent: { md: "flex-end" }, order: { xs: 1, md: 3 } }}>
         <Typography variant="titleMedium" sx={{ fontVariantNumeric: "tabular-nums" }}>
           {money(row.amount)}
         </Typography>
@@ -97,11 +102,11 @@ export function CashoutRow({ row, user, showUser = true, actions }) {
         </Box>
       </Box>
       {showUser && (
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, minWidth: 0, order: { xs: 3, md: 0 } }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, minWidth: 0, order: { xs: 3, md: 1 } }}>
           <UserAvatar user={user ?? { id: row.userId }} size={32} />
           <Box sx={{ minWidth: 0 }}>
             <Typography variant="titleSmall" noWrap component={Link} to={`/user-management/${row.userId}`} sx={{ display: "block", color: "inherit", textDecoration: "none", "&:hover": { textDecoration: "underline" } }}>
-              {isBot(row.userId) ? "Bot" : user?.username ?? "Loading…"}
+              {isBot(row.userId) ? "Bot" : user?.username ?? (loaded ? "Deleted account" : "Loading…")}
             </Typography>
             <Typography variant="bodySmall" color="text.secondary" noWrap component="div">
               {user?.phoneNumber ?? row.userId}
@@ -110,7 +115,7 @@ export function CashoutRow({ row, user, showUser = true, actions }) {
         </Box>
       )}
       {/* Date over time, like the user column's name over phone, so rows keep one height. */}
-      <Box sx={{ order: { xs: 4, md: 0 }, minWidth: 0 }}>
+      <Box sx={{ order: { xs: 4, md: 2 }, minWidth: 0 }}>
         <Typography variant="bodyMedium" component="div" noWrap>
           {formatDate(row.date, "MMM D, YYYY")}
         </Typography>
@@ -118,13 +123,13 @@ export function CashoutRow({ row, user, showUser = true, actions }) {
           {formatDate(row.date, "h:mm A")}
         </Typography>
       </Box>
-      <Box sx={{ display: { xs: "none", md: "block" } }}>
+      <Box sx={{ display: { xs: "none", md: "block" }, order: { md: 4 } }}>
         <CashStatusPill value={row.status} />
       </Box>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, justifyContent: "flex-end", order: { xs: 5, md: 0 }, mr: { xs: -1, md: 0 } }}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, justifyContent: "flex-end", order: 5, mr: { xs: -1, md: 0 } }}>
         {pending && (
           <>
-            <Button variant="outlined" size="small" disabled={actions.busy} onClick={() => actions.askDecline(row)}>
+            <Button variant="tonal" size="small" disabled={actions.busy} onClick={() => actions.askDecline(row)}>
               Decline
             </Button>
             <Button size="small" disabled={actions.busy} onClick={() => actions.setStatus(row, "Approved")}>
@@ -169,7 +174,7 @@ export default function CashoutsPage() {
   const pendingSum = (pendingAll?.data ?? []).reduce((s, r) => s + Number(r.amount || 0), 0);
 
   const ids = [...new Set(rows.map((r) => r.userId).filter(Boolean))];
-  const { data: users } = useMany({ resource: "UserManagement/users", dataProviderName: DP.userProfiles, ids, queryOptions: { enabled: ids.length > 0 } });
+  const { data: users, isFetched: usersLoaded } = useMany({ resource: "UserManagement/users", dataProviderName: DP.userProfiles, ids, queryOptions: { enabled: ids.length > 0 } });
   const userById = Object.fromEntries((users?.data ?? []).map((u) => [u.id, u]));
 
   return (
@@ -194,7 +199,7 @@ export default function CashoutsPage() {
         ) : rows.length === 0 ? (
           <EmptyState icon={status === "InProgress" && !term ? "task_alt" : "payments"} title={status === "InProgress" && !term ? "All caught up" : "No cashouts here"} />
         ) : (
-          rows.map((r) => <CashoutRow key={r.id} row={r} user={userById[r.userId]} actions={actions} />)
+          rows.map((r) => <CashoutRow key={r.id} row={r} user={userById[r.userId]} loaded={usersLoaded} actions={actions} />)
         )}
         <Box sx={{ borderTop: `1px solid ${c.outlineVariant}` }}>
           <Pager page={page} pageSize={pageSize} total={total} onPage={setPage} onPageSize={setPageSize} />
