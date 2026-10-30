@@ -6,7 +6,6 @@ import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
-import FormHelperText from "@mui/material/FormHelperText";
 import TextField from "@mui/material/TextField";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { useTheme } from "@mui/material/styles";
@@ -17,10 +16,19 @@ import { dayjs, useTimezone } from "../../contexts";
 import { richLen } from "./enums";
 import { GAME_MODES, modeOf, useGameModePresets, useStreamBuilder } from "./gameModes";
 import { DEFAULT_TITLE, fillHost, hostLabel, titleRule } from "./hosts";
-import { AudienceField, HostPicker, ModeChoice } from "./pickers";
+import { HostAvatar } from "./pickers";
 import { FieldHelper } from "../../ds/FieldHelper";
-import { SelectButton } from "../../ds/SelectButton";
-import { useWordSets } from "./words";
+import { ListGroup, ListItem, ListSwitch } from "../../ds/ListGroup";
+import { ScopeToggle } from "../../ds/ScopeToggle";
+import { ModeLogo } from "./ModeLogo";
+import { useList } from "@refinedev/core";
+import { DP } from "../../providers";
+import ButtonBase from "@mui/material/ButtonBase";
+import Menu from "@mui/material/Menu";
+import MenuItem from "@mui/material/MenuItem";
+import ListItemText from "@mui/material/ListItemText";
+import Typography from "@mui/material/Typography";
+import { StreamType } from "./enums";
 
 const defaultStart = (tz) => dayjs().tz(tz).add(1, "day").hour(19).minute(0).second(0).millisecond(0);
 
@@ -53,7 +61,8 @@ export function NewStreamDialog({ open, source, date, hosts, onClose, onCreated 
   const { presets } = useGameModePresets();
   const defaultHost = (gameMode) => hosts.find((h) => h.id === presets[gameMode]?.defaultHostId) ?? null;
   const build = useStreamBuilder();
-  const { sets } = useWordSets();
+  const { data: sponsorData } = useList({ resource: "Sponsor", dataProviderName: DP.sponsors, pagination: { mode: "off" } });
+  const [hostMenu, setHostMenu] = useState(null);
 
   useEffect(() => {
     if (open) {
@@ -86,8 +95,15 @@ export function NewStreamDialog({ open, source, date, hosts, onClose, onCreated 
   const valid = !errors.title && !errors.host && !errors.start;
   const show = (k) => (submitted ? errors[k] : null);
   const mode = GAME_MODES[form.gameMode];
-  // Ready word sets of the chosen mode, oldest first (the order Fill month uses them in).
-  const readySets = sets.filter((w) => w.type === form.gameMode && !w.streamId).sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+  // A game mode's defaults in a line: who hosts, who sponsors.
+  const defaultsOf = (id) => {
+    const p = presets[id];
+    const h = hosts.find((x) => x.id === p?.defaultHostId);
+    const sp = sponsorData?.data?.find((x) => x.id === p?.defaultSponsorId);
+    return [h ? hostLabel(h) : "No default host", sp ? sp.name : "No sponsor"].join(" · ");
+  };
+  const superSavvy = form.streamType === StreamType.SuperSavvy;
+  const audience = superSavvy ? StreamType.Public : form.streamType;
 
   const submit = async () => {
     setSubmitted(true);
@@ -121,76 +137,138 @@ export function NewStreamDialog({ open, source, date, hosts, onClose, onCreated 
       };
     }
     // The app shows the stream right away; its game mode logo once the words are in.
-    const res = await create({ resource: "TextSavvyStream", values: form.wordSetId && !source ? { ...values, wordSetId: form.wordSetId } : values, successNotification: false });
+    // Words come later (Pick a word set on the stream); until then the app hides the mode logo.
+    const res = await create({ resource: "TextSavvyStream", values, successNotification: false });
     onCreated(res.data);
   };
 
   return (
     <Dialog open={open} onClose={isPending ? undefined : onClose} fullScreen={fullScreen} maxWidth="sm" fullWidth>
       <DialogTitle>{source ? "Duplicate stream" : "New stream"}</DialogTitle>
-      <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        {/* In the order a stream is put together: what's played, the words, who hosts, when, then the title. */}
-        <ModeChoice value={form.gameMode} onChange={(gameMode) => set({ gameMode, wordSetId: null })} />
-
-        {/* The words: a ready word set of this mode now, or later (the app shows the game mode logo
-            once the words are in). A copy never takes words: a set is used once. */}
-        {!source && (
-          <SelectButton
-            label="Word set"
-            value={form.wordSetId ?? ""}
-            options={[{ value: "", label: "Add words later" }, ...readySets.map((w) => ({ value: w.id, label: `${w.title} · ${w.rounds?.length ?? 0} rounds${w.showdown ? " + showdown" : ""}` }))]}
-            onChange={(wordSetId) => set({ wordSetId: wordSetId || null })}
-            helperText={form.wordSetId ? "Its words and rewards fill in the rounds." : readySets.length ? "Without words the app hides the game mode logo." : `No ready ${mode.label} word sets. Add some in Streams › Game modes.`}
-          />
-        )}
-
-        <HostPicker
-          hosts={hosts}
-          value={form.host}
-          onChange={(host) => {
-            setHostPicked(true);
-            set({ host });
-          }}
-          error={show("host")}
-          helperText={!hostPicked && form.host ? `Default for ${mode.label}` : undefined}
-        />
-
-
-        <Box>
-          <Box sx={{ display: "flex", gap: 2 }}>
-            <DatePicker
-              label="Date"
-              value={form.start}
-              timezone={timezone}
-              disablePast
-              onChange={(d) => set({ start: compose(d, form.start) })}
-              slots={{ openPickerIcon: () => <Icon name="calendar_today" /> }}
-              slotProps={{ textField: { error: !!show("start"), sx: { flex: 3 } } }}
-            />
-            <TimePicker
-              label="Time"
-              value={form.start}
-              timezone={timezone}
-              onChange={(t) => set({ start: compose(form.start, t) })}
-              slots={{ openPickerIcon: () => <Icon name="schedule" /> }}
-              slotProps={{ textField: { error: !!show("start"), sx: { flex: 2 } } }}
-            />
+      <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
+        {/* What's played: a game mode, shown like a host card (its logo, name and defaults). Words
+            are added on the stream afterwards. */}
+        <Box role="radiogroup" aria-label="Game mode" sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+          <Typography variant="overline" color="text.secondary" component="div">
+            Game mode
+          </Typography>
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1 }}>
+            {Object.values(GAME_MODES).map((m) => {
+              const on = m.id === form.gameMode;
+              return (
+                <ButtonBase
+                  key={m.id}
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => set({ gameMode: m.id })}
+                  sx={{
+                    p: 1.5,
+                    gap: 1.5,
+                    justifyContent: "flex-start",
+                    textAlign: "left",
+                    borderRadius: `${theme.tokens.shape.md}px`,
+                    bgcolor: theme.m3.surfaceContainerHigh,
+                    boxShadow: on ? `inset 0 0 0 2px ${theme.m3.primary}` : "none",
+                    transition: `background-color ${theme.tokens.motion.effects}`,
+                    "&:hover": { bgcolor: theme.m3.hover },
+                    "&.Mui-focusVisible": { outline: `2px solid ${theme.m3.focus}`, outlineOffset: 2 },
+                  }}
+                >
+                  <ModeLogo mode={m.id} width={64} height={40} />
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography variant="titleSmall" component="div" noWrap>
+                      {presets[m.id]?.name ?? m.label}
+                    </Typography>
+                    <Typography variant="bodySmall" color="text.secondary" component="div" noWrap>
+                      {defaultsOf(m.id)}
+                    </Typography>
+                  </Box>
+                  {on && <Icon name="check_circle" fill size={20} style={{ color: theme.m3.primary }} />}
+                </ButtonBase>
+              );
+            })}
           </Box>
-          <FormHelperText error={!!show("start")}>{show("start") ?? `Time zone: ${timezone.replace(/_/g, " ")}`}</FormHelperText>
         </Box>
 
-
-        <AudienceField value={form.streamType} onChange={(streamType) => set({ streamType })} />
-
-        <TextField
-          label="Title"
-          value={form.title}
-          onChange={(e) => set({ title: e.target.value })}
-          error={!!show("title")}
-          // {host} is filled with the stream's host wherever the title shows; say how it reads now.
-          helperText={<FieldHelper text={show("title") ?? (/\{host\}/i.test(form.title) && form.host ? `Shows as “${fillHost(form.title, hostLabel(form.host))}”` : "{host} becomes the host's name.")} counter={`${titleLen} / 100`} over={titleLen > 100} />}
-        />
-
+        {/* The stream itself, one group: who hosts, when, for whom, and its title. */}
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+          <Typography variant="overline" color="text.secondary" component="div">
+            Stream
+          </Typography>
+          <ListGroup label="Stream">
+            <ListItem
+              leading={form.host ? <HostAvatar host={form.host} size={36} /> : <Icon name="person_add" size={20} />}
+              title={form.host ? hostLabel(form.host) : "Choose a host"}
+              supporting={form.host ? (hostPicked ? form.host.name : `Default for ${mode.label}`) : `${hosts.length} ${hosts.length === 1 ? "host" : "hosts"} in the library`}
+              error={show("host")}
+              trailing={<Icon name="unfold_more" size={20} />}
+              onClick={(e) => setHostMenu(e.currentTarget)}
+            />
+            <ListItem leading={<Icon name="event" size={20} />} title="When" supporting={show("start") ? undefined : `Time zone: ${timezone.replace(/_/g, " ")}`} error={show("start")}>
+              <Box sx={{ display: "flex", gap: 1.5, mt: 1 }}>
+                <DatePicker
+                  label="Date"
+                  value={form.start}
+                  timezone={timezone}
+                  disablePast
+                  onChange={(d) => set({ start: compose(d, form.start) })}
+                  slots={{ openPickerIcon: () => <Icon name="calendar_today" /> }}
+                  slotProps={{ textField: { error: !!show("start"), sx: { flex: 3 } } }}
+                />
+                <TimePicker
+                  label="Time"
+                  value={form.start}
+                  timezone={timezone}
+                  onChange={(t) => set({ start: compose(form.start, t) })}
+                  slots={{ openPickerIcon: () => <Icon name="schedule" /> }}
+                  slotProps={{ textField: { error: !!show("start"), sx: { flex: 2 } } }}
+                />
+              </Box>
+            </ListItem>
+            <ListItem
+              leading={<Icon name="visibility" size={20} />}
+              title="Visibility"
+              supporting={audience === StreamType.Internal ? "Only the team sees it" : "Everyone in the app"}
+              trailing={<ScopeToggle label="Visibility" all={false} value={audience} options={[{ value: StreamType.Public, label: "Public" }, { value: StreamType.Internal, label: "Internal" }]} onChange={(v) => set({ streamType: v })} />}
+            />
+            <ListSwitch
+              icon="workspace_premium"
+              title="Super Savvy only"
+              supporting="Everyone sees it; only Super Savvy members can join"
+              checked={superSavvy}
+              disabled={audience === StreamType.Internal}
+              onChange={(on) => set({ streamType: on ? StreamType.SuperSavvy : StreamType.Public })}
+            />
+            <ListItem leading={<Icon name="title" size={20} />} title="Title">
+              <TextField
+                value={form.title}
+                onChange={(e) => set({ title: e.target.value })}
+                error={!!show("title")}
+                inputProps={{ "aria-label": "Title" }}
+                // {host} is filled with the stream's host wherever the title shows; say how it reads now.
+                helperText={<FieldHelper text={show("title") ?? (/\{host\}/i.test(form.title) && form.host ? `Shows as “${fillHost(form.title, hostLabel(form.host))}”` : "{host} becomes the host's name.")} counter={`${titleLen} / 100`} over={titleLen > 100} />}
+                sx={{ mt: 1 }}
+              />
+            </ListItem>
+          </ListGroup>
+          <Menu anchorEl={hostMenu} open={!!hostMenu} onClose={() => setHostMenu(null)}>
+            {hosts.map((h) => (
+              <MenuItem
+                key={h.id}
+                selected={h.id === form.host?.id}
+                onClick={() => {
+                  setHostMenu(null);
+                  setHostPicked(true);
+                  set({ host: h });
+                }}
+                sx={{ gap: 1.5 }}
+              >
+                <HostAvatar host={h} size={32} />
+                <ListItemText primary={hostLabel(h)} secondary={h.displayName ? h.name : null} />
+              </MenuItem>
+            ))}
+          </Menu>
+        </Box>
       </DialogContent>
       <DialogActions>
         <Button variant="text" onClick={onClose} disabled={isPending}>
