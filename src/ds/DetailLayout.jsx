@@ -106,10 +106,9 @@ export function SectionNav({ sections, active, onSelect, errorIds = [], warningI
             <Box component="span" sx={{ flex: 1, textAlign: "left", whiteSpace: "nowrap" }}>
               {s.label}
             </Box>
-            {(error || warning) && (
-              <Box component="span" aria-label={error ? "Has errors" : "Needs attention"} sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: error ? c.error : "warning.main" }} />
-            )}
-            {/* Done: a green check (the side nav is where a section's state lives). */}
+            {/* A section's state, one 16px filled icon each so they line up: done, needs something, errors. */}
+            {error && <Icon name="error" size={16} fill aria-label="Has errors" style={{ color: c.error }} />}
+            {warning && <Icon name="error" size={16} fill aria-label="Needs attention" style={{ color: palette.warning.main }} />}
             {done && <Icon name="check_circle" size={16} fill aria-label="Done" style={{ color: palette.success.main }} />}
           </ButtonBase>
           </Fragment>
