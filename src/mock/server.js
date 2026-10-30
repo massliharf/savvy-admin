@@ -6,7 +6,7 @@ import { LOGO_URL } from "../assets";
 import { MODE_LOGOS, STREAM_HERO_URL } from "../assets";
 
 const DB_KEY = "savvy-mock-db";
-const DB_VERSION = 43;
+const DB_VERSION = 44;
 
 // A busy sample schedule, about six weeks around today, so every state shows: ended and canceled
 // streams, one live now, upcoming ones with all their words (logo shown), with none or some missing
@@ -406,6 +406,19 @@ function load() {
         // v43: sample streams follow their game mode's defaults, with a few changed on purpose
         populate(parsed);
         parsed.version = 43;
+      }
+      if (parsed.version === 43) {
+        // v44: item pictures are the real ones again (bundled with the app), by item id
+        const byId = (list) => Object.fromEntries((list ?? []).map((x) => [x.id, x]));
+        const swag = byId(seed.seedSwag()), packs = byId(seed.seedPowerupPacks()), sparks = byId(seed.seedSparkPacks()), seasons = byId(seed.seedSeasons());
+        (parsed.swag ?? []).forEach((x) => swag[x.id] && Object.assign(x, { imageUrl: swag[x.id].imageUrl, imageUrls: swag[x.id].imageUrls }));
+        (parsed.powerupPacks ?? []).forEach((x) => packs[x.id] && (x.contents = packs[x.id].contents));
+        (parsed.sparkPacks ?? []).forEach((x) => sparks[x.id] && (x.iconUrl = sparks[x.id].iconUrl));
+        (parsed.seasons ?? []).forEach((x) => seasons[x.id] && (x.iconUrl = seasons[x.id].iconUrl));
+        const how = seed.seedHowToPlay();
+        parsed.howToPlay = how;
+        (parsed.gameModes ?? []).forEach((m) => (m.howToPlay = seed.seedHowToPlay()));
+        parsed.version = 44;
       }
       if (parsed.version === DB_VERSION) return parsed;
       // Older versions: add what's new and keep everything else.

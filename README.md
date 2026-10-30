@@ -7,7 +7,7 @@ A clickable prototype of the Savvy admin dashboard: streams and their schedule, 
 ```bash
 npm install
 npm run dev            # http://localhost:5173
-npm run build:single   # one self-contained HTML file in dist-single/
+npm run build:pages    # the GitHub Pages build in dist-pages/
 ```
 
 Reset the sample data with `window.__resetMockDb()` in the browser console. Words in Game modes are hidden behind the prototype password `savvywords`.

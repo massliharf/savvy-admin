@@ -4,10 +4,11 @@
 // Anything containing personal data (users, phone numbers, cashouts, shipping addresses) is SYNTHETIC.
 import { HOST_PICTURE_URL, LOGO_URL, MODE_LOGOS, WENDYS_LOGO_URL } from "../assets";
 
-// Sample art for item images (power-ups, packs, swag, seasons), picked from the id so each item
-// keeps its own; no real images or storage addresses.
+// Item images (power-ups, packs, swag, seasons) ship with the app in src/assets/items, by id; an
+// id without one gets sample art picked from the id.
+const ITEM_IMAGES = import.meta.glob("../assets/items/*.png", { eager: true, query: "?url", import: "default" });
 const ART_TONES = ["blue", "purple", "green", "orange", "pink"];
-const img = (name) => expressiveHero(ART_TONES[[...String(name)].reduce((a, ch) => a + ch.charCodeAt(0), 0) % ART_TONES.length], 512, 512);
+const img = (name) => ITEM_IMAGES[`../assets/items/${name}.png`] ?? expressiveHero(ART_TONES[[...String(name)].reduce((a, ch) => a + ch.charCodeAt(0), 0) % ART_TONES.length], 512, 512);
 
 // ---------------------------------------------------------------- helpers
 let seedState = 42;

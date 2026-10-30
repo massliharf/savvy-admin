@@ -63,7 +63,8 @@ function LegacyUserRedirect() {
 }
 
 // The single-file HTML preview runs from file:// or an artifact host, so it uses hash routing.
-const Router = import.meta.env.MODE === "single" ? HashRouter : BrowserRouter;
+// Hash routing where the app is served from a file or a sub-path (single file, GitHub Pages).
+const Router = import.meta.env.MODE === "single" || import.meta.env.MODE === "pages" ? HashRouter : BrowserRouter;
 
 // Refine resources: route patterns and the data provider each one uses.
 const resources = [

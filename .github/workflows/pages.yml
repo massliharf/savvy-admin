@@ -1,4 +1,4 @@
-# Builds the single-file version (hash routing, works under any path) and publishes it to GitHub Pages.
+# Builds the Pages version (hash routing, relative paths: works under any path) and publishes it.
 name: Deploy to GitHub Pages
 
 on:
@@ -28,10 +28,10 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npm run build:single
+      - run: npm run build:pages
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist-single
+          path: dist-pages
       - id: deployment
         uses: actions/deploy-pages@v4
