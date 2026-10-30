@@ -202,7 +202,8 @@ export function NewStreamDialog({ open, source, date, hosts, onClose, onCreated 
               supporting={form.host ? (hostPicked ? form.host.name : `Default for ${mode.label}`) : `${hosts.length} ${hosts.length === 1 ? "host" : "hosts"} in the library`}
               error={show("host")}
               trailing={<Icon name="unfold_more" size={20} />}
-              onClick={(e) => setHostMenu(e.currentTarget)}
+              // The list opens under the whole row, as wide as it (like every picker).
+              onClick={(e) => setHostMenu(e.currentTarget.closest("[role='listitem']") ?? e.currentTarget)}
             />
             <ListItem leading={<Icon name="event" size={20} />} title="When" supporting={show("start") ? undefined : `Time zone: ${timezone.replace(/_/g, " ")}`} error={show("start")}>
               <Box sx={{ display: "flex", gap: 1.5, mt: 1 }}>
@@ -251,7 +252,14 @@ export function NewStreamDialog({ open, source, date, hosts, onClose, onCreated 
               />
             </ListItem>
           </ListGroup>
-          <Menu anchorEl={hostMenu} open={!!hostMenu} onClose={() => setHostMenu(null)}>
+          <Menu
+            anchorEl={hostMenu}
+            open={!!hostMenu}
+            onClose={() => setHostMenu(null)}
+            anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+            transformOrigin={{ vertical: "top", horizontal: "left" }}
+            slotProps={{ paper: { sx: { minWidth: hostMenu?.offsetWidth ?? 280, maxHeight: 400, mt: 0.5 } } }}
+          >
             {hosts.map((h) => (
               <MenuItem
                 key={h.id}
@@ -265,6 +273,7 @@ export function NewStreamDialog({ open, source, date, hosts, onClose, onCreated 
               >
                 <HostAvatar host={h} size={32} />
                 <ListItemText primary={hostLabel(h)} secondary={h.displayName ? h.name : null} />
+                {h.id === form.host?.id && <Icon name="check" />}
               </MenuItem>
             ))}
           </Menu>
