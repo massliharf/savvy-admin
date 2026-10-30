@@ -6,14 +6,14 @@ import { LOGO_URL } from "../assets";
 import { HOST_PICTURE_URL, MODE_LOGOS, STREAM_HERO_URL } from "../assets";
 
 const DB_KEY = "savvy-mock-db";
-const DB_VERSION = 46;
+const DB_VERSION = 47;
 
-// A busy sample schedule, about six weeks around today, so every state shows: ended and canceled
-// streams, one live now, upcoming ones with all their words (logo shown), with none or some missing
-// (logo hidden until the words are in), Internal and Super Savvy only ones, a spotlight, both game
-// modes, four hosts and four sponsors. Streams with words have the word set they came from (Used or
-// Scheduled), and a few more sets are Ready. Everything else is built like a new stream: the game
-// mode's defaults and the Default share card and notification presets.
+// The demo data: one host (Scott) and one sponsor (Wendy's), and for each game mode a set of streams
+// that shows every state: ended (with its words), canceled, live now, upcoming with all its words
+// (logo shown), with some or none (logo hidden until the words are in), Internal, Super Savvy only,
+// a spotlight, with and without a showdown and a sponsor. Each mode has 15 word sets: Used ones (from
+// ended streams), Scheduled ones (on upcoming streams) and Ready ones. Everything else is built like
+// a new stream: the game mode's defaults and the Default share card and notification presets.
 const SAMPLE_WORDS = (
   "cloud rain storm wind snow bread butter toast honey jam river lake ocean wave shore piano drums flute cello harp " +
   "tiger lion zebra panda koala apple peach plum grape lemon chess queen king rook pawn comet star moon orbit planet " +
@@ -33,15 +33,36 @@ const ptTime = (dateKey, hhmm) => {
   const guess = Date.parse(`${dateKey}T00:00:00Z`) + (h * 60 + m) * 60000;
   return guess + ptOffset(guess + 8 * 3600000) * 60000;
 };
-// Times (Pacific) a day's streams start at.
-const dayPlan = (dow) =>
-  dow === 0 || dow === 6
-    ? [["11:00", "SubText"], ["18:00", "TextChain"]]
-    : dow % 2 === 1
-      ? [["13:00", "TextChain"], ["17:00", "SubText"], ["18:00", "TextChain"]]
-      : [["13:00", "TextChain"], ["18:00", "TextChain"]];
+// Each mode's demo streams: [days from today, Pacific time, state].
+const DEMO_STREAMS = {
+  TextChain: [
+    [-6, "13:00", "ended"], [-4, "18:00", "ended"], [-3, "13:00", "canceled"], [-2, "18:00", "ended"],
+    [0, "live", "live"],
+    [1, "13:00", "words"], [1, "18:00", "spotlight"], [2, "13:00", "some"], [3, "18:00", "superSavvy"],
+    [4, "13:00", "internal"], [5, "18:00", "words"], [8, "13:00", "none"], [10, "18:00", "none"], [14, "13:00", "none"],
+  ],
+  SubText: [
+    [-5, "17:00", "ended"], [-3, "11:00", "ended"], [-1, "17:00", "canceled"],
+    [1, "17:00", "words"], [2, "11:00", "some"], [3, "17:00", "words"], [6, "11:00", "superSavvy"],
+    [7, "17:00", "internal"], [9, "17:00", "none"], [13, "11:00", "none"],
+  ],
+};
+const SETS_PER_MODE = 15;
 
 function populate(d) {
+  // One host and one sponsor: Scott and Wendy's; the others go, with what pointed at them.
+  const gone = new Set(d.hosts.filter((h) => h.id !== seed.SCOTT.id).map((h) => h.id));
+  d.hosts = d.hosts.some((h) => h.id === seed.SCOTT.id) ? d.hosts.filter((h) => h.id === seed.SCOTT.id) : [{ ...seed.SCOTT }];
+  d.sponsors = (d.sponsors ?? []).some((sp) => sp.id === seed.WENDYS.id) ? d.sponsors.filter((sp) => sp.id === seed.WENDYS.id) : [{ ...seed.WENDYS }];
+  d.users = (d.users ?? []).filter((u) => !gone.has(u.id));
+  Object.keys(d.claims ?? {}).forEach((id) => gone.has(id) && delete d.claims[id]);
+  (d.gameModes ?? []).forEach((m) => {
+    m.defaultHostId = seed.SCOTT.id;
+    if (m.defaultSponsorId && m.defaultSponsorId !== seed.WENDYS.id) m.defaultSponsorId = null;
+  });
+  (d.scheduleSlots ?? []).forEach((sl) => {
+    if (gone.has(sl.hostId)) sl.hostId = "";
+  });
   // Pictures for hosts and sponsors without one; hosts are Savvy accounts with the Host role.
   d.claims ??= {};
   d.hosts.forEach((h, i) => {
@@ -62,21 +83,12 @@ function populate(d) {
   const notify = d.notificationPresets?.find((p) => p.isDefault) ?? d.notificationPresets?.[0] ?? {};
   const now = Date.now();
   const todayKey = new Date(now - ptOffset(now) * 60000).toISOString().slice(0, 10);
-  // Most streams keep their game mode's defaults (host, sponsor, rewards); some are changed on
-  // purpose so both show: another host, another sponsor or none, a host buster reward.
-  const HOST_TURN = [null, 1, null, 2, null, null, 3, null];
-  const SPONSOR_TURN = [null, null, 1, null, null, "none", 3, null, 2];
   let w = 0;
   const nextWords = () => Array.from({ length: 5 }, () => SAMPLE_WORDS[w++ % SAMPLE_WORDS.length]);
-  const plan = [];
-  for (let off = -14; off <= 27; off += 1) {
-    const key = new Date(Date.parse(`${todayKey}T12:00:00Z`) + off * 86400000).toISOString().slice(0, 10);
-    const dow = new Date(`${key}T12:00:00Z`).getUTCDay();
-    dayPlan(dow).forEach(([time, gameMode]) => plan.push({ at: ptTime(key, time), gameMode, off }));
-  }
-  // One live stream right now (and none others within two hours of it).
-  plan.push({ at: now - 10 * 60000, gameMode: "TextChain", off: 0, live: true });
-  const rows = plan.filter((p) => p.live || Math.abs(p.at - now) > 2 * 3600000).sort((a, b) => a.at - b.at);
+  const day = (off) => new Date(Date.parse(`${todayKey}T12:00:00Z`) + off * 86400000).toISOString().slice(0, 10);
+  const rows = Object.entries(DEMO_STREAMS)
+    .flatMap(([gameMode, list]) => list.map(([off, time, kind]) => ({ gameMode, kind, at: time === "live" ? now - 10 * 60000 : ptTime(day(off), time) })))
+    .sort((a, b) => a.at - b.at);
 
   const sets = [];
   // Set names from their first word, numbered when a name repeats ("Train", "Train 2").
@@ -86,31 +98,22 @@ function populate(d) {
     named[base] = (named[base] ?? 0) + 1;
     return named[base] === 1 ? base : `${base} ${named[base]}`;
   };
-  let spotlight = false;
+  const host = d.hosts[0];
+  const wendys = d.sponsors[0];
   const streams = rows.map((p, i) => {
     const mode = d.gameModes.find((m) => m.id === p.gameMode);
-    const turn = HOST_TURN[i % HOST_TURN.length];
-    const host = (turn == null ? d.hosts.find((h) => h.id === mode?.defaultHostId) : d.hosts[turn % d.hosts.length]) ?? d.hosts[0];
-    const sp = SPONSOR_TURN[i % SPONSOR_TURN.length];
-    const sponsor = sp === "none" ? null : sp == null ? d.sponsors?.find((x) => x.id === mode?.defaultSponsorId) ?? null : d.sponsors?.[sp % d.sponsors.length];
-    const past = p.at < now - 2 * 3600000;
-    const status = p.live ? "InProgress" : past ? (i % 9 === 4 ? "Canceled" : "Completed") : "Scheduled";
-    const streamType = p.live ? "Public" : i % 11 === 5 ? "Internal" : i % 13 === 7 ? "SuperSavvy" : "Public";
-    const hasShowdown = p.gameMode === "TextChain" || i % 2 === 0;
-    // Upcoming: this week mostly has its words, later weeks mostly wait for them.
-    const daysAhead = (p.at - now) / 86400000;
+    // The mode's sponsor, or on some streams Wendy's / none, so both show.
+    const modeSponsor = d.sponsors.find((x) => x.id === mode?.defaultSponsorId) ?? null;
+    const sponsor = i % 4 === 1 ? (modeSponsor ? null : wendys) : modeSponsor;
+    const status = { ended: "Completed", canceled: "Canceled", live: "InProgress" }[p.kind] ?? "Scheduled";
+    const streamType = p.kind === "internal" ? "Internal" : p.kind === "superSavvy" ? "SuperSavvy" : "Public";
+    const hasShowdown = p.gameMode === "TextChain" ? i % 5 !== 3 : i % 2 === 0;
     const words = nextWords();
     const showdownWord = SAMPLE_SHOWDOWNS[i % SAMPLE_SHOWDOWNS.length];
-    let filled = 5;
-    if (status === "Scheduled") {
-      if (daysAhead <= 7) filled = i % 5 === 2 ? 0 : i % 7 === 3 ? 3 : 5;
-      else if (daysAhead <= 14) filled = i % 3 === 0 ? 5 : 0;
-      else filled = i % 6 === 0 ? 5 : 0;
-    }
+    const filled = p.kind === "none" ? 0 : p.kind === "some" ? 3 : 5;
     const complete = filled === 5;
     const rounds = words.map((word, r) => ({ roundIndex: r, word: r < filled ? word : "", durationInSeconds: seed.secondsFor(r < filled ? word : "", r), prizes: null, roundBusterReward: { rewardType: "Sparks", amount: 5 * (r + 1) } }));
     const prize = { ...(mode?.showdown?.prize ?? { rewardType: "Cash", amount: 100 }) };
-    const superSavvyOnly = streamType === "SuperSavvy";
     const st = {
       id: uuid(),
       title: "You vs {host}",
@@ -126,11 +129,11 @@ function populate(d) {
       streamType,
       gameMode: p.gameMode,
       textSavvyRounds: { rounds },
-      showdownConfiguration: hasShowdown ? { word: complete ? showdownWord : "", prize, superSavvyOnly } : null,
+      showdownConfiguration: hasShowdown ? { word: complete ? showdownWord : "", prize, superSavvyOnly: streamType === "SuperSavvy" } : null,
       roundScoring: mode?.roundScoring ?? null,
       hostStumperBonusXp: mode?.hostStumperBonusXp ?? null,
       defaultRewards: mode?.defaultRewards?.length ? mode.defaultRewards : [{ rewardType: "BombPowerup", amount: 1 }],
-      hostBusterReward: i % 10 === 0 ? { rewardType: "Sparks", amount: 25 } : null,
+      hostBusterReward: i % 6 === 0 ? { rewardType: "Sparks", amount: 25 } : null,
       raffleSystemWinnersConfiguration: i % 4 === 0 ? [{ rewardType: "Cash", amount: 10 }, { rewardType: "Cash", amount: 5 }] : null,
       sponsorship: sponsor ? { title: sponsor.title, description: sponsor.description, cta: sponsor.cta, imageUrl: sponsor.imageUrl ?? null } : null,
       shareableCards: share ? JSON.parse(JSON.stringify(share)) : null,
@@ -143,10 +146,10 @@ function populate(d) {
       entranceFee: { type: "Free", amount: 0 },
       totalPrizePool: status === "Completed" ? 100 + (i % 5) * 50 : 0,
       headless: false,
-      isSpotlighted: false,
+      isSpotlighted: p.kind === "spotlight",
     };
-    if (!spotlight && status === "Scheduled" && complete && streamType === "Public") st.isSpotlighted = spotlight = true;
-    // The word set a stream with words came from: Used once it ran, Scheduled while upcoming.
+    // The word set a stream with words came from: Used once it ran, Scheduled while upcoming
+    // (an Internal stream doesn't use up its set: it stays Ready).
     if (complete && status !== "Canceled") {
       sets.push({
         id: `ws-${String(sets.length + 1).padStart(3, "0")}`,
@@ -161,21 +164,22 @@ function populate(d) {
     applyLibrary(st, d);
     return st;
   });
-  // A few more sets, Ready for upcoming streams that still need words.
-  for (let k = 0; k < 8; k += 1) {
-    const type = k % 2 === 0 ? "TextChain" : "SubText";
-    const words = nextWords();
+  // Ready sets, so each built-in mode has 15 in all.
+  ["TextChain", "SubText"].forEach((type, t) => {
     const mode = d.gameModes.find((m) => m.id === type);
-    sets.push({
-      id: `ws-${String(sets.length + 1).padStart(3, "0")}`,
-      type,
-      title: setName(words[0]),
-      rounds: seed.roundsOf(words).map((r, j) => ({ ...r, roundBusterReward: { rewardType: "Sparks", amount: 5 * (j + 1) } })),
-      showdown: k % 3 === 2 ? null : { word: SAMPLE_SHOWDOWNS[(k + 7) % SAMPLE_SHOWDOWNS.length], prize: { ...(mode?.showdown?.prize ?? { rewardType: "Cash", amount: 100 }) } },
-      streamId: null,
-      createdAt: new Date(now - (20 - k) * 86400000).toISOString(),
-    });
-  }
+    for (let k = sets.filter((x) => x.type === type).length; k < SETS_PER_MODE; k += 1) {
+      const words = nextWords();
+      sets.push({
+        id: `ws-${String(sets.length + 1).padStart(3, "0")}`,
+        type,
+        title: setName(words[0]),
+        rounds: seed.roundsOf(words).map((r, j) => ({ ...r, roundBusterReward: { rewardType: "Sparks", amount: 5 * (j + 1) } })),
+        showdown: k % 4 === 3 ? null : { word: SAMPLE_SHOWDOWNS[(k + t * 7) % SAMPLE_SHOWDOWNS.length], prize: { ...(mode?.showdown?.prize ?? { rewardType: "Cash", amount: 100 }) } },
+        streamId: null,
+        createdAt: new Date(now - (30 - k) * 86400000).toISOString(),
+      });
+    }
+  });
   const ids = new Set(streams.map((x) => x.id));
   d.streams = streams;
   d.streamKeys = Object.fromEntries(streams.map((x) => [x.id, randomKey()]));
@@ -449,6 +453,12 @@ function load() {
         };
         Object.assign(parsed, fix(parsed));
         parsed.version = 46;
+      }
+      if (parsed.version === 46) {
+        // v47: demo data with one host (Scott) and one sponsor (Wendy's): streams in every state
+        // and 15 word sets per game mode; the other hosts, sponsors, streams and sets go.
+        populate(parsed);
+        parsed.version = 47;
       }
       if (parsed.version === DB_VERSION) return parsed;
       // Older versions: add what's new and keep everything else.
