@@ -2,7 +2,7 @@
 // its weekly times and Fill month. The mode's own settings (rules, scoring, defaults, How to play)
 // sit behind Advanced. Streams show in the app right away; the game mode logo once words are in.
 import { useMemo, useState } from "react";
-import { useSearchParams } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { useCustomMutation, useInvalidate, useList } from "@refinedev/core";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -18,19 +18,16 @@ import { SearchField } from "../../ds/SearchField";
 import { ContainerCard } from "../../ds/ContainerCard";
 import { Banner } from "../../ds/Banner";
 import { CardsSkeleton } from "../../ds/Skeletons";
-import { dayjs, useTimezone, useTimezoneFormat } from "../../contexts";
+import { dayjs, useTimezoneFormat } from "../../contexts";
 import { DP } from "../../providers";
 import { useNotify } from "../../shell/notifications";
 import { GameMode } from "./enums";
 import { rewardText } from "./detail/fields";
-import { GAME_MODES, modeOf, useGameModePresets } from "./gameModes";
+import { GAME_MODES, useGameModePresets } from "./gameModes";
 import { StreamPickerDialog } from "./pickers";
-import { hostLabel, showTitle, useHosts } from "./hosts";
-import { logoHidden } from "./parts";
-import { FillMonthDialog, SlotsSheet, daysText, slotDays, slotTime, useScheduleSlots, withSlotHosts } from "./slots";
+import { showTitle } from "./hosts";
 import { ModeCards } from "./ModeCards";
 import { NewModeDialog } from "../gameModes/NewModeDialog";
-import { GameModeSettings } from "../gameModes/detail";
 import { useWordValidator } from "./form";
 import { WordSetCard, WordSetSheet, WordSetSummary, isPublic, missingRoundWords, needsSet, setDetails, setState, useWordSetActions, useWordSets, useWordsLock, wordsOf } from "./words";
 
@@ -46,75 +43,18 @@ function rewardsLine(set, preset) {
   return set.showdown && prize ? `Showdown ${rewardText(prize)}` : "";
 }
 
-// A game mode's three parts: its word sets, its schedule, and its settings (what its streams
-// start with and how it shows in the app).
-const SECTIONS = [
-  { value: "sets", label: "Word sets", icon: "spellcheck" },
-  { value: "schedule", label: "Schedule", icon: "event_repeat" },
-  { value: "settings", label: "Settings", icon: "tune" },
-];
-
-/** The mode's weekly time slots and this month, with Time slots and Fill month. */
-function ScheduleTab({ slots, hosts, month, onTimes, onFill }) {
-  const { m3: c } = useTheme();
-  return (
-    <ContainerCard sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1.5, maxWidth: 880 }}>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="titleMedium" component="h2">
-            Time slots
-          </Typography>
-          <Typography variant="bodySmall" color="text.secondary">
-            {month.total ? `${month.total} streams this month${month.hidden ? ` · ${month.hidden} need words` : ""}` : "Nothing planned this month."}
-          </Typography>
-        </Box>
-        <Button variant="tonal" startIcon={<Icon name="edit" />} onClick={onTimes}>
-          Edit time slots
-        </Button>
-        <Button variant="tonal" startIcon={<Icon name="auto_awesome" />} onClick={onFill}>
-          Fill month
-        </Button>
-      </Box>
-      {slots.length === 0 ? (
-        <Typography variant="bodyMedium" color="text.secondary">
-          No time slots yet.
-        </Typography>
-      ) : (
-        <Box>
-          {slots.map((sl) => (
-            <Box key={sl.id} sx={{ display: "flex", alignItems: "center", gap: 2, py: 1.25, "&:not(:last-of-type)": { borderBottom: `1px solid ${c.border}` } }}>
-              <Typography variant="titleSmall" sx={{ width: 80, flexShrink: 0 }}>
-                {slotTime(sl.time)}
-              </Typography>
-              <Typography variant="bodyMedium" color="text.secondary" noWrap sx={{ flex: 1, minWidth: 0 }}>
-                {[daysText(slotDays(sl)), hostLabel(hosts.find((h) => h.id === sl.hostId)) + (sl.followsMode ? " (default)" : ""), sl.streamType === "Internal" ? "Internal" : null].filter(Boolean).join(" · ")}
-              </Typography>
-            </Box>
-          ))}
-        </Box>
-      )}
-    </ContainerCard>
-  );
-}
-
 export default function GameModesPage() {
   const { m3: c } = useTheme();
-  const { timezone } = useTimezone();
   const { formatDate } = useTimezoneFormat();
   const notify = useNotify();
   const invalidate = useInvalidate();
   const [params, setParams] = useSearchParams();
   const mode = GAME_MODES[params.get("mode")] ? params.get("mode") : GameMode.TextChain;
   const [newMode, setNewMode] = useState(false);
+  const navigate = useNavigate();
   const setMode = (m) => setParams((p) => ({ ...Object.fromEntries(p), mode: m }), { replace: true });
-  // Old links (Stream defaults, App) open Settings.
-  const tabParam = ["defaults", "app"].includes(params.get("tab")) ? "settings" : params.get("tab");
-  const section = SECTIONS.some((x) => x.value === tabParam) ? tabParam : "sets";
-  const setSection = (t) => setParams((p) => ({ ...Object.fromEntries(p), tab: t }), { replace: true });
 
   const { presets } = useGameModePresets();
-  const hosts = useHosts();
-  const { slots } = useScheduleSlots();
   const { sets, isLoading } = useWordSets();
   const { data: streamData } = useList({ resource: "TextSavvyStream", pagination: { current: 1, pageSize: 1000 } });
   const streams = useMemo(() => streamData?.data ?? [], [streamData]);
@@ -133,18 +73,11 @@ export default function GameModesPage() {
   const [releasing, setReleasing] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [autoOpen, setAutoOpen] = useState(false);
-  const [timesOpen, setTimesOpen] = useState(false);
-  const [fillOpen, setFillOpen] = useState(false);
 
   const preset = presets[mode];
-  const modeSlots = useMemo(() => slots.filter((sl) => modeOf(sl).id === mode).sort((a, b) => a.time.localeCompare(b.time)), [slots, mode]);
-  const shownSlots = useMemo(() => withSlotHosts(modeSlots, presets), [modeSlots, presets]);
   const upcoming = useMemo(() => streams.filter((s) => s.status === "Scheduled" && dayjs(s.startDate).isAfter(dayjs()) && (s.gameMode ?? GameMode.TextChain) === mode), [streams, mode]);
   // Upcoming public streams of this mode still waiting for words: the app hides their mode logo.
   const waiting = useMemo(() => upcoming.filter((s) => isPublic(s) && needsSet(s, mode)).sort((a, b) => Date.parse(a.startDate) - Date.parse(b.startDate)), [upcoming, mode]);
-  const monthKey = dayjs().tz(timezone).format("YYYY-MM");
-  const inMonth = upcoming.filter((s) => dayjs.utc(s.startDate).tz(timezone).format("YYYY-MM") === monthKey);
-  const month = { total: inMonth.length, hidden: inMonth.filter(logoHidden).length };
 
   const mine = useMemo(() => sets.filter((s) => s.type === mode).map((set) => ({ set, state: setState(set, streamsById) })), [sets, mode, streamsById]);
   const ready = mine.filter((r) => r.state.key === "available").sort((a, b) => Date.parse(a.set.createdAt) - Date.parse(b.set.createdAt));
@@ -193,8 +126,18 @@ export default function GameModesPage() {
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-      {/* Which game mode (the same cards as New stream), then one row of its parts. */}
-      <ModeCards value={mode} onChange={setMode} onAdd={() => setNewMode(true)} />
+      {/* The game modes: pick one to see its word sets; its card opens its settings. */}
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Typography variant="overline" color="text.secondary" component="h2" sx={{ flex: 1 }}>
+            Game modes
+          </Typography>
+          <Button variant="tonal" startIcon={<Icon name="add" />} onClick={() => setNewMode(true)}>
+            New game mode
+          </Button>
+        </Box>
+        <ModeCards value={mode} onChange={setMode} onSettings={(id) => navigate(`/game-modes/${id}`)} />
+      </Box>
       <NewModeDialog
         open={newMode}
         onClose={() => setNewMode(false)}
@@ -202,16 +145,13 @@ export default function GameModesPage() {
           setNewMode(false);
           notify(`“${m.name}” created`);
           // Opens on its settings: logo, defaults and how it shows in the app come next.
-          setParams({ mode: m.id, tab: "settings" }, { replace: true });
+          navigate(`/game-modes/${m.id}`);
         }}
       />
-      <ScopeToggle label="Game mode parts" all={false} value={section} options={SECTIONS} onChange={setSection} />
 
-      {section === "schedule" && <ScheduleTab slots={shownSlots} hosts={hosts} month={month} onTimes={() => setTimesOpen(true)} onFill={() => setFillOpen(true)} />}
-      {section === "settings" && <GameModeSettings key={mode} id={mode} />}
-
-      {section === "sets" && (
-      <>
+      <Typography variant="overline" color="text.secondary" component="h2" sx={{ mb: -1.5 }}>
+        {`${presets[mode]?.name ?? GAME_MODES[mode].label} word sets`}
+      </Typography>
       <PageToolbar
         search={<SearchField value={query} onChange={setQuery} placeholder={hidden ? "Search names" : "Search words or names"} />}
         secondary={[{ label: hidden ? "Show words" : "Hide words", icon: hidden ? "lock_open" : "visibility_off", onClick: () => (hidden ? unlock() : lock()) }]}
@@ -278,23 +218,9 @@ export default function GameModesPage() {
           </Box>
         )}
       </Box>
-      </>
-      )}
 
       {unlockDialog}
       <WordSetSheet open={!!sheet} set={sheet} mode={mode} onClose={() => setSheet(null)} validateWord={validateWord} />
-      <SlotsSheet open={timesOpen} onClose={() => setTimesOpen(false)} slots={slots} hosts={hosts} mode={mode} />
-      <FillMonthDialog
-        open={fillOpen}
-        onClose={() => setFillOpen(false)}
-        initialMonth={dayjs().tz(timezone).startOf("month")}
-        slots={modeSlots}
-        streams={streams}
-        hosts={hosts}
-        timezone={timezone}
-        mode={mode}
-        onEditSlots={() => setTimesOpen(true)}
-      />
       <StreamPickerDialog
         open={!!assigning}
         title="Assign to a stream"

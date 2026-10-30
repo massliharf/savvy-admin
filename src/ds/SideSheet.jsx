@@ -11,16 +11,25 @@ import { Icon } from "./Icon";
  * `headerActions` (icon buttons about the record itself, like "Open user") sit before Close.
  * Every sheet is one width (520), so moving between records never shifts the panel.
  */
-export function SideSheet({ open, onClose, title, subtitle, children, actions, footerStart, headerActions }) {
+export function SideSheet({ open, onClose, onBack, title, subtitle, children, actions, footerStart, headerActions, instant }) {
   return (
     <Drawer
       anchor="right"
       open={open}
       onClose={onClose}
+      // `instant`: one view of a sheet swapping to another (e.g. Fill month ↔ Time slots), no slide.
+      transitionDuration={instant ? 0 : undefined}
       slotProps={{ paper: { sx: { width: { xs: "100%", sm: 520 }, maxWidth: "100%", borderRadius: { xs: 0, sm: undefined } } } }}
     >
       <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1, pl: 2.5, pr: 1.5, pt: 2, pb: 1.5 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, pl: onBack ? 1 : 2.5, pr: 1.5, pt: 2, pb: 1.5 }}>
+          {onBack && (
+            <Tooltip title="Back">
+              <IconButton aria-label="Back" onClick={onBack}>
+                <Icon name="arrow_back" size={20} />
+              </IconButton>
+            </Tooltip>
+          )}
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography variant="headlineSmall" component="h2" noWrap>
               {title}

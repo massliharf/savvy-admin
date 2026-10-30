@@ -13,8 +13,8 @@ import { Pill } from "./Pill";
 /** What a section still needs, by its title: missing parts or errors. Done shows only in the side nav. */
 function StatusPill({ status }) {
   if (!status) return null;
-  if (status.state === "error") return <Pill tone="error" leading={<Icon name="error" size={14} />}>Fix errors</Pill>;
-  if (status.state === "todo") return <Pill tone="warning" leading={<Icon name="warning" size={14} />}>{status.todo.length > 1 ? `${status.todo[0]} · +${status.todo.length - 1}` : status.todo[0]}</Pill>;
+  if (status.state === "error") return <Pill tone="error" icon="error">Fix errors</Pill>;
+  if (status.state === "todo") return <Pill tone="warning" icon="warning">{status.todo.length > 1 ? `${status.todo[0]} and ${status.todo.length - 1} more` : status.todo[0]}</Pill>;
   return null;
 }
 

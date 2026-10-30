@@ -24,7 +24,7 @@ import { NewStreamDialog } from "./NewStreamDialog";
 import { StreamKeyDialog } from "./StreamKeyDialog";
 import { useHosts, showTitle } from "./hosts";
 import { MonthCalendar, MonthNav, StreamLegend, WeekCalendar, WeekNav } from "./calendar";
-import { FillMonthDialog, useScheduleSlots } from "./slots";
+import { FillMonthDialog, SlotsSheet, useScheduleSlots } from "./slots";
 import { radius } from "../../theme/tokens";
 import { useEnterOnChange } from "../../ds/useEnterOnChange";
 import { CardsSkeleton } from "../../ds/Skeletons";
@@ -118,6 +118,20 @@ export default function StreamList() {
   const [deleting, setDeleting] = useState(null);
   const [highlight, setHighlight] = useState(null);
   const [fillOpen, setFillOpen] = useState(false);
+  const [slotsOpen, setSlotsOpen] = useState(false);
+  // Fill month and Time slots are two views of one sheet: switching between them doesn't slide.
+  const [swap, setSwap] = useState(false);
+  // The new view opens first and the old one closes a frame later, so there's no empty frame.
+  const showSheet = (view) => {
+    setSwap(true);
+    (view === "fill" ? setFillOpen : setSlotsOpen)(true);
+    requestAnimationFrame(() => requestAnimationFrame(() => (view === "fill" ? setSlotsOpen : setFillOpen)(false)));
+  };
+  const closeSheet = () => {
+    setSwap(false);
+    setFillOpen(false);
+    setSlotsOpen(false);
+  };
   const { slots } = useScheduleSlots();
   const [month, setMonth] = useState(() => dayjs().tz(timezone).startOf("month"));
   // The calendar always opens on the month.
@@ -252,9 +266,11 @@ export default function StreamList() {
         {/* One toolbar line: search, then range and view next to it; the page actions on the right. */}
         <PageToolbar
           search={<SearchField value={query} onChange={setQuery} placeholder="Search title or host" />}
-          secondary={[
-            { label: "Fill month", icon: "auto_awesome", onClick: () => setFillOpen(true) },
-          ]}
+          // Fill month holds the weekly time slots too: they're edited from there, over it.
+          secondary={[{ label: "Fill month", icon: "auto_awesome", onClick: () => {
+            setSwap(false);
+            setFillOpen(true);
+          } }]}
           actionLabel="New stream"
           onAction={() => navigate("/streams/create")}
         >
@@ -353,7 +369,16 @@ export default function StreamList() {
         onClose={() => navigate("/streams")}
         onCreated={onCreated}
       />
-      <FillMonthDialog open={fillOpen} onClose={() => setFillOpen(false)} initialMonth={range === "week" && view === "calendar" ? week.startOf("month") : month} slots={slots} streams={streams} hosts={hosts} timezone={timezone} onFilled={(m) => setMonth(m)} onEditSlots={() => navigate("/game-modes")} />
+      <FillMonthDialog open={fillOpen} onClose={closeSheet} instant={swap} initialMonth={range === "week" && view === "calendar" ? week.startOf("month") : month} slots={slots} streams={streams} hosts={hosts} timezone={timezone} onFilled={(m) => setMonth(m)} onEditSlots={() => showSheet("slots")} />
+      {/* Opened from Fill month; back (or saving) returns there with the new times. */}
+      <SlotsSheet
+        open={slotsOpen}
+        instant={swap}
+        onClose={closeSheet}
+        onBack={() => showSheet("fill")}
+        slots={slots}
+        hosts={hosts}
+      />
       <StreamKeyDialog stream={keyStream} onClose={() => setKeyStream(null)} />
       <ConfirmDialog open={!!deleting} title="Delete stream?" tone="error" confirmLabel="Delete" onCancel={() => setDeleting(null)} onConfirm={confirmDelete}>
         “{deleting && showTitle(deleting)}” and its rounds will be removed. This can't be undone.

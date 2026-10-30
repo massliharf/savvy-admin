@@ -8,10 +8,6 @@ import Switch from "@mui/material/Switch";
 import IconButton from "@mui/material/IconButton";
 import Tooltip from "@mui/material/Tooltip";
 import ButtonBase from "@mui/material/ButtonBase";
-import Dialog from "@mui/material/Dialog";
-import DialogActions from "@mui/material/DialogActions";
-import DialogContent from "@mui/material/DialogContent";
-import DialogTitle from "@mui/material/DialogTitle";
 import Typography from "@mui/material/Typography";
 import { useTheme } from "@mui/material/styles";
 import { Icon } from "../../ds/Icon";
@@ -210,7 +206,7 @@ function SlotFields({ form, index, hosts, mode }) {
  * Side sheet with the weekly time slots "Fill month" uses. With `mode`, only that game mode's
  * slots (from Game modes); the others are kept as they are.
  */
-export function SlotsSheet({ open, onClose, slots, hosts, mode }) {
+export function SlotsSheet({ open, onClose, onBack, instant, slots, hosts, mode }) {
   const notify = useNotify();
   const { presets } = useGameModePresets();
   const { control, setValue, getValues, trigger, handleSubmit, reset, formState } = useForm({ defaultValues: { slots: [] } });
@@ -236,7 +232,7 @@ export function SlotsSheet({ open, onClose, slots, hosts, mode }) {
     try {
       await mutateAsync({ resource: "ScheduleSlot", dataProviderName: DP.scheduleSlots, id: "all", values: { slots: mode ? [...slots.filter((sl) => modeOf(sl).id !== mode), ...v.slots] : v.slots }, successNotification: false, errorNotification: false });
       notify("Time slots saved");
-      onClose();
+      (onBack ?? onClose)();
     } catch {
       notify("Couldn't save the time slots", { variant: "error" });
     }
@@ -263,11 +259,13 @@ export function SlotsSheet({ open, onClose, slots, hosts, mode }) {
     <SideSheet
       open={open}
       onClose={onClose}
+      onBack={onBack}
+      instant={instant}
       title="Time slots"
       subtitle={mode ? `${modeOf({ gameMode: mode }).label} · changes apply to the next fill` : "Changes apply to the next fill."}
       actions={
         <>
-          <Button variant="text" onClick={onClose}>
+          <Button variant="text" onClick={onBack ?? onClose}>
             Cancel
           </Button>
           <Button onClick={save} disabled={!formState.isDirty || isPending}>
@@ -345,7 +343,7 @@ function planMonth({ month, slots, streams, sets, hosts, timezone, useWords, exi
 }
 
 /** Preview of a month's new streams; adding them (and words for existing ones) is one request. */
-export function FillMonthDialog({ open, onClose, initialMonth, slots, streams, hosts, timezone, onFilled, onEditSlots, mode }) {
+export function FillMonthDialog({ open, onClose, instant, initialMonth, slots, streams, hosts, timezone, onFilled, onEditSlots, mode }) {
   const { m3: c, tokens } = useTheme();
   const notify = useNotify();
   const invalidate = useInvalidate();
@@ -406,9 +404,31 @@ export function FillMonthDialog({ open, onClose, initialMonth, slots, streams, h
   const nothing = !planned.length && !assignments.length;
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth scroll="paper">
-      <DialogTitle>{mode ? `Fill month · ${modeOf({ gameMode: mode }).label}` : "Fill month"}</DialogTitle>
-      <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+    // A side sheet, like Time slots: it opens over the page and swaps to Time slots in place.
+    <SideSheet
+      open={open}
+      onClose={onClose}
+      instant={instant}
+      title={mode ? `Fill month · ${modeOf({ gameMode: mode }).label}` : "Fill month"}
+      subtitle="Adds a stream for each time slot this month."
+      footerStart={
+        onEditSlots && (
+          <Button variant="text" startIcon={<Icon name="edit" />} onClick={onEditSlots}>
+            Edit time slots
+          </Button>
+        )
+      }
+      actions={
+        <>
+          <Button variant="text" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={create} disabled={nothing || isPending || !slots.length} startIcon={<Icon name="auto_awesome" />}>
+            {isPending ? "Adding…" : planned.length ? `Add ${planned.length} ${planned.length === 1 ? "stream" : "streams"}` : assignments.length ? "Add words" : "Nothing to add"}
+          </Button>
+        </>
+      }
+    >
         <MonthNav
           month={month}
           onChange={(m) => setMonth(m.isBefore(dayjs().tz(timezone).startOf("month")) ? month : m)}
@@ -472,22 +492,7 @@ export function FillMonthDialog({ open, onClose, initialMonth, slots, streams, h
             <Banner icon="hide_image">{`Streams show in the app right away; the game mode logo shows once the words are in. Times are in ${timezone.replace(/_/g, " ")}.`}</Banner>
           </>
         )}
-      </DialogContent>
-      <DialogActions>
-        {/* The weekly time slots are what a month is filled from: edited from here, not the page. */}
-        {onEditSlots && (
-          <Button variant="text" startIcon={<Icon name="schedule" />} onClick={onEditSlots} sx={{ mr: "auto" }}>
-            Time slots
-          </Button>
-        )}
-        <Button variant="text" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button onClick={create} disabled={nothing || isPending || !slots.length} startIcon={<Icon name="auto_awesome" />}>
-          {isPending ? "Adding…" : planned.length ? `Add ${planned.length} ${planned.length === 1 ? "stream" : "streams"}` : assignments.length ? "Add words" : "Nothing to add"}
-        </Button>
-      </DialogActions>
-    </Dialog>
+    </SideSheet>
   );
 }
 

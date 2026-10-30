@@ -2,7 +2,7 @@
 // stream of this mode starts with, in the same groups as a stream's page: Game, Host, Sponsor,
 // Rewards, Messaging) and App (logo, name, home screen pill, How to play).
 import { useEffect, useState } from "react";
-import { Navigate, useNavigate, useParams } from "react-router";
+import { useNavigate, useParams } from "react-router";
 import { useForm } from "@refinedev/react-hook-form";
 import { useFieldArray, useWatch } from "react-hook-form";
 import Box from "@mui/material/Box";
@@ -11,12 +11,13 @@ import { Icon } from "../../ds/Icon";
 import { EmptyState } from "../../ds/EmptyState";
 import { FormSection } from "../../ds/FormSection";
 import { ImageField, useFilePreview } from "../../ds/ImageField";
-import { DetailSkeleton, SectionGroup } from "../../ds/DetailLayout";
+import { DetailHeader, DetailSkeleton, SectionGroup } from "../../ds/DetailLayout";
+import { ModeLogo } from "../streams/ModeLogo";
 import { SaveBar } from "../../ds/SaveBar";
 import { SelectButton } from "../../ds/SelectButton";
 import { useNotify } from "../../shell/notifications";
 import { DP } from "../../providers";
-import { GAME_MODES } from "../streams/gameModes";
+import { GAME_MODES, useGameModePresets } from "../streams/gameModes";
 import { TextInput } from "../streams/detail/fields";
 import { PillFields, RewardsEditor, ScoringFields, ShowdownEditor } from "../streams/detail/sections";
 import { ListAdd, ListGroup, ListItem } from "../../ds/ListGroup";
@@ -272,8 +273,30 @@ export function GameModeSettings({ id }) {
   );
 }
 
-/** Old address of a game mode's settings: now its Stream defaults tab. */
+/** A game mode's page (opened from its card): what its streams start with and how it shows in the app. */
 export default function GameModeDetail() {
   const { id } = useParams();
-  return <Navigate to={`/game-modes?mode=${id}&tab=settings`} replace />;
+  const navigate = useNavigate();
+  const { presets, isLoading } = useGameModePresets();
+  const preset = presets[id];
+  const meta = GAME_MODES[id];
+  useEffect(() => {
+    if (preset) document.title = `${preset.name} · Game modes · Savvy Admin`;
+  }, [preset]);
+  if (isLoading) return <DetailSkeleton />;
+  if (!preset || !meta) return <EmptyState icon="search_off" title="Game mode not found" description="It may have been deleted." />;
+  return (
+    <Box>
+      <DetailHeader
+        onBack={() => navigate(`/game-modes?mode=${id}`)}
+        backLabel="Back to game modes"
+        media={<ModeLogo mode={id} width={72} height={40} />}
+        title={preset.name}
+        subtitle={meta.custom ? `Plays ${GAME_MODES[meta.base]?.label}` : meta.summary}
+      />
+      <Box sx={{ px: { xs: 2, sm: 3.5 }, py: 3 }}>
+        <GameModeSettings key={id} id={id} />
+      </Box>
+    </Box>
+  );
 }

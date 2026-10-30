@@ -1,6 +1,8 @@
 import { useList } from "@refinedev/core";
 import Box from "@mui/material/Box";
 import ButtonBase from "@mui/material/ButtonBase";
+import IconButton from "@mui/material/IconButton";
+import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { useTheme } from "@mui/material/styles";
 import { Icon } from "../../ds/Icon";
@@ -11,10 +13,10 @@ import { ModeLogo } from "./ModeLogo";
 
 /**
  * Game mode as selectable cards (logo, name and its defaults: host · sponsor). The one game mode
- * picker: New stream, a stream's Game mode section and time slots. `onAdd` ends the list with a
- * "New game mode" card (Game modes page).
+ * picker: New stream, a stream's Game mode section and time slots. `onSettings` adds a settings
+ * button to each card (Game modes page), which opens that mode's page.
  */
-export function ModeCards({ value, onChange, onAdd }) {
+export function ModeCards({ value, onChange, onSettings }) {
   const theme = useTheme();
   const { presets } = useGameModePresets();
   const hosts = useHosts();
@@ -30,29 +32,40 @@ export function ModeCards({ value, onChange, onAdd }) {
     <Box role="radiogroup" aria-label="Game mode" sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(260px, 100%), 1fr))", gap: 1 }}>
       {Object.values(GAME_MODES).map((m) => {
         const on = m.id === value;
+        const name = presets[m.id]?.name ?? m.label;
         return (
-          <ButtonBase
+          <Box
             key={m.id}
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              borderRadius: `${theme.tokens.shape.md}px`,
+              bgcolor: theme.m3.surfaceContainerHigh,
+              boxShadow: on ? `inset 0 0 0 2px ${theme.m3.primary}` : "none",
+              transition: `background-color ${theme.tokens.motion.effects}`,
+              "&:has(> .mode-pick:hover)": { bgcolor: theme.m3.hover },
+            }}
+          >
+          <ButtonBase
+            className="mode-pick"
             role="radio"
             aria-checked={on}
             onClick={() => onChange(m.id)}
             sx={{
+              flex: 1,
+              minWidth: 0,
               p: 1.5,
               gap: 1.5,
               justifyContent: "flex-start",
               textAlign: "left",
               borderRadius: `${theme.tokens.shape.md}px`,
-              bgcolor: theme.m3.surfaceContainerHigh,
-              boxShadow: on ? `inset 0 0 0 2px ${theme.m3.primary}` : "none",
-              transition: `background-color ${theme.tokens.motion.effects}`,
-              "&:hover": { bgcolor: theme.m3.hover },
               "&.Mui-focusVisible": { outline: `2px solid ${theme.m3.focus}`, outlineOffset: 2 },
             }}
           >
             <ModeLogo mode={m.id} width={64} height={40} />
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Typography variant="titleSmall" component="div" noWrap>
-                {presets[m.id]?.name ?? m.label}
+                {name}
               </Typography>
               <Typography variant="bodySmall" color="text.secondary" component="div" noWrap>
                 {defaultsOf(m.id)}
@@ -60,32 +73,16 @@ export function ModeCards({ value, onChange, onAdd }) {
             </Box>
             {on && <Icon name="check_circle" fill size={20} style={{ color: theme.m3.primary }} />}
           </ButtonBase>
+          {onSettings && (
+            <Tooltip title={`${name} settings`}>
+              <IconButton aria-label={`${name} settings`} onClick={() => onSettings(m.id)} sx={{ mr: 1, flexShrink: 0 }}>
+                <Icon name="settings" size={20} />
+              </IconButton>
+            </Tooltip>
+          )}
+          </Box>
         );
       })}
-      {onAdd && (
-        <ButtonBase
-          onClick={onAdd}
-          sx={{
-            p: 1.5,
-            gap: 1.5,
-            minHeight: 64,
-            justifyContent: "flex-start",
-            textAlign: "left",
-            borderRadius: `${theme.tokens.shape.md}px`,
-            color: theme.m3.onSurfaceVariant,
-            transition: `background-color ${theme.tokens.motion.effects}`,
-            "&:hover": { bgcolor: theme.m3.hover, color: theme.m3.onSurface },
-            "&.Mui-focusVisible": { outline: `2px solid ${theme.m3.focus}`, outlineOffset: 2 },
-          }}
-        >
-          <Box sx={{ width: 64, height: 40, flexShrink: 0, display: "grid", placeItems: "center", borderRadius: `${theme.tokens.shape.sm}px`, bgcolor: theme.m3.surfaceContainerHigh }}>
-            <Icon name="add" size={20} />
-          </Box>
-          <Typography variant="titleSmall" component="div">
-            New game mode
-          </Typography>
-        </ButtonBase>
-      )}
     </Box>
   );
 }
