@@ -1,0 +1,19 @@
+// Static assets imported as URLs so the single-file build can inline them.
+import logoUrl from "./development-savvy-logo.png?url";
+import dictionaryUrl from "./wordle-dictionary.txt?url";
+import textChainLogoUrl from "./textchain-logo.svg?url";
+import subTextLogoUrl from "./subtext-logo.svg?url";
+import hostPictureUrl from "./host-sample.svg?url";
+import streamHeroUrl from "./stream-hero-sample.svg?url";
+import wendysLogoUrl from "./sponsor-sample.svg?url";
+
+export const LOGO_URL = logoUrl;
+export const DICTIONARY_URL = dictionaryUrl;
+// The game modes' logos (Savvy TextChain, Savvy SubText).
+export const MODE_LOGOS = { TextChain: textChainLogoUrl, SubText: subTextLogoUrl };
+// Sample art (no real photos or logos): the host's picture (square: avatar and hero card) and
+// the default 900 × 1200 stream image.
+export const HOST_PICTURE_URL = hostPictureUrl;
+export const STREAM_HERO_URL = streamHeroUrl;
+// Sample sponsor logo (made-up art).
+export const WENDYS_LOGO_URL = wendysLogoUrl;
