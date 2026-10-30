@@ -1,4 +1,5 @@
 import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
 import ButtonBase from "@mui/material/ButtonBase";
 import IconButton from "@mui/material/IconButton";
 import Tooltip from "@mui/material/Tooltip";
@@ -21,6 +22,7 @@ function StatusPill({ status }) {
  * A titled card that groups related fields. `id` is used as a scroll anchor. `status` ({ state,
  * summary, todo }) puts its summary under the title and a missing / errors pill by it. `collapsible` sections fold
  * to their title, pill and a one-line `status.summary`; `open` and `onToggle` control that.
+ * `status.onReset` adds a "Reset to game mode" button.
  */
 export function FormSection({ id, title, description, action, status, collapsible, open = true, onToggle, children }) {
   const { m3: c } = useTheme();
@@ -55,15 +57,26 @@ export function FormSection({ id, title, description, action, status, collapsibl
             onClick={onToggle}
             aria-expanded={open}
             aria-controls={`${id}-body`}
-            sx={{ flex: "1 1 280px", minWidth: 0, display: "flex", alignItems: "center", gap: 2, textAlign: "left", borderRadius: 2, m: -1, p: 1, "&:hover .fold-chevron": { color: c.onSurface }, "&.Mui-focusVisible": { outline: `2px solid ${c.focus}` } }}
+            sx={{ flex: "1 1 280px", minWidth: 0, display: "flex", alignItems: "center", gap: 2, textAlign: "left", borderRadius: 2, m: -1, p: 1, "&.Mui-focusVisible": { outline: `2px solid ${c.focus}` } }}
           >
             {heading}
-            <Icon name={open ? "keyboard_arrow_up" : "keyboard_arrow_down"} size={20} className="fold-chevron" style={{ color: c.onSurfaceVariant, flexShrink: 0 }} />
           </ButtonBase>
         ) : (
           heading
         )}
+        {/* A part preset by the game mode and changed here goes back to it in one click. */}
+        {status?.onReset && (
+          <Button variant="text" size="small" startIcon={<Icon name="undo" size={16} />} onClick={status.onReset} sx={{ alignSelf: "center", flexShrink: 0 }}>
+            Reset to game mode
+          </Button>
+        )}
         {!folded && action}
+        {/* Fold chevron at the far end of the row, after the section's buttons. */}
+        {collapsible && (
+          <IconButton aria-label={open ? `Collapse ${title}` : `Expand ${title}`} aria-expanded={open} aria-controls={`${id}-body`} onClick={onToggle} sx={{ alignSelf: "center", ml: "auto", mr: -1 }}>
+            <Icon name={open ? "keyboard_arrow_up" : "keyboard_arrow_down"} size={20} />
+          </IconButton>
+        )}
       </Box>
       {!folded && (
         <Box id={`${id}-body`} sx={{ display: "flex", flexDirection: "column", gap: 2 }}>

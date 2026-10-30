@@ -11,7 +11,7 @@ import { Icon } from "../../../ds/Icon";
 import { EmptyState } from "../../../ds/EmptyState";
 import { ActionMenu } from "../../../ds/ActionMenu";
 import { ConfirmDialog } from "../../../ds/ConfirmDialog";
-import { DetailBody, DetailHeader, DetailSkeleton, SectionNav, useActiveSection } from "../../../ds/DetailLayout";
+import { DetailBody, DetailHeader, DetailSkeleton, SectionGroup, SectionNav, useActiveSection } from "../../../ds/DetailLayout";
 import { useTimezoneFormat } from "../../../contexts";
 import { useNotify } from "../../../shell/notifications";
 import { useStreamForm, useWordValidator } from "../form";
@@ -36,24 +36,26 @@ import {
   STATUS_OPTIONS,
 } from "./sections";
 
-// Every part is its own open section, in the order a stream is set up. `fields` are what each owns,
-// to jump to the first error.
-// Always open: what a stream is (details) and plays (words).
-// In the order a stream is put together: game mode → words → host → when (and title) → extras.
+// As in New stream: game mode, then the stream's own part (title, when, visibility), then the parts
+// the game mode presets, grouped and ordered as in Game modes › Stream defaults: Game, Host,
+// Sponsor, Rewards, Messaging. `fields` are
+// what each owns, to jump to the first error.
 const SECTIONS = [
-  { id: "mode", label: "Game mode", icon: "sports_esports", fields: ["gameMode"] },
+  { id: "mode", group: "Game mode", label: "Game mode", icon: "sports_esports", fields: ["gameMode"] },
+  { id: "basics", group: "Stream", label: "When & title", icon: "event", fields: ["title", "subtitle", "startDate", "streamType", "headless", "isSpotlighted"] },
   // Words holds the rounds and the showdown word together.
-  { id: "words", label: "Words", icon: "spellcheck", fields: ["textSavvyRounds", "showdownConfiguration"] },
+  { id: "words", group: "Game", label: "Words", icon: "spellcheck", fields: ["textSavvyRounds", "showdownConfiguration"] },
+  { id: "game", group: "Game", label: "Scoring", icon: "scoreboard", fields: ["roundScoring"] },
   // The host brings their pictures (host picture, stream image, hero card).
-  { id: "host", label: "Host", icon: "person", fields: ["hostId", "hostName", "imageUrl", "heroImageUrl"] },
-  { id: "basics", label: "When & title", icon: "event", fields: ["title", "subtitle", "startDate", "streamType", "headless", "isSpotlighted"] },
-  { id: "sponsor", label: "Sponsor", icon: "handshake", fields: ["sponsorship"] },
-  { id: "rewards-card", label: "Rewards", icon: "redeem", fields: ["defaultRewards", "hostBusterReward", "hostStumperBonusXp"] },
-  { id: "raffle", label: "Raffle", icon: "confirmation_number", fields: ["raffleSystemWinnersConfiguration"] },
-  { id: "game", label: "Scoring", icon: "scoreboard", fields: ["roundScoring"] },
-  { id: "share", label: "Share cards", icon: "style", fields: ["shareableCards"] },
-  { id: "notifications-card", label: "Notifications", icon: "notifications", fields: ["lobbyOpenTitle", "lobbyOpenBody", "goingLiveTitle", "goingLiveBody", "round1StartsTitle", "round1StartsBody", "round1StartsAt"] },
+  { id: "host", group: "Host", label: "Host", icon: "person", fields: ["hostId", "hostName", "imageUrl", "heroImageUrl"] },
+  { id: "sponsor", group: "Sponsor", label: "Sponsor", icon: "handshake", fields: ["sponsorship"] },
+  { id: "rewards-card", group: "Rewards", label: "Rewards", icon: "redeem", fields: ["defaultRewards", "hostBusterReward", "hostStumperBonusXp"] },
+  { id: "raffle", group: "Rewards", label: "Raffle", icon: "confirmation_number", fields: ["raffleSystemWinnersConfiguration"] },
+  { id: "share", group: "Messaging", label: "Share cards", icon: "style", fields: ["shareableCards"] },
+  { id: "notifications-card", group: "Messaging", label: "Notifications", icon: "notifications", fields: ["lobbyOpenTitle", "lobbyOpenBody", "goingLiveTitle", "goingLiveBody", "round1StartsTitle", "round1StartsBody", "round1StartsAt"] },
 ];
+// Groups in order; a group of several sections gets a heading (one section already names it).
+const GROUPS = [...new Set(SECTIONS.map((s) => s.group))].map((g) => ({ name: g, ids: SECTIONS.filter((s) => s.group === g).map((s) => s.id) }));
 
 export default function StreamDetail() {
   const { id } = useParams();
@@ -177,6 +179,18 @@ export default function StreamDetail() {
   if (!stream || loadedId !== stream.id) return <DetailSkeleton />;
 
   const audience = STREAM_TYPES[getValues("streamType")];
+  const body = {
+    basics: <DetailsSection key="basics" form={form} frame={frame("basics")} />,
+    mode: <GameModeSection key="mode" form={form} frame={frame("mode")} />,
+    words: <WordsSection key="words" form={form} validateWord={validateWord} onPickWords={() => setPicking(true)} frame={frame("words")} />,
+    game: <ScoringSection key="game" form={form} frame={frame("game")} />,
+    host: <HostSection key="host" form={form} hosts={hosts} frame={frame("host")} />,
+    sponsor: <SponsorSection key="sponsor" form={form} frame={frame("sponsor")} />,
+    "rewards-card": <RewardsSection key="rewards-card" form={form} frame={frame("rewards-card")} />,
+    raffle: <RaffleSection key="raffle" form={form} frame={frame("raffle")} />,
+    share: <ShareCardsSection key="share" form={form} hosts={hosts} frame={frame("share")} />,
+    "notifications-card": <NotificationsSection key="notifications-card" form={form} frame={frame("notifications-card")} />,
+  };
 
   return (
     <Box>
@@ -240,18 +254,11 @@ export default function StreamDetail() {
             ))}
           </Banner>
         )}
-        {/* In the order a stream is put together: what's played, with which words, by whom, when;
-            then the extras, which come set from the game mode and the Default presets. */}
-        <GameModeSection form={form} frame={frame("mode")} />
-        <WordsSection form={form} validateWord={validateWord} onPickWords={() => setPicking(true)} frame={frame("words")} />
-        <HostSection form={form} hosts={hosts} frame={frame("host")} />
-        <DetailsSection form={form} frame={frame("basics")} />
-        <SponsorSection form={form} frame={frame("sponsor")} />
-        <RewardsSection form={form} frame={frame("rewards-card")} />
-        <RaffleSection form={form} frame={frame("raffle")} />
-        <ScoringSection form={form} frame={frame("game")} />
-        <ShareCardsSection form={form} hosts={hosts} frame={frame("share")} />
-        <NotificationsSection form={form} frame={frame("notifications-card")} />
+        {GROUPS.map((g) => (
+          <SectionGroup key={g.name} title={g.ids.length > 1 ? g.name : null}>
+            {g.ids.map((id) => body[id])}
+          </SectionGroup>
+        ))}
       </DetailBody>
 
       <StreamKeyDialog stream={keyOpen ? stream : null} onClose={() => setKeyOpen(false)} />

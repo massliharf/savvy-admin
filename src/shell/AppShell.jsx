@@ -18,6 +18,7 @@ import { useThemeSettings } from "../theme/ThemeSettings";
 import { DESTINATIONS, findDestination, findTab, isRecordPage } from "./nav";
 import { radius } from "../theme/tokens";
 import { RailContext } from "./railContext";
+import { useGameModePresets } from "../pages/streams/gameModes";
 
 const RAIL_WIDTH = 72;
 const EXPANDED_WIDTH = 236;
@@ -318,6 +319,8 @@ function BottomBar({ activeId }) {
 }
 
 export function AppShell({ children }) {
+  // Loads the game modes once for every page, so ones made in the admin are known everywhere.
+  useGameModePresets();
   const theme = useTheme();
   const compact = useMediaQuery(theme.breakpoints.down("sm"));
   const { pathname } = useLocation();

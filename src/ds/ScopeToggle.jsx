@@ -15,7 +15,7 @@ export function ScopeToggle({ label, value, options, onChange, all = "All", coun
   const text = (o) => (count ? `${o.label} · ${count(o.value)}` : o.label);
   return (
     // On a narrow screen a long set scrolls sideways inside itself instead of widening the page.
-    <ToggleButtonGroup exclusive value={value ?? ALL} onChange={(_, v) => v != null && onChange(v === ALL ? null : v)} aria-label={label} sx={{ maxWidth: "100%", overflowX: "auto", scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" }, "& .MuiToggleButton-root": { flexShrink: 0, whiteSpace: "nowrap" } }}>
+    <ToggleButtonGroup exclusive value={value ?? ALL} onChange={(_, v) => v != null && onChange(v === ALL ? null : v)} aria-label={label} sx={{ width: "fit-content", maxWidth: "100%", overflowX: "auto", scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" }, "& .MuiToggleButton-root": { flexShrink: 0, whiteSpace: "nowrap" } }}>
       {items.map((o) => (
         <ToggleButton key={String(o.value ?? ALL)} value={o.value ?? ALL} sx={o.icon ? { gap: 0.75 } : undefined}>
           {o.icon && <Icon name={o.icon} size={18} />}

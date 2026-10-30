@@ -1,16 +1,19 @@
-// Game mode detail — the defaults a new stream of this mode starts from, and its How to Play.
+// A game mode's settings, shown as two tabs of Streams › Game modes: Stream defaults (what a new
+// stream of this mode starts with, in the same groups as a stream's page: Game, Host, Sponsor,
+// Rewards, Messaging) and App (logo, name, home screen pill, How to play).
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { Navigate, useNavigate, useParams } from "react-router";
 import { useForm } from "@refinedev/react-hook-form";
 import { useFieldArray, useWatch } from "react-hook-form";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import { Icon } from "../../ds/Icon";
-import { IconTile } from "../../ds/IconTile";
 import { EmptyState } from "../../ds/EmptyState";
 import { FormSection } from "../../ds/FormSection";
 import { ImageField, useFilePreview } from "../../ds/ImageField";
-import { DetailBody, DetailHeader, DetailSkeleton, SectionNav, useActiveSection } from "../../ds/DetailLayout";
+import { DetailSkeleton, SectionGroup } from "../../ds/DetailLayout";
+import { SaveBar } from "../../ds/SaveBar";
+import { SelectButton } from "../../ds/SelectButton";
 import { useNotify } from "../../shell/notifications";
 import { DP } from "../../providers";
 import { GAME_MODES } from "../streams/gameModes";
@@ -20,24 +23,14 @@ import { ListAdd, ListGroup, ListItem } from "../../ds/ListGroup";
 import { ActionMenu } from "../../ds/ActionMenu";
 import { useDragSort } from "../../ds/DragSort";
 import { ImageCell, TextCell } from "../../ds/EditTable";
-import { useList } from "@refinedev/core";
+import { useDelete, useList } from "@refinedev/core";
+import { ConfirmDialog } from "../../ds/ConfirmDialog";
 import Avatar from "@mui/material/Avatar";
 import { useTheme } from "@mui/material/styles";
 import { cornerFor } from "../../ds/IconTile";
 import { HostPicker, PickCard, PickPlaceholder } from "../streams/pickers";
 import { useHosts } from "../streams/hosts";
 
-// Pictures first: Details (logo, title, description) leads.
-const SECTIONS = [
-  { id: "details", label: "Details", icon: "info", fields: ["name", "summary"] },
-  // Who hosts and sponsors a new stream of this mode, unless the stream picks otherwise.
-  { id: "defaults", label: "Defaults", icon: "tune", fields: ["defaultHostId", "defaultSponsorId"] },
-  { id: "home", label: "Home screen", icon: "smartphone", fields: ["gameModeDisplayName", "gameModeBackgroundColor"] },
-  { id: "scoring", label: "Scoring", icon: "scoreboard", fields: ["roundScoring"] },
-  { id: "showdown", label: "Showdown", icon: "trophy", fields: ["showdown"], showdown: true },
-  { id: "rewards", label: "Rewards", icon: "redeem", fields: ["defaultRewards", "hostStumperBonusXp"] },
-  { id: "howto", label: "How to play", icon: "help", fields: ["howToPlay"] },
-];
 
 
 /**
@@ -67,8 +60,8 @@ function PowerUpRow({ control, setValue, index, onRemove, drag }) {
 
 const NO_SPONSOR = "__none";
 
-/** The mode's default host and sponsor, picked from the libraries (a sponsor is optional). */
-function ModeDefaults({ control, setValue }) {
+/** The mode's default host and sponsor, from the libraries (a sponsor is optional). */
+function useModeDefaults({ control, setValue }) {
   const { m3: c } = useTheme();
   const hosts = useHosts();
   const { data } = useList({ resource: "Sponsor", dataProviderName: DP.sponsors, pagination: { mode: "off" } });
@@ -82,11 +75,22 @@ function ModeDefaults({ control, setValue }) {
       <Icon name={src === NO_SPONSOR ? "block" : "handshake"} size={size / 2} />
     </Avatar>
   );
+  return { host, sponsor, sponsors, hosts, set, thumb };
+}
+
+/** The mode's default host, picked from Hosts. */
+function ModeHost({ control, setValue }) {
+  const { host, hosts, set } = useModeDefaults({ control, setValue });
+  return <HostPicker hosts={hosts} value={host} onChange={(h) => set("defaultHostId", h?.id ?? null)} label={null} />;
+}
+
+/** The mode's default sponsor, picked from Sponsors (or none). */
+function ModeSponsor({ control, setValue }) {
+  const { sponsor, sponsors, set, thumb } = useModeDefaults({ control, setValue });
   return (
     <>
-      <HostPicker hosts={hosts} value={host} onChange={(h) => set("defaultHostId", h?.id ?? null)} label="Default host" />
       <PickCard
-        label="Default sponsor"
+        label={null}
         ariaLabel="Default sponsor"
         value={sponsor?.id ?? NO_SPONSOR}
         options={[{ value: NO_SPONSOR, media: thumb(NO_SPONSOR, 32), primary: "No sponsor" }, ...sponsors.map((sp) => ({ value: sp.id, media: thumb(sp.imageUrl, 32), primary: sp.name, secondary: sp.title }))]}
@@ -99,10 +103,30 @@ function ModeDefaults({ control, setValue }) {
   );
 }
 
-export default function GameModeDetail() {
-  const { id } = useParams();
-  const navigate = useNavigate();
+/** The share card and notification presets new streams of this mode start from. */
+function ModeMessaging({ control, setValue }) {
+  const [shareId, noteId] = useWatch({ control, name: ["defaultSharePresetId", "defaultNotificationPresetId"] });
+  const { data: share } = useList({ resource: "SharePreset", dataProviderName: DP.sharePresets, pagination: { mode: "off" } });
+  const { data: notes } = useList({ resource: "NotificationPreset", dataProviderName: DP.notificationPresets, pagination: { mode: "off" } });
+  const options = (list) => [{ value: "", label: `Library default (${list.find((p) => p.isDefault)?.name ?? "none"})` }, ...list.map((p) => ({ value: p.id, label: p.name }))];
+  const set = (name) => (v) => setValue(name, v || null, { shouldDirty: true, shouldTouch: true });
+  return (
+    <>
+      <SelectButton label="Share cards" value={shareId ?? ""} options={options(share?.data ?? [])} onChange={set("defaultSharePresetId")} helperText="Presets are kept in Library › Share cards." />
+      <SelectButton label="Notifications" value={noteId ?? ""} options={options(notes?.data ?? [])} onChange={set("defaultNotificationPresetId")} helperText="Presets are kept in Library › Notifications." />
+    </>
+  );
+}
+
+/**
+ * A game mode's settings on one page: what its new streams start with, then how it shows in the
+ * app. Changes save with the floating Save bar.
+ */
+export function GameModeSettings({ id }) {
   const notify = useNotify();
+  const navigate = useNavigate();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const { mutate: removeMode, isPending: deleting } = useDelete();
   const meta = GAME_MODES[id];
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -115,7 +139,7 @@ export default function GameModeDetail() {
     getValues,
     handleSubmit,
     trigger,
-    formState: { isDirty, errors },
+    formState: { isDirty },
   } = useForm({
     refineCoreProps: {
       resource: "GameMode",
@@ -128,15 +152,12 @@ export default function GameModeDetail() {
   });
   const { fields: powerUps, append, move, remove } = useFieldArray({ control, name: "howToPlay.powerUps" });
   const powerUpDrag = useDragSort({ count: powerUps.length, onMove: move });
-  // The same section parts as a stream's page (scoring, rewards) take the form as one object.
+  // The same parts as a stream's page (scoring, rewards) take the form as one object.
   const modeForm = { control, setValue, getValues, trigger };
-  const roundCount = useWatch({ control, name: "roundCount" });
   const gameModeIconUrl = useWatch({ control, name: "gameModeIconUrl" });
   const gameLogoUrl = useWatch({ control, name: "gameLogoUrl" });
   const mode = query?.data?.data;
   const subText = meta?.base === "SubText";
-  // Only "with Showdown" modes have showdown defaults.
-  const sections = SECTIONS.filter((s) => !s.showdown || meta?.showdown);
 
   useEffect(() => {
     if (!mode) return;
@@ -150,18 +171,9 @@ export default function GameModeDetail() {
     setLoaded(true);
   }, [mode, reset]);
 
-  useEffect(() => {
-    if (mode) document.title = `${mode.name} · Game modes · Savvy Admin`;
-  }, [mode]);
-
-  const [active, goTo] = useActiveSection(sections, loaded);
-  const errorIds = sections.filter((s) => s.fields.some((f) => errors[f])).map((s) => s.id);
-
   const save = async () => {
     if (!(await trigger())) {
-      const first = sections.find((s) => s.fields.some((f) => control.getFieldState(f).invalid));
       notify("Some fields need attention", { variant: "error" });
-      if (first) goTo(first.id);
       return;
     }
     setSaving(true);
@@ -182,79 +194,86 @@ export default function GameModeDetail() {
   const icon = imageHandlers("gameModeIconFile", "gameModeIconUrl");
   const logo = imageHandlers("gameLogoFile", "gameLogoUrl");
 
-  if (query?.isError) {
-    return (
-      <EmptyState icon="error" title="Couldn't load this game mode" description={query.error?.message}>
-        <Button variant="tonal" onClick={() => navigate("/game-modes")}>
-          Back to game modes
-        </Button>
-      </EmptyState>
-    );
-  }
+  if (query?.isError) return <EmptyState icon="error" title="Couldn't load this game mode" description={query.error?.message} />;
   if (!mode || !loaded) return <DetailSkeleton />;
 
   return (
-    <Box>
-      <DetailHeader
-        onBack={() => navigate(`/game-modes?mode=${mode.id}`)}
-        backLabel="Back to game modes"
-        media={
-          <IconTile icon={meta?.icon ?? "sports_esports"} tone={meta?.tone ?? "primary"} size={48} />
-        }
-        title={mode.name}
-        subtitle="Advanced settings · defaults for new streams and sets"
-        actions={
-          <>
-            {isDirty && (
-              <Button variant="text" onClick={() => reset()} disabled={saving} sx={{ display: { xs: "none", sm: "inline-flex" } }}>
-                Discard
-              </Button>
-            )}
-            <Button onClick={save} disabled={!isDirty || saving} startIcon={<Icon name="check" />}>
-              {saving ? "Saving…" : "Save"}
-            </Button>
-          </>
-        }
-      />
-      <DetailBody nav={<SectionNav label="Game mode sections" sections={sections} active={active} onSelect={goTo} errorIds={errorIds} />}>
-        <FormSection id="details" title="Details">
-          <ImageField label="Game logo" value={gameLogoUrl} width={336} height={156} fit="contain" onChange={logo.onChange} onRemove={logo.onRemove} />
-          <TextInput control={control} name="name" label="Title" max={40} rules={{ validate: (v) => (v?.trim() ? (v.length <= 40 ? true : "Use 40 characters or fewer") : "Enter a title") }} />
-          <TextInput control={control} name="summary" label="Description" max={120} rules={{ required: "Add a short description", maxLength: { value: 120, message: "Use 120 characters or fewer" } }} />
-        </FormSection>
-
-        <FormSection id="defaults" title="Defaults" description="New streams of this mode start with these. A stream can still change them.">
-          <ModeDefaults control={control} setValue={setValue} />
-        </FormSection>
-
-        <FormSection id="home" title="Home screen">
-          <PillFields control={control} iconUrl={gameModeIconUrl} onIconChange={icon.onChange} onIconRemove={icon.onRemove} />
-        </FormSection>
-
-        <FormSection id="scoring" title="Scoring">
-          <ScoringFields control={control} subText={subText} roundCount={5} withStumper={false} />
-        </FormSection>
-
-        {meta?.showdown && (
-          <FormSection id="showdown" title="Showdown">
-            <ShowdownEditor control={control} setValue={setValue} name="showdown" word={false} note="Each stream picks its own showdown word." />
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 2, maxWidth: 880 }}>
+      {/* The same groups, in the same order, as a stream's page: it starts with these. */}
+      <SectionGroup title="New streams start with">
+          <FormSection id="game" title="Game" description="Points per round and the showdown prize.">
+            <ScoringFields control={control} subText={subText} roundCount={5} withStumper={false} />
+            {meta?.showdown && <ShowdownEditor control={control} setValue={setValue} name="showdown" word={false} note="Each stream gets its showdown word from its word set." />}
           </FormSection>
-        )}
-
-        <FormSection id="rewards" title="Rewards">
-          <RewardsEditor form={modeForm} keys={["defaultRewards"]} stumper />
-        </FormSection>
-
-        <FormSection id="howto" title="How to play">
-          <ListGroup label="Power-ups">
-            {powerUps.map((f, i) => (
-              <PowerUpRow key={f.id} control={control} setValue={setValue} index={i} drag={powerUpDrag} onRemove={() => remove(i)} />
-            ))}
-            <ListAdd label="Add power-up" onClick={() => append({ title: "", description: "", iconUrl: "", iconFile: null })} />
-          </ListGroup>
-        </FormSection>
-
-      </DetailBody>
+          <FormSection id="host" title="Host">
+            <ModeHost control={control} setValue={setValue} />
+          </FormSection>
+          <FormSection id="sponsor" title="Sponsor">
+            <ModeSponsor control={control} setValue={setValue} />
+          </FormSection>
+          <FormSection id="rewards" title="Rewards">
+            <RewardsEditor form={modeForm} keys={["defaultRewards"]} stumper />
+          </FormSection>
+          <FormSection id="messaging" title="Messaging">
+            <ModeMessaging control={control} setValue={setValue} />
+          </FormSection>
+      </SectionGroup>
+      {/* What players see of the mode in the app. */}
+      <SectionGroup title="In the app">
+          <FormSection id="details" title="Name & logo">
+            <ImageField label="Game logo" value={gameLogoUrl} width={336} height={156} fit="contain" onChange={logo.onChange} onRemove={logo.onRemove} />
+            <TextInput control={control} name="name" label="Title" max={40} rules={{ validate: (v) => (v?.trim() ? (v.length <= 40 ? true : "Use 40 characters or fewer") : "Enter a title") }} />
+            <TextInput control={control} name="summary" label="Description" max={120} rules={{ required: "Add a short description", maxLength: { value: 120, message: "Use 120 characters or fewer" } }} />
+          </FormSection>
+          <FormSection id="home" title="Home screen">
+            <PillFields control={control} iconUrl={gameModeIconUrl} onIconChange={icon.onChange} onIconRemove={icon.onRemove} />
+          </FormSection>
+          <FormSection id="howto" title="How to play">
+            <ListGroup label="Power-ups">
+              {powerUps.map((f, i) => (
+                <PowerUpRow key={f.id} control={control} setValue={setValue} index={i} drag={powerUpDrag} onRemove={() => remove(i)} />
+              ))}
+              <ListAdd label="Add power-up" onClick={() => append({ title: "", description: "", iconUrl: "", iconFile: null })} />
+            </ListGroup>
+          </FormSection>
+      </SectionGroup>
+      {/* A mode made here can go again (the server refuses while streams, sets or slots use it). */}
+      {mode.base && (
+        <Box>
+          <Button variant="text" color="error" startIcon={<Icon name="delete" />} disabled={deleting} onClick={() => setConfirmDelete(true)}>
+            Delete game mode
+          </Button>
+        </Box>
+      )}
+      <ConfirmDialog
+        open={confirmDelete}
+        title={`Delete “${mode.name}”?`}
+        tone="error"
+        confirmLabel="Delete"
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={() => {
+          setConfirmDelete(false);
+          removeMode(
+            { resource: "GameMode", dataProviderName: DP.gameModes, id, successNotification: false, errorNotification: false, invalidates: ["list"] },
+            {
+              onSuccess: () => {
+                notify(`“${mode.name}” deleted`);
+                navigate("/game-modes", { replace: true });
+              },
+              onError: (e) => notify(e?.errors?.id?.[0] ?? e?.response?.data?.errors?.id?.[0] ?? "Couldn't delete the game mode", { variant: "error" }),
+            },
+          );
+        }}
+      >
+        Only possible while no stream, word set or time slot uses it.
+      </ConfirmDialog>
+      <SaveBar dirty={isDirty} saving={saving} onSave={save} onDiscard={() => reset()} />
     </Box>
   );
+}
+
+/** Old address of a game mode's settings: now its Stream defaults tab. */
+export default function GameModeDetail() {
+  const { id } = useParams();
+  return <Navigate to={`/game-modes?mode=${id}&tab=settings`} replace />;
 }

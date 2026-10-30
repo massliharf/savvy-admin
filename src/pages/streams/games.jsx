@@ -2,7 +2,7 @@
 // its weekly times and Fill month. The mode's own settings (rules, scoring, defaults, How to play)
 // sit behind Advanced. Streams show in the app right away; the game mode logo once words are in.
 import { useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router";
+import { useSearchParams } from "react-router";
 import { useCustomMutation, useInvalidate, useList } from "@refinedev/core";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -25,10 +25,12 @@ import { GameMode } from "./enums";
 import { rewardText } from "./detail/fields";
 import { GAME_MODES, modeOf, useGameModePresets } from "./gameModes";
 import { StreamPickerDialog } from "./pickers";
-import { ModeLogo } from "./ModeLogo";
-import { showTitle, useHosts } from "./hosts";
+import { hostLabel, showTitle, useHosts } from "./hosts";
 import { logoHidden } from "./parts";
-import { FillMonthDialog, SlotsSheet, useScheduleSlots } from "./slots";
+import { FillMonthDialog, SlotsSheet, daysText, slotDays, slotTime, useScheduleSlots, withSlotHosts } from "./slots";
+import { ModeCards } from "./ModeCards";
+import { NewModeDialog } from "../gameModes/NewModeDialog";
+import { GameModeSettings } from "../gameModes/detail";
 import { useWordValidator } from "./form";
 import { WordSetCard, WordSetSheet, WordSetSummary, isPublic, missingRoundWords, needsSet, setDetails, setState, useWordSetActions, useWordSets, useWordsLock, wordsOf } from "./words";
 
@@ -44,40 +46,53 @@ function rewardsLine(set, preset) {
   return set.showdown && prize ? `Showdown ${rewardText(prize)}` : "";
 }
 
-/**
- * The game mode in one line: its logo and name, its weekly time slots and this month at a glance,
- * and what to do with it — edit the time slots, fill a month, or open its settings (Advanced).
- */
-function ModeHeader({ mode, preset, slots, month, onTimes, onFill }) {
-  const navigate = useNavigate();
-  const meta = GAME_MODES[mode];
-  const plan = [
-    slots.length ? `${slots.length} time ${slots.length === 1 ? "slot" : "slots"}` : "No time slots yet",
-    month.total ? `${month.total} this month` : null,
-    month.hidden ? `${month.hidden} need words` : null,
-  ].filter(Boolean).join(" · ");
+// A game mode's three parts: its word sets, its schedule, and its settings (what its streams
+// start with and how it shows in the app).
+const SECTIONS = [
+  { value: "sets", label: "Word sets", icon: "spellcheck" },
+  { value: "schedule", label: "Schedule", icon: "event_repeat" },
+  { value: "settings", label: "Settings", icon: "tune" },
+];
+
+/** The mode's weekly time slots and this month, with Time slots and Fill month. */
+function ScheduleTab({ slots, hosts, month, onTimes, onFill }) {
+  const { m3: c } = useTheme();
   return (
-    <ContainerCard sx={{ p: 2, display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-      <ModeLogo mode={mode} width={96} height={48} />
-      <Box sx={{ flex: "1 1 200px", minWidth: 0 }}>
-        <Typography variant="titleMedium" component="h2" noWrap>
-          {preset?.name ?? meta.label}
-        </Typography>
-        <Typography variant="bodySmall" color="text.secondary" noWrap>
-          {plan}
-        </Typography>
-      </Box>
-      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-        <Button variant="tonal" startIcon={<Icon name="schedule" />} onClick={onTimes}>
-          Time slots
+    <ContainerCard sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1.5, maxWidth: 880 }}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography variant="titleMedium" component="h2">
+            Time slots
+          </Typography>
+          <Typography variant="bodySmall" color="text.secondary">
+            {month.total ? `${month.total} streams this month${month.hidden ? ` · ${month.hidden} need words` : ""}` : "Nothing planned this month."}
+          </Typography>
+        </Box>
+        <Button variant="tonal" startIcon={<Icon name="edit" />} onClick={onTimes}>
+          Edit time slots
         </Button>
         <Button variant="tonal" startIcon={<Icon name="auto_awesome" />} onClick={onFill}>
           Fill month
         </Button>
-        <Button variant="tonal" startIcon={<Icon name="tune" />} onClick={() => navigate(`/game-modes/${mode}`)}>
-          Advanced
-        </Button>
       </Box>
+      {slots.length === 0 ? (
+        <Typography variant="bodyMedium" color="text.secondary">
+          No time slots yet.
+        </Typography>
+      ) : (
+        <Box>
+          {slots.map((sl) => (
+            <Box key={sl.id} sx={{ display: "flex", alignItems: "center", gap: 2, py: 1.25, "&:not(:last-of-type)": { borderBottom: `1px solid ${c.border}` } }}>
+              <Typography variant="titleSmall" sx={{ width: 80, flexShrink: 0 }}>
+                {slotTime(sl.time)}
+              </Typography>
+              <Typography variant="bodyMedium" color="text.secondary" noWrap sx={{ flex: 1, minWidth: 0 }}>
+                {[daysText(slotDays(sl)), hostLabel(hosts.find((h) => h.id === sl.hostId)) + (sl.followsMode ? " (default)" : ""), sl.streamType === "Internal" ? "Internal" : null].filter(Boolean).join(" · ")}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+      )}
     </ContainerCard>
   );
 }
@@ -90,7 +105,12 @@ export default function GameModesPage() {
   const invalidate = useInvalidate();
   const [params, setParams] = useSearchParams();
   const mode = GAME_MODES[params.get("mode")] ? params.get("mode") : GameMode.TextChain;
+  const [newMode, setNewMode] = useState(false);
   const setMode = (m) => setParams((p) => ({ ...Object.fromEntries(p), mode: m }), { replace: true });
+  // Old links (Stream defaults, App) open Settings.
+  const tabParam = ["defaults", "app"].includes(params.get("tab")) ? "settings" : params.get("tab");
+  const section = SECTIONS.some((x) => x.value === tabParam) ? tabParam : "sets";
+  const setSection = (t) => setParams((p) => ({ ...Object.fromEntries(p), tab: t }), { replace: true });
 
   const { presets } = useGameModePresets();
   const hosts = useHosts();
@@ -118,6 +138,7 @@ export default function GameModesPage() {
 
   const preset = presets[mode];
   const modeSlots = useMemo(() => slots.filter((sl) => modeOf(sl).id === mode).sort((a, b) => a.time.localeCompare(b.time)), [slots, mode]);
+  const shownSlots = useMemo(() => withSlotHosts(modeSlots, presets), [modeSlots, presets]);
   const upcoming = useMemo(() => streams.filter((s) => s.status === "Scheduled" && dayjs(s.startDate).isAfter(dayjs()) && (s.gameMode ?? GameMode.TextChain) === mode), [streams, mode]);
   // Upcoming public streams of this mode still waiting for words: the app hides their mode logo.
   const waiting = useMemo(() => upcoming.filter((s) => isPublic(s) && needsSet(s, mode)).sort((a, b) => Date.parse(a.startDate) - Date.parse(b.startDate)), [upcoming, mode]);
@@ -172,16 +193,31 @@ export default function GameModesPage() {
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+      {/* Which game mode (the same cards as New stream), then one row of its parts. */}
+      <ModeCards value={mode} onChange={setMode} onAdd={() => setNewMode(true)} />
+      <NewModeDialog
+        open={newMode}
+        onClose={() => setNewMode(false)}
+        onCreated={(m) => {
+          setNewMode(false);
+          notify(`“${m.name}” created`);
+          // Opens on its settings: logo, defaults and how it shows in the app come next.
+          setParams({ mode: m.id, tab: "settings" }, { replace: true });
+        }}
+      />
+      <ScopeToggle label="Game mode parts" all={false} value={section} options={SECTIONS} onChange={setSection} />
+
+      {section === "schedule" && <ScheduleTab slots={shownSlots} hosts={hosts} month={month} onTimes={() => setTimesOpen(true)} onFill={() => setFillOpen(true)} />}
+      {section === "settings" && <GameModeSettings key={mode} id={mode} />}
+
+      {section === "sets" && (
+      <>
       <PageToolbar
         search={<SearchField value={query} onChange={setQuery} placeholder={hidden ? "Search names" : "Search words or names"} />}
         secondary={[{ label: hidden ? "Show words" : "Hide words", icon: hidden ? "lock_open" : "visibility_off", onClick: () => (hidden ? unlock() : lock()) }]}
         actionLabel="New word set"
         onAction={() => setSheet({})}
-      >
-        <ScopeToggle label="Game mode" all={false} value={mode} options={Object.values(GAME_MODES).map((m) => ({ value: m.id, label: presets[m.id]?.name ?? m.label, icon: m.icon }))} onChange={setMode} />
-      </PageToolbar>
-
-      <ModeHeader mode={mode} preset={preset} slots={modeSlots} month={month} onTimes={() => setTimesOpen(true)} onFill={() => setFillOpen(true)} />
+      />
 
       {waiting.length > 0 && (
         <Banner
@@ -201,9 +237,6 @@ export default function GameModesPage() {
 
       <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
-          <Typography variant="titleMedium" component="h2" sx={{ mr: 1 }}>
-            Word sets
-          </Typography>
           <ScopeToggle label="Word sets" all={false} value={tab} options={TABS.map((t) => ({ value: t.id, label: t.label }))} count={count} onChange={setTab} />
         </Box>
 
@@ -245,6 +278,8 @@ export default function GameModesPage() {
           </Box>
         )}
       </Box>
+      </>
+      )}
 
       {unlockDialog}
       <WordSetSheet open={!!sheet} set={sheet} mode={mode} onClose={() => setSheet(null)} validateWord={validateWord} />

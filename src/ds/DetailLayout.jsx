@@ -1,5 +1,5 @@
 // Shared layout for record detail pages: sticky header, section menu with scroll-spy, content column.
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import Box from "@mui/material/Box";
 import ButtonBase from "@mui/material/ButtonBase";
 import IconButton from "@mui/material/IconButton";
@@ -67,14 +67,23 @@ export function SectionNav({ sections, active, onSelect, errorIds = [], warningI
   const { m3: c, tokens, palette } = useTheme();
   return (
     <Box component="nav" aria-label={label} sx={{ display: "flex", flexDirection: { xs: "row", lg: "column" }, gap: "2px", overflowX: { xs: "auto", lg: "visible" }, scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}>
-      {sections.map((s) => {
+      {sections.map((s, i) => {
         const on = active === s.id;
+        // Sections with a `group` sit under its name (wide screens); a group of one is just set apart.
+        const starts = s.group && s.group !== sections[i - 1]?.group;
+        const many = starts && sections.filter((x) => x.group === s.group).length > 1;
         const error = errorIds.includes(s.id);
         const warning = !error && warningIds.includes(s.id);
         const done = !error && !warning && doneIds.includes(s.id);
         return (
+          <Fragment key={s.id}>
+          {starts && i > 0 && <Box aria-hidden sx={{ display: { xs: "none", lg: "block" }, height: many ? 0 : 8 }} />}
+          {many && (
+            <Typography variant="overline" color="text.secondary" component="div" sx={{ display: { xs: "none", lg: "block" }, px: 1.5, pt: i > 0 ? 1.5 : 0, pb: 0.25 }}>
+              {s.group}
+            </Typography>
+          )}
           <ButtonBase
-            key={s.id}
             onClick={() => onSelect(s.id)}
             aria-current={on ? "true" : undefined}
             sx={{
@@ -103,6 +112,7 @@ export function SectionNav({ sections, active, onSelect, errorIds = [], warningI
             {/* Done: a green check (the side nav is where a section's state lives). */}
             {done && <Icon name="check_circle" size={16} fill aria-label="Done" style={{ color: palette.success.main }} />}
           </ButtonBase>
+          </Fragment>
         );
       })}
     </Box>

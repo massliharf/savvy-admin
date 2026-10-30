@@ -543,8 +543,8 @@ export const gameModesProvider = (http) => ({
   update: async ({ id, variables }) => ({
     data: ok(await http.put(`${API}/admin/game-modes/${id}`, toFormData(variables), { headers: {} })).data,
   }),
-  create: notImpl(),
-  deleteOne: notImpl(),
+  create: async ({ variables }) => ({ data: ok(await http.post(`${API}/admin/game-modes`, variables)).data }),
+  deleteOne: async ({ id }) => ({ data: ok(await http.delete(`${API}/admin/game-modes/${id}`)).data }),
 });
 
 // Daily schedule slots (prototype endpoints); the list is saved as a whole (JSON).

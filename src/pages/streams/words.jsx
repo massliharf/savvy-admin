@@ -34,10 +34,6 @@ import { CardCorner } from "../../ds/CardCorner";
 import { showTitle } from "./hosts";
 import { ModeLogo } from "./ModeLogo";
 
-export const WORD_TYPES = {
-  TextChain: { label: GAME_MODES.TextChain.label, icon: GAME_MODES.TextChain.icon, tone: GAME_MODES.TextChain.tone },
-  SubText: { label: GAME_MODES.SubText.label, icon: GAME_MODES.SubText.icon, tone: GAME_MODES.SubText.tone },
-};
 
 /** Every word in a set: its rounds, then its showdown word. */
 export const wordsOf = (set) => [...(set.rounds ?? []).map((r) => r.word), set.showdown?.word].filter((w) => w != null);
@@ -180,7 +176,7 @@ export function setDetails(set) {
 
 /** Name, words and details of a set; used in the set pickers. */
 export function WordSetSummary({ set, hidden }) {
-  const t = WORD_TYPES[set.type] ?? WORD_TYPES.TextChain;
+  const t = GAME_MODES[set.type] ?? GAME_MODES.TextChain;
   return (
     <Box sx={{ display: "flex", alignItems: "center", gap: 2, minWidth: 0 }}>
       <ModeLogo mode={set.type} />
@@ -304,7 +300,7 @@ export function WordSetSheet({ open, set, mode = "TextChain", onClose, validateW
       open={open}
       onClose={onClose}
       title={isNew ? "New word set" : set.title || "Word set"}
-      subtitle={isNew ? undefined : `${WORD_TYPES[set.type]?.label ?? set.type} word set`}
+      subtitle={isNew ? undefined : `${GAME_MODES[set.type]?.label ?? set.type} word set`}
       actions={
         <>
           <Button variant="text" onClick={onClose}>
@@ -323,7 +319,7 @@ export function WordSetSheet({ open, set, mode = "TextChain", onClose, validateW
     >
       {/* Which game mode the set is for: the page's mode to start with; fixed once the set exists. */}
       {isNew && (
-        <ChoiceGroup label="Game mode" value={type} options={Object.entries(WORD_TYPES).map(([id, w]) => ({ value: id, label: w.label, icon: w.icon }))} onChange={(v) => setValue("type", v, { shouldDirty: true })} />
+        <ChoiceGroup label="Game mode" value={type} options={Object.values(GAME_MODES).map((m) => ({ value: m.id, label: m.label, icon: m.icon }))} onChange={(v) => setValue("type", v, { shouldDirty: true })} />
       )}
       <TextInput control={control} name="title" label="Name" max={40} rules={{ validate: (v) => (v?.trim() ? (v.trim().length <= 40 ? true : "Use 40 characters or fewer") : "Enter a name") }} />
       <SetWordsEditor control={control} setValue={setValue} getValues={getValues} fields={fields} append={append} remove={remove} validateWord={validateWord} />
@@ -348,10 +344,10 @@ export function WordSetPickerDialog({ open, type, stream, onClose, onPick }) {
     .sort((a, b) => Number(!!a.streamId) - Number(!!b.streamId) || Date.parse(a.createdAt) - Date.parse(b.createdAt));
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth scroll="paper">
-      <DialogTitle>{`Pick a ${WORD_TYPES[type]?.label ?? type} word set`}</DialogTitle>
+      <DialogTitle>{`Pick a ${GAME_MODES[type]?.label ?? type} word set`}</DialogTitle>
       <DialogContent dividers sx={{ p: 0 }}>
         {usable.length === 0 ? (
-          <EmptyState compact icon="spellcheck" title={`No ${WORD_TYPES[type]?.label ?? type} sets available`} description="Add more in Streams › Game modes." />
+          <EmptyState compact icon="spellcheck" title={`No ${GAME_MODES[type]?.label ?? type} sets available`} description="Add more in Streams › Game modes." />
         ) : (
           <SelectList label="Word sets" items={usable} value={picked?.id} onChange={(id) => setPicked(usable.find((w) => w.id === id))} renderItem={(w) => <WordSetSummary set={w} hidden={hidden} />} />
         )}
@@ -372,7 +368,7 @@ export function WordSetPickerDialog({ open, type, stream, onClose, onPick }) {
 /** A word set as a card: name and game mode, its words (hideable), where it is, and ⋮ actions. */
 export function WordSetCard({ set, state, hidden, onOpen, actions, showState = true, detail }) {
   const { formatDate } = useTimezoneFormat();
-  const t = WORD_TYPES[set.type] ?? WORD_TYPES.TextChain;
+  const t = GAME_MODES[set.type] ?? GAME_MODES.TextChain;
   return (
     // The whole card is the click target (its hover covers all of it); ⋮ sits in the corner.
     <Card sx={{ position: "relative", height: "100%" }}>

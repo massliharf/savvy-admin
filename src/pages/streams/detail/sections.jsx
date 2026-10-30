@@ -18,12 +18,13 @@ import { ImageField, useFilePreview } from "../../../ds/ImageField";
 import { ColorSwatches } from "../../../ds/ColorSwatches";
 import { cornerFor } from "../../../ds/IconTile";
 import { DEFAULT_ROUND_DURATION, ROUND_COUNT, GameMode, busterFor, durationFor, NON_CASH_REWARDS, RAFFLE_REWARD_OPTIONS, RewardType, StreamType, richLen, stripRichText } from "../enums";
-import { AudienceField, HostPicker, ModeChoice, PickCard, PickPlaceholder } from "../pickers";
+import { ModeCards } from "../ModeCards";
+import { AudienceField, HostPicker, PickCard, PickPlaceholder } from "../pickers";
 import { HostSheet } from "../../library/hosts";
 import { fillHost, hostLabel, titleRule } from "../hosts";
 import { useWordsLock } from "../words";
 import { useSheet } from "../../library/shared";
-import { GAME_MODES, modeDefaults, modeId, newShowdown, useGameModePresets } from "../gameModes";
+import { GAME_MODES, baseOf, modeId, newShowdown, useGameModePresets, useStreamBuilder } from "../gameModes";
 import { DP } from "../../../providers";
 import { useTimezoneFormat } from "../../../contexts";
 import { DateTimeInput, NumberInput, RewardCell, TextInput, rewardText } from "./fields";
@@ -182,6 +183,7 @@ export function DetailsSection({ form, frame }) {
         <SwitchListRow control={control} name="isSpotlighted" icon="star" title="Spotlight" supporting="Featured at the top of the home screen" />
         <SwitchListRow control={control} name="headless" icon="smart_toy" title="Run headless" />
       </ListGroup>
+      <ShowdownTypeField control={control} setValue={form.setValue} />
     </FormSection>
   );
 }
@@ -326,11 +328,11 @@ export function ModeField({ control, setValue, prefix = "" }) {
   const { presets } = useGameModePresets();
   const pick = (id) => {
     const m = GAME_MODES[id];
-    setValue(at("gameMode"), m.base, { shouldDirty: true });
+    setValue(at("gameMode"), m.id, { shouldDirty: true });
     if (m.showdown && !showdown) setValue(at("showdownConfiguration"), newShowdown(presets[id], streamType), { shouldDirty: true });
     if (!m.showdown && showdown) setValue(at("showdownConfiguration"), null, { shouldDirty: true });
   };
-  return <ModeChoice value={modeId(gameMode, !!showdown)} onChange={pick} />;
+  return <ModeCards value={modeId(gameMode, !!showdown)} onChange={pick} />;
 }
 
 
@@ -364,7 +366,7 @@ export function WordsSection({ form, validateWord, onPickWords, frame }) {
     >
       {dialog}
       {/* Each round's word, time and Round Pounder, all in view (words masked while locked). */}
-      <RoundsEditor form={form} name="textSavvyRounds.rounds" fields={roundFields} append={appendRound} remove={removeRound} subText={gameMode === GameMode.SubText} validateWord={validateWord} masked={masked} />
+      <RoundsEditor form={form} name="textSavvyRounds.rounds" fields={roundFields} append={appendRound} remove={removeRound} subText={baseOf(gameMode) === GameMode.SubText} validateWord={validateWord} masked={masked} />
       {showdown && (
         <Box id="showdown" sx={{ display: "flex", flexDirection: "column", gap: 1, scrollMarginTop: 96 }}>
           <Typography variant="overline" color="text.secondary" component="h3" sx={{ px: 0.5 }}>
@@ -381,37 +383,45 @@ export function WordsSection({ form, validateWord, onPickWords, frame }) {
  * Game mode (Savvy TextChain or Savvy SubText) and its showdown (Savvy Showdown or Super Savvy
  * Showdown), both connected button groups. Scoring comes from the mode and can be changed here.
  */
-/** This stream's points per round (opened from "Game mode defaults"). */
+/** This stream's points per round; the section's summary says if they're still the game mode's. */
 export function ScoringSection({ form, frame }) {
   return (
     <FormSection {...frame} id="game" title="Scoring">
-      <ScoringRows form={form} />
+      <ScoringFields control={form.control} subText={baseOf(form.gameMode) === GameMode.SubText} roundCount={form.roundFields?.length ?? 5} withStumper={false} />
     </FormSection>
   );
 }
 
 export function GameModeSection({ form, frame }) {
   const { control, setValue } = form;
+  return (
+    <FormSection {...frame} id="mode" title="Game mode">
+      <ModeField control={control} setValue={setValue} />
+    </FormSection>
+  );
+}
+
+/**
+ * Savvy or Super Savvy Showdown: it follows who can join (a Super Savvy only stream always runs a
+ * Super Savvy Showdown), so it sits with the audience.
+ */
+function ShowdownTypeField({ control, setValue }) {
   const [gameMode, showdown, streamType] = useWatch({ control, name: ["gameMode", "showdownConfiguration", "streamType"] });
   const { presets } = useGameModePresets();
   const superSavvy = streamType === StreamType.SuperSavvy;
   const setShowdown = (superSavvyOnly) => setValue("showdownConfiguration", { ...(showdown ?? newShowdown(presets[modeId(gameMode)], streamType)), superSavvyOnly }, { shouldDirty: true });
-  // A Super Savvy only stream always runs a Super Savvy Showdown.
   useEffect(() => {
     if (superSavvy && showdown && !showdown.superSavvyOnly) setValue("showdownConfiguration", { ...showdown, superSavvyOnly: true }, { shouldDirty: true });
   }, [superSavvy, showdown, setValue]);
   return (
-    <FormSection {...frame} id="mode" title="Game mode">
-      <ModeField control={control} setValue={setValue} />
-      <ChoiceGroup
-        label="Showdown"
-        value={showdown ? (showdown.superSavvyOnly ? 1 : 0) : null}
-        options={SHOWDOWN_TYPES.map((t, i) => ({ value: i, label: t.label, icon: t.icon }))}
-        onChange={(v) => setShowdown(SHOWDOWN_TYPES[v].superSavvyOnly)}
-        disabled={superSavvy}
-        helperText={superSavvy ? "Super Savvy only streams always run a Super Savvy Showdown." : undefined}
-      />
-    </FormSection>
+    <ChoiceGroup
+      label="Showdown"
+      value={showdown ? (showdown.superSavvyOnly ? 1 : 0) : null}
+      options={SHOWDOWN_TYPES.map((t, i) => ({ value: i, label: t.label, icon: t.icon }))}
+      onChange={(v) => setShowdown(SHOWDOWN_TYPES[v].superSavvyOnly)}
+      disabled={superSavvy}
+      helperText={superSavvy ? "Super Savvy only streams always run a Super Savvy Showdown." : undefined}
+    />
   );
 }
 
@@ -525,38 +535,6 @@ export function ScoringFields({ control, subText, roundCount, prefix = "roundSco
 // Same values regardless of key order; numbers compared as numbers ("500" = 500).
 const canon = (v) => (v && typeof v === "object" ? Object.keys(v).sort().map((k) => [k, canon(v[k])]) : v == null || v === "" ? null : Number.isNaN(Number(v)) ? v : Number(v));
 const sameJson = (a, b) => JSON.stringify(canon(a)) === JSON.stringify(canon(b));
-
-/**
- * Points per round, edited right in the table. Says whether they're still the game mode's
- * defaults; once changed, "Use defaults" puts them back.
- */
-export function ScoringRows({ form, subText, roundCount, summary }) {
-  const { control, gameMode, setValue } = form;
-  const [showdown, scoring] = useWatch({ control, name: ["showdownConfiguration", "roundScoring"] });
-  const { presets } = useGameModePresets();
-  const defaults = modeDefaults(modeId(gameMode, !!showdown), presets[modeId(gameMode, !!showdown)]);
-  const same = sameJson(scoring, defaults.scoring);
-  return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, minHeight: 32 }}>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="labelLarge" color="text.secondary" component="div">
-            Points per round
-          </Typography>
-          <Typography variant="bodySmall" color="text.secondary" component="div">
-            {summary ? summary(scoring) : same ? "Game mode defaults" : "Custom for this stream"}
-          </Typography>
-        </Box>
-        {!summary && !same && (
-          <Button variant="tonal" size="small" startIcon={<Icon name="undo" />} onClick={() => setValue("roundScoring", structuredClone(defaults.scoring), { shouldDirty: true })}>
-            Use defaults
-          </Button>
-        )}
-      </Box>
-      <ScoringFields control={control} subText={subText ?? gameMode === GameMode.SubText} roundCount={roundCount ?? form.roundFields?.length ?? 5} withStumper={false} />
-    </Box>
-  );
-}
 
 // ---------------------------------------------------------------- rewards
 export const SHOWDOWN_REWARDS = ["Cash", "Sparks", "BombPowerup", "HintPowerup"];
@@ -1072,7 +1050,6 @@ export function useSectionStatus(form, sections, hosts) {
 
   const mode = GAME_MODES[modeId(gameMode)];
   const preset = presets[modeId(gameMode)];
-  const defaults = modeDefaults(modeId(gameMode, !!showdown), presets[modeId(gameMode, !!showdown)]);
   const words = (rounds ?? []).map((r) => r?.word).filter(Boolean);
   const missingWords = (rounds ?? []).length - words.length;
   const host = hosts.find((h) => h.id === hostId);
@@ -1080,37 +1057,44 @@ export function useSectionStatus(form, sections, hosts) {
   const notePreset = (noteData?.data ?? []).find((p) => NOTIFICATION_KEYS.every((k, i) => (p[k] ?? "") === (notes[i] ?? "")));
   const on = (v) => (Array.isArray(v) ? v.length > 0 : !!v);
   const participationReward = Array.isArray(participation) ? participation[0] : participation;
-  // One way to say where a value comes from, in every section: the game mode's default (or the
-  // Default preset) or changed for this stream.
-  const from = (text, isDefault) => `${text} · ${isDefault ? "Default" : "Custom"}`;
+  // What the game mode would give this stream (Game modes › Stream defaults): the same builder New
+  // stream and Fill month use. Each part says if it still matches it, and can go back to it.
+  const build = useStreamBuilder();
+  const defaultHost = hosts.find((h) => h.id === preset?.defaultHostId);
+  const template = build({ title, host: defaultHost ?? {}, startDate, gameMode: modeId(gameMode, !!showdown), streamType });
+  const from = (text, isDefault) => `${text} · ${isDefault ? `From ${mode?.label ?? "game mode"}` : "Changed"}`;
+  const resetTo = (names) => () => names.forEach((n) => form.setValue(n, structuredClone(template[n] ?? null), { shouldDirty: true }));
+  // Only a part that differs from the game mode offers the reset.
+  const part = (text, isDefault, names) => ({ summary: from(text, isDefault), onReset: isDefault ? undefined : resetTo(names) });
   const sponsorName = sponsorship ? (sponsorData?.data ?? []).find((sp) => sp.title === sponsorship.title)?.name ?? sponsorship.title ?? "Custom sponsor" : "No sponsor";
-  const defaultSponsor = (sponsorData?.data ?? []).find((sp) => sp.id === preset?.defaultSponsorId);
-  const sponsorIsDefault = defaultSponsor ? sponsorship?.title === defaultSponsor.title : !sponsorship;
-  const rewardsAreDefault = sameJson(participation ?? [], defaults.defaultRewards) && !on(buster) && (stumper ?? null) === (preset?.hostStumperBonusXp ?? null);
+  const sponsorIsDefault = (sponsorship?.title ?? null) === (template.sponsorship?.title ?? null);
+  const rewardsAreDefault = sameJson(participation ?? [], template.defaultRewards) && !on(buster) && (stumper ?? null) === (template.hostStumperBonusXp ?? null);
+  const shareIsDefault = sameJson(cards, template.shareableCards);
+  const notesAreDefault = NOTIFICATION_KEYS.every((k, i) => (notes[i] ?? "") === (template[k] ?? ""));
 
   const parts = {
     basics: {
       todo: [!title?.trim() && "Add a title", !startDate && "Pick a date"].filter(Boolean),
-      summary: [fillHost(title?.trim(), hostLabel(host) || hostName) || "Untitled", startDate && formatDate(startDate, "ddd, MMM D · h:mm A"), streamType === StreamType.Internal ? "Internal" : streamType === StreamType.SuperSavvy ? "Super Savvy only" : "Public"].filter(Boolean).join(" · "),
+      summary: [fillHost(title?.trim(), hostLabel(host) || hostName) || "Untitled", startDate && formatDate(startDate, "ddd, MMM D · h:mm A"), streamType === StreamType.Internal ? "Internal" : streamType === StreamType.SuperSavvy ? "Super Savvy only" : "Public", showdown && (showdown.superSavvyOnly ? "Super Savvy Showdown" : "Savvy Showdown")].filter(Boolean).join(" · "),
     },
     // The pictures come from the host: missing ones are added in Hosts.
-    host: { todo: [!hostId && "Pick a host", hostId && !form.imageUrl && "Host picture missing", hostId && !form.heroImageUrl && "Stream image missing"].filter(Boolean), summary: hostId ? from(hostLabel(host) || hostName, hostId === preset?.defaultHostId) : "No host" },
-    mode: { todo: [], summary: [mode?.label, showdown ? (showdown.superSavvyOnly ? "Super Savvy Showdown" : "Savvy Showdown") : "No showdown"].filter(Boolean).join(" · ") },
+    host: { todo: [!hostId && "Pick a host", hostId && !form.imageUrl && "Host picture missing", hostId && !form.heroImageUrl && "Stream image missing"].filter(Boolean), ...(hostId ? part(hostLabel(host) || hostName, !defaultHost || hostId === defaultHost.id, ["hostId", "hostName", "imageUrl", "heroImageUrl", "heroCardImageUrl"]) : { summary: "No host" }) },
+    mode: { todo: [], summary: mode?.custom ? `${mode.label} · plays ${GAME_MODES[mode.base]?.label}` : mode?.label ?? "" },
     words: {
       todo: [missingWords > 0 && `${missingWords} ${missingWords === 1 ? "word" : "words"} missing`, (rounds ?? []).length === 0 && "No rounds", showdown && !showdown.word && "Showdown word missing"].filter(Boolean),
       summary: wordsHidden
         ? [words.length ? `${words.length} ${words.length === 1 ? "word" : "words"}` : "No words yet", showdown?.word && "showdown word"].filter(Boolean).join(" + ")
         : [words.join(", ") || "No words yet", showdown?.word && `showdown: ${showdown.word}`].filter(Boolean).join(" · "),
     },
-    game: { todo: [], summary: from("Points per round", sameJson(scoring, defaults.scoring)) },
-    sponsor: { todo: [], summary: from(sponsorName, sponsorIsDefault) },
+    game: { todo: [], ...part("Points per round", sameJson(scoring, template.roundScoring), ["roundScoring"]) },
+    sponsor: { todo: [], ...part(sponsorName, sponsorIsDefault, ["sponsorship"]) },
     "rewards-card": {
       todo: [],
-      summary: from([on(participation) ? `Participation: ${rewardText(participationReward)}` : "No participation reward", on(buster) && `Host buster: ${rewardText(buster)}`, stumper != null && `Stumper: ${stumper} XP`].filter(Boolean).join(" · "), rewardsAreDefault),
+      ...part([on(participation) ? `Participation: ${rewardText(participationReward)}` : "No participation reward", on(buster) && `Host buster: ${rewardText(buster)}`, stumper != null && `Stumper: ${stumper} XP`].filter(Boolean).join(" · "), rewardsAreDefault, ["defaultRewards", "hostBusterReward", "hostStumperBonusXp"]),
     },
     raffle: { todo: [], summary: on(raffle) ? `${raffle.length} ${raffle.length === 1 ? "winner" : "winners"}` : "Off" },
-    share: { todo: [], summary: sharePreset ? from(`${sharePreset.name} preset`, sharePreset.isDefault) : from("Own cards", false) },
-    "notifications-card": { todo: [], summary: notePreset ? from(`${notePreset.name} preset`, notePreset.isDefault) : from("Own texts", false) },
+    share: { todo: [], ...part(sharePreset ? `${sharePreset.name} preset` : "Own cards", shareIsDefault, ["shareableCards"]) },
+    "notifications-card": { todo: [], ...part(notePreset ? `${notePreset.name} preset` : "Own texts", notesAreDefault, NOTIFICATION_KEYS) },
   };
 
   return Object.fromEntries(
@@ -1118,7 +1102,7 @@ export function useSectionStatus(form, sections, hosts) {
       const p = parts[s.id] ?? { todo: [], summary: "" };
       const failing = s.fields.filter((f) => f.split(".").reduce((o, k) => o?.[k], errors));
       const state = failing.length ? "error" : p.todo.length ? "todo" : "ok";
-      return [s.id, { state, summary: p.summary, todo: p.todo, label: s.label }];
+      return [s.id, { state, summary: p.summary, todo: p.todo, label: s.label, onReset: p.onReset }];
     }),
   );
 }

@@ -1154,7 +1154,7 @@ on("put", "/admin/game-modes/:id", ({ params, body }) => {
   const prev = db.gameModes[i];
   const errors = {};
   const count = Number(body.roundCount);
-  if (params.id.startsWith("SubText") && count !== 5) errors.roundCount = ["SubText always has 5 rounds."];
+  if ((prev.base ?? prev.id) === "SubText" && count !== 5) errors.roundCount = ["SubText always has 5 rounds."];
   if (!(count >= 1 && count <= 20)) errors.roundCount = ["Use 1 to 20 rounds."];
   if (!(Number(body.roundDurationInSeconds) >= 5)) errors.roundDurationInSeconds = ["At least 5 seconds."];
   const powerUps = compactArr(body.howToPlay?.powerUps ?? []).map((p) => {
@@ -1181,10 +1181,43 @@ on("put", "/admin/game-modes/:id", ({ params, body }) => {
     howToPlay: { powerUps },
     defaultHostId: body.defaultHostId || null,
     defaultSponsorId: body.defaultSponsorId || null,
+    // The share card and notification presets new streams of this mode start from (none: the
+    // libraries' Default preset).
+    defaultSharePresetId: body.defaultSharePresetId || null,
+    defaultNotificationPresetId: body.defaultNotificationPresetId || null,
     showdown: prev.showdown ? { prize: { rewardType: body.showdown?.prize?.rewardType ?? "Cash", amount: Number(body.showdown?.prize?.amount) || 1 }, superSavvyOnly: !!body.showdown?.superSavvyOnly } : null,
   };
   refreshUpcoming((s) => (s.gameMode ?? "TextChain") === db.gameModes[i].id);
   return json(db.gameModes[i]);
+});
+
+// A new game mode plays an existing game's rules (`base`: TextChain or SubText) with its own name,
+// logo, word sets, time slots and stream defaults; it starts as a copy of that game's settings.
+on("post", "/admin/game-modes", ({ body }) => {
+  const name = String(body?.name ?? "").trim();
+  const from = db.gameModes.find((m) => m.id === body?.base && !m.base);
+  const errors = {};
+  if (!name) errors.name = ["Enter a name."];
+  else if (name.length > 40) errors.name = ["Use 40 characters or fewer."];
+  else if (db.gameModes.some((m) => m.name.toLowerCase() === name.toLowerCase())) errors.name = ["A game mode with this name exists."];
+  if (!from) errors.base = ["Pick the game it plays."];
+  if (Object.keys(errors).length) return badRequest(errors);
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "mode";
+  let id = `${from.id}-${slug}`;
+  for (let n = 2; db.gameModes.some((m) => m.id === id); n++) id = `${from.id}-${slug}-${n}`;
+  const mode = { ...structuredClone(from), id, base: from.id, name, gameLogoUrl: null, gameModeIconUrl: null, gameModeDisplayName: null };
+  db.gameModes.push(mode);
+  return json(mode);
+});
+// Only a mode made here can go, and only while no stream, word set or time slot uses it.
+on("delete", "/admin/game-modes/:id", ({ params }) => {
+  const m = db.gameModes.find((x) => x.id === params.id);
+  if (!m) return notFound();
+  if (!m.base) return badRequest({ id: ["Built-in game modes can't be deleted."] });
+  const used = db.streams.some((st) => st.gameMode === m.id) || db.wordSets.some((w) => w.type === m.id) || db.scheduleSlots.some((sl) => sl.gameMode === m.id);
+  if (used) return badRequest({ id: ["Its streams, word sets or time slots still use it."] });
+  db.gameModes = db.gameModes.filter((x) => x.id !== m.id);
+  return json({ id: m.id });
 });
 
 // ---- Schedule slots (prototype endpoints): the whole list is read and replaced at once.
@@ -1226,7 +1259,7 @@ function wordSetFromBody(b, prev) {
 function wordSetErrors(w) {
   const errors = {};
   const okWord = (v) => /^[a-z]+$/.test(v);
-  if (w.type !== "TextChain" && w.type !== "SubText") errors.type = ["Pick TextChain or SubText."];
+  if (!db.gameModes.some((m) => m.id === w.type)) errors.type = ["Pick a game mode."];
   if (!w.title) errors.title = ["Enter a name."];
   const n = w.rounds.length;
   if (n < 5 || n > 20) errors.rounds = ["Use 5 to 20 rounds."];

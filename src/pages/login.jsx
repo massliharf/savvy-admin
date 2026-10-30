@@ -32,8 +32,9 @@ export default function LoginPage() {
   });
 
   return (
-    <Box sx={{ minHeight: "100dvh", display: "grid", placeItems: "center", bgcolor: c.surfaceContainer, px: 2, py: 4 }}>
-      <Card component="main" sx={{ width: "100%", maxWidth: 420, p: { xs: 3, sm: 5 }, bgcolor: c.surface, borderRadius: radius("lg"), border: `1px solid ${c.border}` }}>
+    // Same layers as the app: its outer background, the card a panel on it.
+    <Box sx={{ minHeight: "100dvh", display: "grid", placeItems: "center", bgcolor: c.background, px: 2, py: 4 }}>
+      <Card component="main" sx={{ width: "100%", maxWidth: 420, p: { xs: 3, sm: 5 }, bgcolor: c.surfaceContainerLowest, borderRadius: radius("lg"), border: "none", boxShadow: "none" }}>
         <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 1, mb: 4 }}>
           <Box component="img" src={LOGO_URL} alt="" sx={{ width: 64, height: 64, mb: 1 }} />
           <Typography variant="headlineMedium" component="h1">

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "@refinedev/react-hook-form";
 import { useFieldArray, useWatch } from "react-hook-form";
 import { DEFAULT_HOST_STUMPER_BONUS_XP, DEFAULT_ROUND_DURATION, DEFAULT_ROUND_SCORING, DEFAULT_STREAM_IMAGE, GameMode, RewardType, SUBTEXT_ROUNDS, durationFor } from "./enums";
+import { baseOf } from "./gameModes";
 
 const DEFAULT_IMAGE_SIZE = 256; // Wb
 
@@ -111,7 +112,7 @@ export function useStreamForm({ streamId, action, defaultValues, redirect = "lis
   useEffect(() => {
     const prev = prevGameMode.current;
     prevGameMode.current = gameMode;
-    if (gameMode === GameMode.SubText) {
+    if (baseOf(gameMode) === GameMode.SubText) {
       const rounds = getValues("textSavvyRounds.rounds") ?? [];
       if (rounds.length < SUBTEXT_ROUNDS) {
         appendRound(
@@ -140,7 +141,7 @@ export function useStreamForm({ streamId, action, defaultValues, redirect = "lis
       if (bonus == null) setValue("hostStumperBonusXp", DEFAULT_HOST_STUMPER_BONUS_XP, { shouldDirty: true });
       return;
     }
-    if (prev === GameMode.SubText) {
+    if (prev && baseOf(prev) === GameMode.SubText) {
       const rounds = getValues("textSavvyRounds.rounds") ?? [];
       const empty = rounds
         .map((r, i) => (String(r.word ?? "").trim() === "" ? i : -1))
@@ -225,7 +226,7 @@ export function useStreamForm({ streamId, action, defaultValues, redirect = "lis
           round5OrMore: count >= 5 ? values.roundScoring.round5OrMore : undefined,
         }
       : values.roundScoring;
-    const hasStumper = values.gameMode === GameMode.SubText || count >= 5;
+    const hasStumper = baseOf(values.gameMode) === GameMode.SubText || count >= 5;
     const bonus = values.hostStumperBonusXp;
     const hostStumperBonusXp = hasStumper && Number.isFinite(bonus) ? bonus : undefined;
     // eslint-disable-next-line no-unused-vars

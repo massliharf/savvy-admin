@@ -37,7 +37,8 @@ const VIEWS = [
 ];
 
 const FILTER_GROUPS = { mode: "Game mode", type: "Visibility", setup: "Status" };
-const FILTERS = [
+// A function: game modes made in the admin join the list once their presets load.
+const filters = () => [
   ...Object.values(GAME_MODES).map((m) => ({ id: `mode:${m.id}`, group: "mode", label: m.label, test: (s) => modeOf(s).id === m.id })),
   ...Object.entries(STREAM_TYPES).map(([v, t]) => ({ id: `type:${v}`, group: "type", label: t.label, test: (s) => s.streamType === v })),
   { id: "draft", group: "setup", label: "Needs words", test: logoHidden },
@@ -158,7 +159,7 @@ export default function StreamList() {
   const matching = useMemo(() => {
     const q = query.trim().toLowerCase();
     const byGroup = active.reduce((acc, id) => {
-      const f = FILTERS.find((x) => x.id === id);
+      const f = filters().find((x) => x.id === id);
       (acc[f.group] ??= []).push(f.test);
       return acc;
     }, {});
@@ -264,7 +265,7 @@ export default function StreamList() {
           )}
           <ViewToggle value={view} onChange={setView} views={VIEWS} />
           {/* Game mode, visibility and status share one chip: one menu, titled groups. */}
-          <MenuFilterChip label="Filter" options={FILTERS} groups={FILTER_GROUPS} selected={active} onToggle={toggleFilter} onClear={() => setActive([])} />
+          <MenuFilterChip label="Filter" options={filters()} groups={FILTER_GROUPS} selected={active} onToggle={toggleFilter} onClear={() => setActive([])} />
         </PageToolbar>
         {/* The colour legend only matters where colour is the main cue: the calendar. */}
         {view === "calendar" && (

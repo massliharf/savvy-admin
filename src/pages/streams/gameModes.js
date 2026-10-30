@@ -36,6 +36,20 @@ export const GAME_MODES = {
     hostStumperBonusXp: DEFAULT_HOST_STUMPER_BONUS_XP,
   },
 };
+/**
+ * Game modes made in the admin play a built-in game's rules (`base`) under their own name; they're
+ * added here as their presets load, so every lookup by id (GAME_MODES[id], modeOf) finds them.
+ */
+function registerModes(list) {
+  list.forEach((p) => {
+    const from = GAME_MODES[p.base];
+    if (p.base && from) GAME_MODES[p.id] = { ...from, id: p.id, base: p.base, label: p.name, custom: true };
+  });
+  Object.keys(GAME_MODES).forEach((id) => GAME_MODES[id].custom && !list.some((p) => p.id === id) && delete GAME_MODES[id]);
+}
+/** The built-in game whose rules a mode plays (TextChain or SubText). */
+export const baseOf = (gameMode) => GAME_MODES[gameMode]?.base ?? gameMode ?? GameMode.TextChain;
+
 /** Every game mode (one colour each in the calendar). */
 export const BASE_MODES = Object.values(GAME_MODES);
 /** Id of the game mode a stream (or slot) plays. The showdown no longer makes a mode of its own. */
@@ -64,6 +78,7 @@ export const NOTIFICATION_DEFAULTS = {
 export function useGameModePresets() {
   const { data, isLoading } = useList({ resource: "GameMode", dataProviderName: DP.gameModes, pagination: { mode: "off" } });
   const presets = Object.fromEntries((data?.data ?? []).map((m) => [m.id, m]));
+  if (data?.data) registerModes(data.data);
   return { presets, isLoading };
 }
 
@@ -93,7 +108,7 @@ export function streamFromPreset({ title, host, startDate, gameMode, streamType 
     heroCardImageUrl: host.heroCardImageUrl ?? null,
     startDate,
     streamType,
-    gameMode: meta.base,
+    gameMode: meta.id,
     showdownConfiguration: meta.showdown ? newShowdown(preset, streamType) : null,
     headless: false,
     isSpotlighted: false,
@@ -111,8 +126,8 @@ export function streamFromPreset({ title, host, startDate, gameMode, streamType 
 
 /**
  * The one way a new stream is put together (New stream and Fill month alike): the game mode's
- * defaults (rounds, scoring, rewards, showdown, host's pictures, default sponsor), then the
- * Default share card and notification presets. Words come later, from a word set.
+ * defaults (rounds, scoring, rewards, showdown, host's pictures, default sponsor, share card and
+ * notification presets). Words come later, from a word set.
  */
 export function useStreamBuilder() {
   const { presets } = useGameModePresets();
@@ -122,8 +137,9 @@ export function useStreamBuilder() {
   return (base) => {
     const preset = presets[base.gameMode];
     const values = streamFromPreset(base, preset);
-    const sharePreset = share?.data?.find((p) => p.isDefault) ?? share?.data?.[0];
-    const notifyPreset = notify?.data?.find((p) => p.isDefault) ?? notify?.data?.[0];
+    // The game mode's presets, else the libraries' Default ones.
+    const sharePreset = share?.data?.find((p) => p.id === preset?.defaultSharePresetId) ?? share?.data?.find((p) => p.isDefault) ?? share?.data?.[0];
+    const notifyPreset = notify?.data?.find((p) => p.id === preset?.defaultNotificationPresetId) ?? notify?.data?.find((p) => p.isDefault) ?? notify?.data?.[0];
     if (sharePreset) values.shareableCards = structuredClone(sharePreset.cards);
     if (notifyPreset) Object.keys(NOTIFICATION_DEFAULTS).forEach((k) => (values[k] = notifyPreset[k] ?? values[k]));
     const sponsor = sponsors?.data?.find((sp) => sp.id === preset?.defaultSponsorId);
