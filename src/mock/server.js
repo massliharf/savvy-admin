@@ -235,6 +235,29 @@ const uuid = () =>
 const now = () => new Date().toISOString();
 
 let db = load();
+// Pictures that ship with the app (host, stream, sponsor, logos, items) are saved as URLs, which
+// change from build to build (dev paths, hashed names). Point every saved one at this build's file,
+// so pictures saved by an older version still show.
+{
+  const files = import.meta.glob("../assets/**/*.{png,svg}", { eager: true, query: "?url", import: "default" });
+  const current = Object.fromEntries(Object.entries(files).map(([path, url]) => [path.split("/").pop().replace(/\.(png|svg)$/, ""), url]));
+  const stems = Object.keys(current).map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).sort((x, y) => y.length - x.length);
+  const re = new RegExp(`/(${stems.join("|")})(-[A-Za-z0-9_-]{8})?\\.(png|svg)(\\?[^"]*)?$`);
+  const fix = (v) => {
+    if (typeof v === "string") {
+      if (v.startsWith("data:") || v.startsWith("blob:")) return v;
+      const m = v.match(re);
+      return m ? current[m[1]] : v;
+    }
+    if (Array.isArray(v)) return v.map(fix);
+    if (v && typeof v === "object") {
+      for (const k of Object.keys(v)) v[k] = fix(v[k]);
+      return v;
+    }
+    return v;
+  };
+  fix(db);
+}
 // Game modes carry a default host and sponsor that new streams of the mode start with.
 db.gameModes.forEach((m) => {
   if (!("defaultHostId" in m)) m.defaultHostId = db.hosts?.[0]?.id ?? null;
