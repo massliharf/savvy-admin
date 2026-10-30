@@ -3,10 +3,10 @@
 // localStorage ("savvy-mock-db"); call window.__resetMockDb() to restore the seed.
 import * as seed from "./seed";
 import { LOGO_URL } from "../assets";
-import { MODE_LOGOS, STREAM_HERO_URL } from "../assets";
+import { HOST_PICTURE_URL, MODE_LOGOS, STREAM_HERO_URL } from "../assets";
 
 const DB_KEY = "savvy-mock-db";
-const DB_VERSION = 44;
+const DB_VERSION = 45;
 
 // A busy sample schedule, about six weeks around today, so every state shows: ended and canceled
 // streams, one live now, upcoming ones with all their words (logo shown), with none or some missing
@@ -420,6 +420,21 @@ function load() {
         (parsed.gameModes ?? []).forEach((m) => (m.howToPlay = seed.seedHowToPlay()));
         parsed.version = 44;
       }
+      if (parsed.version === 44) {
+        // v45: pictures that pointed at removed sample files point at the current sample art
+        const swap = { "host-scott.png": HOST_PICTURE_URL, "stream-hero.png": STREAM_HERO_URL, "sponsor-wendys.svg": seed.WENDYS.imageUrl };
+        const fix = (v) => {
+          if (typeof v === "string") {
+            const hit = Object.keys(swap).find((f) => v.endsWith(`/${f}`) || v.includes(`/${f}?`));
+            return hit ? swap[hit] : v;
+          }
+          if (Array.isArray(v)) return v.map(fix);
+          if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, fix(x)]));
+          return v;
+        };
+        Object.assign(parsed, fix(parsed));
+        parsed.version = 45;
+      }
       if (parsed.version === DB_VERSION) return parsed;
       // Older versions: add what's new and keep everything else.
       if (parsed.version === 4) {
@@ -563,7 +578,9 @@ function save() {
   try {
     localStorage.setItem(DB_KEY, JSON.stringify(db));
   } catch {
-    /* quota (large data URLs) — keep in memory */
+    // Storage full (large pictures): the change lives in memory only, so say so instead of
+    // letting it vanish on the next reload.
+    if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("savvy-mock-save-failed"));
   }
 }
 if (typeof window !== "undefined") {

@@ -28,9 +28,10 @@ async function cropToFile(src, area, width, height) {
   canvas.height = height;
   canvas.getContext("2d").drawImage(img, area.x, area.y, area.width, area.height, 0, 0, width, height);
   const blob = await new Promise((resolve, reject) =>
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Canvas toBlob failed"))), "image/png"),
+    // WebP keeps transparency (logos) at a fraction of PNG's size, so uploads fit the saved data.
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Canvas toBlob failed"))), "image/webp", 0.88),
   );
-  return new File([blob], "image.png", { type: "image/png" });
+  return new File([blob], "image.webp", { type: blob.type || "image/webp" });
 }
 
 /** A picked file's preview (an object URL while it's mounted), else the saved URL. */
@@ -151,7 +152,7 @@ export function ImageField({ label, value, width, height, onChange, onRemove, hi
             <Icon name="zoom_in" size={20} />
           </Box>
           <Typography variant="bodySmall" color="text.secondary">
-            Saved as a {width} × {height} px PNG.
+            Saved as a {width} × {height} px image.
           </Typography>
         </DialogContent>
         <DialogActions>

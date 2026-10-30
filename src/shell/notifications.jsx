@@ -1,4 +1,4 @@
-import { forwardRef, useCallback } from "react";
+import { forwardRef, useCallback, useEffect } from "react";
 import { SnackbarContent, SnackbarProvider, useSnackbar } from "notistack";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -66,6 +66,17 @@ const Snackbar = forwardRef(function Snackbar({ id, message, variant, descriptio
 
 const COMPONENTS = { default: Snackbar, success: Snackbar, error: Snackbar, warning: Snackbar, info: Snackbar };
 
+/** Tells the user when the prototype's data couldn't be saved in the browser (storage full). */
+function SaveFailedWatcher() {
+  const { enqueueSnackbar } = useSnackbar();
+  useEffect(() => {
+    const onFail = () => enqueueSnackbar("Couldn't save in this browser: storage is full. Remove large pictures and try again.", { variant: "error", preventDuplicate: true });
+    window.addEventListener("savvy-mock-save-failed", onFail);
+    return () => window.removeEventListener("savvy-mock-save-failed", onFail);
+  }, [enqueueSnackbar]);
+  return null;
+}
+
 export function SnackbarHost({ children }) {
   return (
     <>
@@ -79,6 +90,7 @@ export function SnackbarHost({ children }) {
         disableWindowBlurListener
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
+        <SaveFailedWatcher />
         {children}
       </SnackbarProvider>
     </>
