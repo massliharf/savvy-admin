@@ -29,9 +29,11 @@ export function SideSheet({ open, onClose, onBack, title, subtitle, children, ac
       onClose={guarded(onClose)}
       // `instant`: one view of a sheet swapping to another (e.g. Fill month ↔ Time slots), no slide.
       transitionDuration={instant ? 0 : undefined}
-      slotProps={{ paper: { sx: { width: { xs: "100%", sm: 520 }, maxWidth: "100%", borderRadius: { xs: 0, sm: undefined } } } }}
+      // The paper never scrolls (only the form inside does): otherwise wheel or focus scrolling
+      // could push the whole sheet, header and footer included, up and leave a blank area below.
+      slotProps={{ paper: { sx: { width: { xs: "100%", sm: 520 }, maxWidth: "100%", borderRadius: { xs: 0, sm: undefined }, overflow: "clip" } } }}
     >
-      <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <Box sx={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, pl: onBack ? 1 : 2.5, pr: 1.5, pt: 2, pb: 1.5 }}>
           {onBack && (
             <Tooltip title="Back">
@@ -61,7 +63,7 @@ export function SideSheet({ open, onClose, onBack, title, subtitle, children, ac
           component="form"
           autoComplete="off"
           onSubmit={(e) => e.preventDefault()}
-          sx={{ flex: 1, overflowY: "auto", scrollbarGutter: "stable", px: 2.5, pt: 1, pb: 2.5, display: "flex", flexDirection: "column", gap: 2 }}
+          sx={{ flex: 1, minHeight: 0, overflowY: "auto", overscrollBehavior: "contain", scrollbarGutter: "stable", px: 2.5, pt: 1, pb: 2.5, display: "flex", flexDirection: "column", gap: 2 }}
         >
           {children}
         </Box>
