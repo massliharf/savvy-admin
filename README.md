@@ -2,7 +2,9 @@
 
 A clickable prototype of the Savvy admin dashboard: streams and their schedule, bundles and word sets, How to play & format, time slots, hosts, sponsors, polls, seasons, users and the shop. It runs entirely in the browser on a mock backend; sign in with any email and password.
 
-**Live:** https://massliharf.github.io/savvy-admin-2/ (version 1: https://massliharf.github.io/savvy-admin/)
+**Live:** https://massliharf.github.io/savvy-admin/savvy-admin-2/ (version 1: https://massliharf.github.io/savvy-admin/)
+
+This is the `v2` branch. The Pages workflow on `main` publishes `main` at the site root and this branch under `savvy-admin-2/`; after pushing here, run that workflow again (Actions › Deploy to GitHub Pages › Run workflow).
 
 ```bash
 npm install
