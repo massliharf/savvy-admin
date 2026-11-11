@@ -181,6 +181,7 @@ function PresetSheet({ state, onClose, onDelete }) {
     <SideSheet
       open={open}
       onClose={onClose}
+      dirty={formState.isDirty}
       title={preset ? preset.question : `New ${meta.label.toLowerCase()}`}
       subtitle={preset ? meta.label : undefined}
       footerStart={

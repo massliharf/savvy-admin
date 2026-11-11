@@ -1,8 +1,8 @@
-// Streams › Game modes — one place per game mode: its sets (words + rewards, what each stream plays),
-// its weekly times and Fill month. The mode's own settings (rules, scoring, defaults, How to play)
-// sit behind Advanced. Streams show in the app right away; the game mode logo once words are in.
+// Streams › Bundles — the bundles (what a new stream starts with: points, showdown, rewards,
+// messaging; a card opens its settings) and the word sets. A word set is only words: it has no
+// format and no rewards, and any stream can take it.
 import { useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router";
+import { useNavigate } from "react-router";
 import { useCustomMutation, useInvalidate, useList } from "@refinedev/core";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -21,12 +21,9 @@ import { CardsSkeleton } from "../../ds/Skeletons";
 import { dayjs, useTimezoneFormat } from "../../contexts";
 import { DP } from "../../providers";
 import { useNotify } from "../../shell/notifications";
-import { GameMode } from "./enums";
-import { rewardText } from "./detail/fields";
-import { GAME_MODES, useGameModePresets } from "./gameModes";
 import { StreamPickerDialog } from "./pickers";
 import { showTitle } from "./hosts";
-import { ModeCards } from "./ModeCards";
+import { BundleCards } from "./BundleCards";
 import { NewModeDialog } from "../gameModes/NewModeDialog";
 import { useWordValidator } from "./form";
 import { WordSetCard, WordSetSheet, WordSetSummary, isPublic, missingRoundWords, needsSet, setDetails, setState, useWordSetActions, useWordSets, useWordsLock, wordsOf } from "./words";
@@ -37,24 +34,14 @@ const TABS = [
   { id: "used", label: "Used" },
 ];
 
-/** "Showdown $100": the set's showdown prize (else the game mode's). */
-function rewardsLine(set, preset) {
-  const prize = set.showdown?.prize ?? preset?.showdown?.prize;
-  return set.showdown && prize ? `Showdown ${rewardText(prize)}` : "";
-}
-
 export default function GameModesPage() {
   const { m3: c } = useTheme();
   const { formatDate } = useTimezoneFormat();
   const notify = useNotify();
   const invalidate = useInvalidate();
-  const [params, setParams] = useSearchParams();
-  const mode = GAME_MODES[params.get("mode")] ? params.get("mode") : GameMode.TextChain;
   const [newMode, setNewMode] = useState(false);
   const navigate = useNavigate();
-  const setMode = (m) => setParams((p) => ({ ...Object.fromEntries(p), mode: m }), { replace: true });
 
-  const { presets } = useGameModePresets();
   const { sets, isLoading } = useWordSets();
   const { data: streamData } = useList({ resource: "TextSavvyStream", pagination: { current: 1, pageSize: 1000 } });
   const streams = useMemo(() => streamData?.data ?? [], [streamData]);
@@ -74,12 +61,12 @@ export default function GameModesPage() {
   const [deleting, setDeleting] = useState(null);
   const [autoOpen, setAutoOpen] = useState(false);
 
-  const preset = presets[mode];
-  const upcoming = useMemo(() => streams.filter((s) => s.status === "Scheduled" && dayjs(s.startDate).isAfter(dayjs()) && (s.gameMode ?? GameMode.TextChain) === mode), [streams, mode]);
-  // Upcoming public streams of this mode still waiting for words: the app hides their mode logo.
-  const waiting = useMemo(() => upcoming.filter((s) => isPublic(s) && needsSet(s, mode)).sort((a, b) => Date.parse(a.startDate) - Date.parse(b.startDate)), [upcoming, mode]);
+  // Upcoming streams; a set goes to one of its own format, or to one without a format yet.
+  const upcoming = useMemo(() => streams.filter((s) => s.status === "Scheduled" && dayjs(s.startDate).isAfter(dayjs())), [streams]);
+  // Upcoming public streams this format's sets could fill: the app hides their logo until then.
+  const waiting = useMemo(() => upcoming.filter((s) => isPublic(s) && needsSet(s)).sort((a, b) => Date.parse(a.startDate) - Date.parse(b.startDate)), [upcoming]);
 
-  const mine = useMemo(() => sets.filter((s) => s.type === mode).map((set) => ({ set, state: setState(set, streamsById) })), [sets, mode, streamsById]);
+  const mine = useMemo(() => sets.map((set) => ({ set, state: setState(set, streamsById) })), [sets, streamsById]);
   const ready = mine.filter((r) => r.state.key === "available").sort((a, b) => Date.parse(a.set.createdAt) - Date.parse(b.set.createdAt));
   const count = (key) => mine.filter((r) => r.state.key === key).length;
   const rows = useMemo(() => {
@@ -97,14 +84,14 @@ export default function GameModesPage() {
       await request({ url: "/TextSavvyStream/bulk", method: "post", values: { streams: [], assignments: autoPairs }, dataProviderName: undefined, successNotification: false, errorNotification: false });
       invalidate({ resource: "TextSavvyStream", invalidates: ["list"] });
       invalidate({ resource: "WordSet", dataProviderName: DP.wordSets, invalidates: ["list"] });
-      notify(`${autoPairs.length} ${autoPairs.length === 1 ? "stream got its words" : "streams got their words"}; the game mode logo now shows`);
+      notify(`${autoPairs.length} ${autoPairs.length === 1 ? "stream got its words" : "streams got their words"}`);
     } catch (e) {
       notify(e?.response?.data?.detail ?? "Couldn't add the words", { variant: "error" });
     }
   };
 
   const candidates = assigning
-    ? upcoming.filter((s) => !onlyMissing || needsSet(s, mode)).sort((a, b) => Date.parse(a.startDate) - Date.parse(b.startDate))
+    ? upcoming.filter((s) => !onlyMissing || needsSet(s)).sort((a, b) => Date.parse(a.startDate) - Date.parse(b.startDate))
     : [];
   const describe = (s) => {
     const internal = isPublic(s) ? null : "Internal: the set stays ready";
@@ -126,17 +113,17 @@ export default function GameModesPage() {
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-      {/* The game modes: pick one to see its word sets; its card opens its settings. */}
+      {/* The bundles: a card opens that bundle's settings. */}
       <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <Typography variant="overline" color="text.secondary" component="h2" sx={{ flex: 1 }}>
-            Game modes
+            Bundles
           </Typography>
           <Button variant="tonal" startIcon={<Icon name="add" />} onClick={() => setNewMode(true)}>
-            New game mode
+            New bundle
           </Button>
         </Box>
-        <ModeCards value={mode} onChange={setMode} onSettings={(id) => navigate(`/game-modes/${id}`)} />
+        <BundleCards onOpen={(id) => navigate(`/bundles/${id}`)} />
       </Box>
       <NewModeDialog
         open={newMode}
@@ -144,13 +131,13 @@ export default function GameModesPage() {
         onCreated={(m) => {
           setNewMode(false);
           notify(`“${m.name}” created`);
-          // Opens on its settings: logo, defaults and how it shows in the app come next.
-          navigate(`/game-modes/${m.id}`);
+          // Opens on its settings: points, showdown, rewards and messaging come next.
+          navigate(`/bundles/${m.id}`);
         }}
       />
 
       <Typography variant="overline" color="text.secondary" component="h2" sx={{ mb: -1.5 }}>
-        {`${presets[mode]?.name ?? GAME_MODES[mode].label} word sets`}
+        Word sets
       </Typography>
       <PageToolbar
         search={<SearchField value={query} onChange={setQuery} placeholder={hidden ? "Search names" : "Search words or names"} />}
@@ -171,7 +158,7 @@ export default function GameModesPage() {
             )
           }
         >
-          {`${waiting.length} upcoming ${waiting.length === 1 ? "stream shows" : "streams show"} without the game mode logo until ${waiting.length === 1 ? "it gets" : "they get"} words. ${ready.length ? `${ready.length} ${ready.length === 1 ? "word set is" : "word sets are"} ready.` : "No word sets are ready."}`}
+          {`${waiting.length} upcoming ${waiting.length === 1 ? "stream is" : "streams are"} still waiting for words. ${ready.length ? `${ready.length} ${ready.length === 1 ? "word set is" : "word sets are"} ready.` : "No word sets are ready."}`}
         </Banner>
       )}
 
@@ -201,7 +188,7 @@ export default function GameModesPage() {
                 state={state}
                 hidden={hidden}
                 showState={false}
-                detail={`${setDetails(set)}${rewardsLine(set, preset) ? ` · ${rewardsLine(set, preset)}` : ""}`}
+                detail={setDetails(set)}
                 onOpen={() => unlock(() => setSheet(set))}
                 actions={
                   <ActionMenu
@@ -220,7 +207,7 @@ export default function GameModesPage() {
       </Box>
 
       {unlockDialog}
-      <WordSetSheet open={!!sheet} set={sheet} mode={mode} onClose={() => setSheet(null)} validateWord={validateWord} />
+      <WordSetSheet open={!!sheet} set={sheet} onClose={() => setSheet(null)} validateWord={validateWord} />
       <StreamPickerDialog
         open={!!assigning}
         title="Assign to a stream"
@@ -234,7 +221,7 @@ export default function GameModesPage() {
         streams={candidates}
         describe={describe}
         toggle={{ label: "Only streams missing words", value: onlyMissing, onChange: setOnlyMissing }}
-        emptyText={`Upcoming ${GAME_MODES[mode].label} streams will show here.`}
+        emptyText="Upcoming streams will show here."
         busy={busy}
         onClose={() => setAssigning(null)}
         onConfirm={async (stream) => (await assign(assigning, stream)) && setAssigning(null)}
@@ -246,7 +233,7 @@ export default function GameModesPage() {
         onCancel={() => setAutoOpen(false)}
         onConfirm={autoAssign}
       >
-        The oldest ready sets go to the earliest streams, with their rewards. Their game mode logo then shows in the app.
+The oldest ready sets go to the earliest streams.
       </ConfirmDialog>
       <ConfirmDialog
         open={!!releasing}
@@ -256,7 +243,7 @@ export default function GameModesPage() {
         onCancel={() => setReleasing(null)}
         onConfirm={async () => (await release(releasing.set)) && setReleasing(null)}
       >
-        {releasing?.stream && `“${showTitle(releasing.stream)}” (${formatDate(releasing.stream.startDate, "MMM D")}) loses these words; the app hides its game mode logo until it gets new ones.`}
+        {releasing?.stream && `“${showTitle(releasing.stream)}” (${formatDate(releasing.stream.startDate, "MMM D")}) loses these words.`}
       </ConfirmDialog>
       <ConfirmDialog open={!!deleting} title={`Delete “${deleting?.title || "word set"}”?`} tone="error" confirmLabel="Delete" onCancel={() => setDeleting(null)} onConfirm={confirmDelete}>
         No stream has used it yet. This can't be undone.

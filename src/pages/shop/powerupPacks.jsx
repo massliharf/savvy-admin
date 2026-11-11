@@ -102,6 +102,7 @@ function PackSheet({ sheet }) {
     <SideSheet
       open={sheet.open}
       onClose={sheet.close}
+      dirty={formState.isDirty}
       title={isNew ? "New power-up pack" : sheet.record?.title}
       subtitle={isNew ? undefined : "Power-up pack"}
       footerStart={

@@ -64,10 +64,10 @@ export function FormSection({ id, title, description, action, status, collapsibl
         ) : (
           heading
         )}
-        {/* A part preset by the game mode and changed here goes back to it in one click. */}
+        {/* A part that came from the bundle and was changed here goes back to it in one click. */}
         {status?.onReset && (
           <Button variant="text" size="small" startIcon={<Icon name="undo" size={16} />} onClick={status.onReset} sx={{ alignSelf: "center", flexShrink: 0 }}>
-            Reset to game mode
+            Reset to bundle
           </Button>
         )}
         {!folded && action}

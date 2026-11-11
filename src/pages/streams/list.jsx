@@ -18,7 +18,7 @@ import { SearchField } from "../../ds/SearchField";
 import { MenuFilterChip } from "../../ds/MenuFilterChip";
 import { dayjs, useTimezone } from "../../contexts";
 import { useNotify } from "../../shell/notifications";
-import { GAME_MODES, modeOf, setupIssues } from "./gameModes";
+import { GAME_MODES, modeOf } from "./gameModes";
 import { STREAM_TYPES, StreamItem, logoHidden } from "./parts";
 import { NewStreamDialog } from "./NewStreamDialog";
 import { StreamKeyDialog } from "./StreamKeyDialog";
@@ -36,13 +36,13 @@ const VIEWS = [
   { id: "list", label: "List", icon: "view_agenda" },
 ];
 
-const FILTER_GROUPS = { mode: "Game mode", type: "Visibility", setup: "Status" };
+const FILTER_GROUPS = { mode: "Format", type: "Visibility", setup: "Status" };
 // A function: game modes made in the admin join the list once their presets load.
 const filters = () => [
-  ...Object.values(GAME_MODES).map((m) => ({ id: `mode:${m.id}`, group: "mode", label: m.label, test: (s) => modeOf(s).id === m.id })),
+  ...Object.values(GAME_MODES).map((m) => ({ id: `mode:${m.id}`, group: "mode", label: m.label, test: (s) => s.gameMode === m.id })),
   ...Object.entries(STREAM_TYPES).map(([v, t]) => ({ id: `type:${v}`, group: "type", label: t.label, test: (s) => s.streamType === v })),
-  { id: "draft", group: "setup", label: "Needs words", test: logoHidden },
-  { id: "setup", group: "setup", label: "Needs setup", test: (s) => setupIssues(s).length > 0 },
+  // Upcoming and still missing its host, its format or words.
+  { id: "draft", group: "setup", label: "Needs setup", test: logoHidden },
 ];
 
 function WeekHeader({ week, count, timezone }) {

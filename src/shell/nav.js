@@ -11,7 +11,9 @@ export const DESTINATIONS = [
     icon: "live_tv",
     tabs: [
       { icon: "calendar_month", label: "Schedule", path: "/streams" },
-      { icon: "sports_esports", label: "Game modes", path: "/game-modes" },
+      { icon: "sports_esports", label: "Bundles", path: "/bundles" },
+      // What players see of each game in the app; each game opens in a side sheet.
+      { icon: "help", label: "How to play & format", path: "/how-to-play" },
     ],
   },
   {
@@ -79,7 +81,7 @@ export function findDestination(pathname) {
 }
 
 /** Single-record pages (own header, no section tabs, no "New stream" FAB). */
-export const isRecordPage = (pathname) => [/^\/streams\/edit\/[^/]+$/, /^\/game-modes\/[^/]+$/].some((re) => re.test(pathname));
+export const isRecordPage = (pathname) => [/^\/streams\/edit\/[^/]+$/, /^\/bundles\/[^/]+$/].some((re) => re.test(pathname));
 
 export function findTab(destination, pathname) {
   return destination?.tabs.find((t) => matches(pathname, t.path)) ?? null;

@@ -9,7 +9,7 @@ import DialogTitle from "@mui/material/DialogTitle";
  * Confirmation dialog. `tone="error"` for destructive actions. Text children are wrapped as the
  * supporting text; pass `content` for anything else (fields, lists).
  */
-export function ConfirmDialog({ open, title, children, content, confirmLabel, tone = "primary", busy = false, disabled = false, onConfirm, onCancel }) {
+export function ConfirmDialog({ open, title, children, content, confirmLabel, cancelLabel = "Cancel", tone = "primary", busy = false, disabled = false, onConfirm, onCancel }) {
   return (
     <Dialog open={open} onClose={onCancel} maxWidth="xs" fullWidth>
       <DialogTitle>{title}</DialogTitle>
@@ -21,7 +21,7 @@ export function ConfirmDialog({ open, title, children, content, confirmLabel, to
       )}
       <DialogActions>
         <Button variant="text" onClick={onCancel} disabled={busy}>
-          Cancel
+          {cancelLabel}
         </Button>
         <Button color={tone === "error" ? "error" : "primary"} onClick={onConfirm} disabled={busy || disabled}>
           {confirmLabel}

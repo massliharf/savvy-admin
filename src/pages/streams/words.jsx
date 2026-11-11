@@ -3,7 +3,7 @@
 // once; Internal test streams may reuse sets. Listed under Streams › Game modes, per game mode.
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useCustomMutation, useInvalidate, useList } from "@refinedev/core";
-import { useFieldArray, useForm, useWatch } from "react-hook-form";
+import { useFieldArray, useForm } from "react-hook-form";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Dialog from "@mui/material/Dialog";
@@ -14,7 +14,6 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { useTheme } from "@mui/material/styles";
 import { Icon } from "../../ds/Icon";
-import { ChoiceGroup } from "../../ds/SelectButton";
 import { EmptyState } from "../../ds/EmptyState";
 import { Pill } from "../../ds/Pill";
 import { SelectList } from "../../ds/SelectList";
@@ -22,17 +21,14 @@ import { SideSheet } from "../../ds/SideSheet";
 import { useTimezoneFormat } from "../../contexts";
 import { DP } from "../../providers";
 import { useNotify } from "../../shell/notifications";
-import { GameMode, StreamType, ROUND_COUNT, busterFor, durationFor } from "./enums";
+import { StreamType, ROUND_COUNT, durationFor } from "./enums";
 import { TextInput } from "./detail/fields";
-import { BusterCell, RoundTimeCell, SHOWDOWN_REWARDS, wordRules } from "./detail/sections";
-import { RewardCell } from "./detail/fields";
+import { RoundTimeCell, wordRules } from "./detail/sections";
 import { EditTable, TextCell } from "../../ds/EditTable";
-import { GAME_MODES, useGameModePresets } from "./gameModes";
 import Card from "@mui/material/Card";
 import CardActionArea from "@mui/material/CardActionArea";
 import { CardCorner } from "../../ds/CardCorner";
 import { showTitle } from "./hosts";
-import { ModeLogo } from "./ModeLogo";
 
 
 /** Every word in a set: its rounds, then its showdown word. */
@@ -40,7 +36,8 @@ export const wordsOf = (set) => [...(set.rounds ?? []).map((r) => r.word), set.s
 export const isPublic = (s) => s.streamType !== StreamType.Internal;
 export const missingRoundWords = (s) => (s.textSavvyRounds?.rounds ?? []).filter((r) => !r.word).length;
 /** Does the stream (of this game mode) still need a set? Round words missing, or no showdown word. */
-export const needsSet = (s, type) => (s.gameMode ?? GameMode.TextChain) === type && (missingRoundWords(s) > 0 || (!!s.showdownConfiguration && !s.showdownConfiguration.word));
+// A stream still waiting for words. Any word set fits any stream: a set is only words.
+export const needsSet = (s) => missingRoundWords(s) > 0 || (!!s.showdownConfiguration && !s.showdownConfiguration.word);
 
 // Words stay hidden until someone enters the words password; they hide again with "Hide words"
 // or a reload. Shared by every page that shows sets.
@@ -176,17 +173,13 @@ export function setDetails(set) {
 
 /** Name, words and details of a set; used in the set pickers. */
 export function WordSetSummary({ set, hidden }) {
-  const t = GAME_MODES[set.type] ?? GAME_MODES.TextChain;
   return (
-    <Box sx={{ display: "flex", alignItems: "center", gap: 2, minWidth: 0 }}>
-      <ModeLogo mode={set.type} />
-      <Box sx={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 0.5 }}>
-        <Typography variant="titleSmall">{set.title || "Untitled set"}</Typography>
-        <WordTokens set={set} hidden={hidden} />
-        <Typography variant="bodySmall" color="text.secondary" component="div">
-          {`${t.label} · ${setDetails(set)}`}
-        </Typography>
-      </Box>
+    <Box sx={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 0.5 }}>
+      <Typography variant="titleSmall">{set.title || "Untitled set"}</Typography>
+      <WordTokens set={set} hidden={hidden} />
+      <Typography variant="bodySmall" color="text.secondary" component="div">
+        {setDetails(set)}
+      </Typography>
     </Box>
   );
 }
@@ -198,13 +191,13 @@ export function setState(set, streamsById) {
   return { key: stream.status === "Scheduled" ? "assigned" : "used", stream };
 }
 
-const blankRounds = (count) => Array.from({ length: count }, (_, i) => ({ roundIndex: i, word: "", durationInSeconds: durationFor("", i), roundBusterReward: busterFor(i) }));
+const blankRounds = (count) => Array.from({ length: count }, (_, i) => ({ roundIndex: i, word: "", durationInSeconds: durationFor("", i) }));
 const NO_SHOWDOWN = { word: "" };
 const wordInput = { htmlInput: { autoCapitalize: "none", spellCheck: false } };
 
 /**
- * A set's words as one M3 data table, like a stream's Words: per round the word, its time and
- * Round Pounder reward (at least five rounds); then the showdown word and its prize.
+ * A set's words as one M3 data table: per round the word and its time (at least five rounds),
+ * then the showdown word. Rewards and the showdown prize are the stream's, from its bundle.
  */
 function SetWordsEditor({ control, setValue, getValues, fields, append, remove, validateWord }) {
   const { m3: c } = useTheme();
@@ -214,9 +207,9 @@ function SetWordsEditor({ control, setValue, getValues, fields, append, remove, 
     </Typography>
   );
   // The showdown is the last row, left empty when the set has none.
-  const wordRow = (key, lead, name, label, rules, time, reward) => ({
+  const wordRow = (key, lead, name, label, rules, time) => ({
     key,
-    cells: [lead, <TextCell key="w" control={control} name={name} label={label} placeholder={key === "sd" ? "No showdown" : "Add a word"} rules={rules} inputProps={{ autoCapitalize: "none", spellCheck: false }} />, time, reward],
+    cells: [lead, <TextCell key="w" control={control} name={name} label={label} placeholder={key === "sd" ? "No showdown" : "Add a word"} rules={rules} inputProps={{ autoCapitalize: "none", spellCheck: false }} />, time],
   });
   return (
     <>
@@ -226,49 +219,42 @@ function SetWordsEditor({ control, setValue, getValues, fields, append, remove, 
           { header: "#", width: "16px" },
           { header: "Word", width: "minmax(96px, 1fr)" },
           { header: "Time", width: "64px", align: "right" },
-          // Narrows before the word does, so words stay readable on a phone.
-          { header: "Reward", width: "minmax(148px, 176px)" },
         ]}
-        minWidth={340}
+        minWidth={260}
         rows={[
           ...fields.map((f, i) => ({
-            ...wordRow(f.id, number(i + 1), `rounds.${i}.word`, `Round ${i + 1} word`, wordRules(validateWord), <RoundTimeCell key="t" control={control} setValue={setValue} getValues={getValues} base={`rounds.${i}`} label={`Round ${i + 1} time`} />, <BusterCell key="b" control={control} setValue={setValue} base={`rounds.${i}`} index={i} />),
+            ...wordRow(f.id, number(i + 1), `rounds.${i}.word`, `Round ${i + 1} word`, wordRules(validateWord), <RoundTimeCell key="t" control={control} setValue={setValue} getValues={getValues} base={`rounds.${i}`} label={`Round ${i + 1} time`} />),
             onRemove: fields.length > ROUND_COUNT && i === fields.length - 1 ? () => remove(i) : undefined,
             removeLabel: `Remove round ${i + 1}`,
           })),
-          wordRow("sd", <Icon key="i" name="trophy" size={20} style={{ color: c.onSurfaceVariant }} />, "showdown.word", "Showdown word (optional)", { validate: async (v) => (!v ? true : !/^[a-z]+$/.test(v) ? "Lowercase letters a–z only" : validateWord ? await validateWord(v) : true) }, null, <RewardCell key="p" control={control} name="showdown.prize" allowed={SHOWDOWN_REWARDS} label="Showdown prize" />),
+          wordRow("sd", <Icon key="i" name="trophy" size={20} style={{ color: c.onSurfaceVariant }} />, "showdown.word", "Showdown word (optional)", { validate: async (v) => (!v ? true : !/^[a-z]+$/.test(v) ? "Lowercase letters a–z only" : validateWord ? await validateWord(v) : true) }, null),
         ]}
         // A new round goes in before the showdown row.
         addLabel="Add round"
-        onAdd={() => append({ roundIndex: fields.length, word: "", durationInSeconds: durationFor("", fields.length), roundBusterReward: busterFor(fields.length) })}
+        onAdd={() => append({ roundIndex: fields.length, word: "", durationInSeconds: durationFor("", fields.length) })}
       />
       <Typography variant="bodySmall" color="text.secondary" sx={{ mt: -1 }}>
-        Reward is the Round Pounder reward per round, and the showdown prize on the trophy row. Leave the showdown word empty for a set without one.
+        Leave the showdown word empty for a set without one. Rewards and the showdown prize come from the stream's bundle.
       </Typography>
     </>
   );
 }
 
 /** Add or edit a set with the same round / showdown fields a stream has. */
-export function WordSetSheet({ open, set, mode = "TextChain", onClose, validateWord }) {
+export function WordSetSheet({ open, set, onClose, validateWord }) {
   const notify = useNotify();
   const invalidate = useInvalidate();
-  const { presets } = useGameModePresets();
   const { mutateAsync, isPending } = useCustomMutation();
   const isNew = !set?.id;
-  const { control, setValue, getValues, handleSubmit, reset, formState, setError } = useForm({ defaultValues: { type: "TextChain", title: "", rounds: [], hasShowdown: true, showdown: { ...NO_SHOWDOWN } } });
-  const type = useWatch({ control, name: "type" });
+  const { control, setValue, getValues, handleSubmit, reset, formState, setError } = useForm({ defaultValues: { title: "", rounds: [], hasShowdown: true, showdown: { ...NO_SHOWDOWN } } });
   const { fields, append, remove } = useFieldArray({ control, name: "rounds" });
 
   // A new set starts with the game mode's rounds and round duration.
   const fresh = () => blankRounds(ROUND_COUNT);
-  // The showdown prize: the set's own, else the game mode's.
-  const prizeOf = (t, sd) => sd?.prize ?? presets[t]?.showdown?.prize ?? { rewardType: "Cash", amount: 100 };
-
   useEffect(() => {
     if (!open) return;
-    if (set?.id) reset({ type: set.type, title: set.title ?? "", rounds: (set.rounds ?? []).map((r, i) => ({ ...r, roundBusterReward: r.roundBusterReward === undefined ? busterFor(i) : r.roundBusterReward })), hasShowdown: !!set.showdown, showdown: { word: set.showdown?.word ?? "", prize: prizeOf(set.type, set.showdown) } });
-    else reset({ type: mode, title: "", rounds: fresh(), hasShowdown: true, showdown: { ...NO_SHOWDOWN, prize: prizeOf(mode) } });
+    if (set?.id) reset({ title: set.title ?? "", rounds: (set.rounds ?? []).map((r) => ({ ...r })), hasShowdown: !!set.showdown, showdown: { word: set.showdown?.word ?? "" } });
+    else reset({ title: "", rounds: fresh(), hasShowdown: true, showdown: { ...NO_SHOWDOWN } });
     // Reset only when the sheet opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, set]);
@@ -277,16 +263,15 @@ export function WordSetSheet({ open, set, mode = "TextChain", onClose, validateW
   const save = (addAnother) =>
     handleSubmit(async (v) => {
       const values = {
-        type: v.type,
         title: v.title.trim(),
-        rounds: v.rounds.map((r, i) => ({ word: r.word, durationInSeconds: r.durationInSeconds ?? durationFor(r.word, i), roundBusterReward: r.roundBusterReward ?? null })),
-        showdown: v.showdown?.word?.trim() ? { word: v.showdown.word.trim(), prize: v.showdown.prize } : null,
+        rounds: v.rounds.map((r, i) => ({ word: r.word, durationInSeconds: r.durationInSeconds ?? durationFor(r.word, i) })),
+        showdown: v.showdown?.word?.trim() ? { word: v.showdown.word.trim() } : null,
       };
       try {
         await mutateAsync({ url: isNew ? "/admin/word-sets" : `/admin/word-sets/${set.id}`, method: isNew ? "post" : "put", dataProviderName: DP.wordSets, values, successNotification: false, errorNotification: false });
         invalidate({ resource: "WordSet", dataProviderName: DP.wordSets, invalidates: ["list"] });
         notify(isNew ? `“${v.title.trim()}” added` : "Word set saved");
-        if (addAnother) reset({ type: v.type, title: "", rounds: fresh(), hasShowdown: v.hasShowdown, showdown: { ...NO_SHOWDOWN, prize: v.showdown.prize } });
+        if (addAnother) reset({ title: "", rounds: fresh(), hasShowdown: v.hasShowdown, showdown: { ...NO_SHOWDOWN } });
         else onClose();
       } catch (e) {
         const errors = e?.response?.data?.errors;
@@ -299,8 +284,9 @@ export function WordSetSheet({ open, set, mode = "TextChain", onClose, validateW
     <SideSheet
       open={open}
       onClose={onClose}
+      dirty={formState.isDirty}
       title={isNew ? "New word set" : set.title || "Word set"}
-      subtitle={isNew ? undefined : `${GAME_MODES[set.type]?.label ?? set.type} word set`}
+      subtitle={isNew ? undefined : "Word set"}
       actions={
         <>
           <Button variant="text" onClick={onClose}>
@@ -317,10 +303,6 @@ export function WordSetSheet({ open, set, mode = "TextChain", onClose, validateW
         </>
       }
     >
-      {/* Which game mode the set is for: the page's mode to start with; fixed once the set exists. */}
-      {isNew && (
-        <ChoiceGroup label="Game mode" value={type} options={Object.values(GAME_MODES).map((m) => ({ value: m.id, label: m.label, icon: m.icon }))} onChange={(v) => setValue("type", v, { shouldDirty: true })} />
-      )}
       <TextInput control={control} name="title" label="Name" max={40} rules={{ validate: (v) => (v?.trim() ? (v.trim().length <= 40 ? true : "Use 40 characters or fewer") : "Enter a name") }} />
       <SetWordsEditor control={control} setValue={setValue} getValues={getValues} fields={fields} append={append} remove={remove} validateWord={validateWord} />
     </SideSheet>
@@ -328,10 +310,10 @@ export function WordSetSheet({ open, set, mode = "TextChain", onClose, validateW
 }
 
 /**
- * From a stream's detail page: pick a set for its rounds (same game mode) or its showdown. A public
+ * From a stream's detail page: pick a set for its words. A public
  * stream can only take sets no other public stream uses; an Internal one can take any.
  */
-export function WordSetPickerDialog({ open, type, stream, onClose, onPick }) {
+export function WordSetPickerDialog({ open, stream, onClose, onPick }) {
   const { sets } = useWordSets();
   const { hidden } = useWordsLock();
   const [picked, setPicked] = useState(null);
@@ -340,14 +322,14 @@ export function WordSetPickerDialog({ open, type, stream, onClose, onPick }) {
   }, [open]);
   const publicStream = stream ? isPublic(stream) : true;
   const usable = sets
-    .filter((w) => w.type === type && (!publicStream || !w.streamId || w.streamId === stream?.id))
+    .filter((w) => !publicStream || !w.streamId || w.streamId === stream?.id)
     .sort((a, b) => Number(!!a.streamId) - Number(!!b.streamId) || Date.parse(a.createdAt) - Date.parse(b.createdAt));
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth scroll="paper">
-      <DialogTitle>{`Pick a ${GAME_MODES[type]?.label ?? type} word set`}</DialogTitle>
+      <DialogTitle>Pick a word set</DialogTitle>
       <DialogContent dividers sx={{ p: 0 }}>
         {usable.length === 0 ? (
-          <EmptyState compact icon="spellcheck" title={`No ${GAME_MODES[type]?.label ?? type} sets available`} description="Add more in Streams › Game modes." />
+          <EmptyState compact icon="spellcheck" title="No word sets available" description="Add more in Streams › Bundles." />
         ) : (
           <SelectList label="Word sets" items={usable} value={picked?.id} onChange={(id) => setPicked(usable.find((w) => w.id === id))} renderItem={(w) => <WordSetSummary set={w} hidden={hidden} />} />
         )}
@@ -365,15 +347,13 @@ export function WordSetPickerDialog({ open, type, stream, onClose, onPick }) {
 }
 
 // Types are filtered with the stock cards above the list; these chips filter by state.
-/** A word set as a card: name and game mode, its words (hideable), where it is, and ⋮ actions. */
+/** A word set as a card: its name, its words (hideable), where it is, and ⋮ actions. */
 export function WordSetCard({ set, state, hidden, onOpen, actions, showState = true, detail }) {
   const { formatDate } = useTimezoneFormat();
-  const t = GAME_MODES[set.type] ?? GAME_MODES.TextChain;
   return (
     // The whole card is the click target (its hover covers all of it); ⋮ sits in the corner.
     <Card sx={{ position: "relative", height: "100%" }}>
       <CardActionArea onClick={onOpen} sx={{ height: "100%", minWidth: 0, p: 2, pr: 6, display: "flex", alignItems: "flex-start", justifyContent: "flex-start", gap: 2 }}>
-        <ModeLogo mode={set.type} />
         <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
           <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
             <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -381,7 +361,7 @@ export function WordSetCard({ set, state, hidden, onOpen, actions, showState = t
                 {set.title || "Untitled set"}
               </Typography>
               <Typography variant="bodySmall" color="text.secondary" component="div" noWrap>
-                {state.key === "available" ? (detail ?? `${t.label} · ${setDetails(set)}`) : `${state.key === "used" ? "Used by" : "Assigned to"} ${showTitle(state.stream)} · ${formatDate(state.stream.startDate, "MMM D")}`}
+                {state.key === "available" ? (detail ?? setDetails(set)) : `${state.key === "used" ? "Used by" : "Assigned to"} ${showTitle(state.stream)} · ${formatDate(state.stream.startDate, "MMM D")}`}
               </Typography>
             </Box>
             {showState && <Pill tone={state.key === "available" ? "success" : state.key === "used" ? "neutral" : "primary"}>{state.key === "available" ? "Available" : state.key === "used" ? "Used" : "Assigned"}</Pill>}

@@ -55,6 +55,7 @@ function PackSheet({ sheet }) {
     <SideSheet
       open={sheet.open}
       onClose={sheet.close}
+      dirty={formState.isDirty}
       title={isNew ? "New spark pack" : `${Number(sheet.record?.sparksGranted ?? 0).toLocaleString()} Sparks`}
       subtitle={isNew ? undefined : "Spark pack"}
       footerStart={

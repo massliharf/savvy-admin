@@ -333,6 +333,32 @@ export const withShowdown = (m) => ({
   showdown: { prize: { rewardType: "Cash", amount: 100 }, superSavvyOnly: false },
 });
 
+// Bundles: what a new stream starts with, whatever game its word set plays. Points per round,
+// the showdown (which kind, and its prize), the rewards and the messaging presets. Rounds always
+// pay Sparks (the Round Pounder reward); a "cash game" pays cash in the showdown, a "sparks game"
+// pays Sparks there too.
+const BUNDLE_SCORING = {
+  rounds1To2: { greenLetterXp: 500, yellowLetterXp: 250, solveBonusXp: 500, timeBonusXp: 100 },
+  rounds3To4: { greenLetterXp: 1000, yellowLetterXp: 500, solveBonusXp: 1000, timeBonusXp: 100 },
+  round5OrMore: { greenLetterXp: 0, yellowLetterXp: 0, solveBonusXp: 2000, timeBonusXp: 200 },
+};
+const bundle = (id, name, prize, superSavvyOnly) => ({
+  id,
+  name,
+  roundScoring: structuredClone(BUNDLE_SCORING),
+  hostStumperBonusXp: 500,
+  defaultRewards: [{ rewardType: "BombPowerup", amount: 1 }],
+  showdown: { prize, superSavvyOnly },
+  defaultSharePresetId: null,
+  defaultNotificationPresetId: null,
+});
+export const DEFAULT_BUNDLE_ID = "bundle-cash-savvy";
+export const seedBundles = () => [
+  bundle("bundle-cash-super-savvy", "Cash game · Super Savvy Showdown", { rewardType: "Cash", amount: 100 }, true),
+  bundle("bundle-sparks-savvy", "Sparks game · Savvy Showdown", { rewardType: "Sparks", amount: 500 }, false),
+  bundle(DEFAULT_BUNDLE_ID, "Cash game · Savvy Showdown", { rewardType: "Cash", amount: 100 }, false),
+];
+
 // Two game modes, Savvy TextChain and Savvy SubText: five rounds, then a Savvy Showdown.
 export const SHOWDOWN_DEFAULTS = { prize: { rewardType: "Cash", amount: 100 }, superSavvyOnly: false };
 export const seedGameModes = () => seedBaseModes().map((m) => ({ ...m, name: `Savvy ${m.name}`, summary: MODE_SUMMARY[m.id], roundCount: 5, showdown: SHOWDOWN_DEFAULTS }));
@@ -429,7 +455,10 @@ export const seedHosts = () => [{ ...SCOTT }, { ...MAYA_CHEN }, { ...LEO }, { ..
 // Weekly time slots Fill month makes streams from (times in the admin time zone, PT by default):
 // when, who hosts and for whom. Title, rewards, share cards and notifications come from defaults.
 // No hostId: the slot follows its game mode's default host.
-const slot = (id, time, gameMode, days) => ({ id, time, title: "You vs {host}", gameMode, days, hostId: "", streamType: "Public" });
+// A time slot: when, on which days, who hosts and who can join. (The game argument is unused:
+// a stream's format comes with its word set.)
+// eslint-disable-next-line no-unused-vars
+const slot = (id, time, gameMode, days) => ({ id, time, title: "You vs {host}", days, hostId: "", streamType: "Public" });
 
 // Word sets: a word per round (3–4 letters → 60s, longer → 90s, the fifth 45s by default) and the
 // showdown word; their rewards default to the game mode's.

@@ -24,11 +24,11 @@ import { HostSheet } from "../../library/hosts";
 import { fillHost, hostLabel, titleRule } from "../hosts";
 import { useWordsLock } from "../words";
 import { useSheet } from "../../library/shared";
-import { GAME_MODES, baseOf, modeId, newShowdown, useGameModePresets, useStreamBuilder } from "../gameModes";
+import { GAME_MODES, baseOf, modeId, newShowdown, useBundles, useStreamBuilder } from "../gameModes";
 import { DP } from "../../../providers";
 import { useTimezoneFormat } from "../../../contexts";
 import { DateTimeInput, NumberInput, RewardCell, TextInput, rewardText } from "./fields";
-import { EditTable, NumberCell, TextCell, cellSx } from "../../../ds/EditTable";
+import { EditTable, NumberCell, SelectCell, TextCell, cellSx } from "../../../ds/EditTable";
 import { radius } from "../../../theme/tokens";
 import { ListGroup, ListSwitch } from "../../../ds/ListGroup";
 import { Choice, ChoiceGroup } from "../../../ds/SelectButton";
@@ -319,22 +319,25 @@ export function RoundsEditor({ form, name, fields, append, remove, validateWord,
 }
 
 /**
- * Game mode picker for a stream or time slot (fields under `prefix`). A "with Showdown" mode keeps
- * the base `gameMode` and turns the showdown on, starting from that mode's showdown defaults.
+ * The stream's format: one of the How to play & format presets (TextChain, SubText). It decides
+ * the logo, the pill and How to play in the app.
  */
 export function ModeField({ control, setValue, prefix = "" }) {
-  const at = (k) => `${prefix}${k}`;
-  const [gameMode, showdown, streamType] = useWatch({ control, name: [at("gameMode"), at("showdownConfiguration"), at("streamType")] });
-  const { presets } = useGameModePresets();
+  const [gameMode, bundleId, scoring] = useWatch({ control, name: [`${prefix}gameMode`, `${prefix}bundleId`, `${prefix}roundScoring`] });
+  const { bundles, byId } = useBundles();
   const pick = (id) => {
-    const m = GAME_MODES[id];
-    setValue(at("gameMode"), m.id, { shouldDirty: true });
-    if (m.showdown && !showdown) setValue(at("showdownConfiguration"), newShowdown(presets[id], streamType), { shouldDirty: true });
-    if (!m.showdown && showdown) setValue(at("showdownConfiguration"), null, { shouldDirty: true });
+    setValue(`${prefix}gameMode`, id, { shouldDirty: true });
+    // SubText gives no points for yellow letters; back on TextChain they return to the bundle's.
+    if (!scoring) return;
+    const from = (byId[bundleId] ?? bundles[0])?.roundScoring;
+    const next = structuredClone(scoring);
+    Object.keys(next).forEach((bracket) => {
+      if (next[bracket]) next[bracket].yellowLetterXp = id === GameMode.SubText ? 0 : (from?.[bracket]?.yellowLetterXp ?? next[bracket].yellowLetterXp);
+    });
+    setValue(`${prefix}roundScoring`, next, { shouldDirty: true });
   };
-  return <ModeCards value={modeId(gameMode, !!showdown)} onChange={pick} />;
+  return <ModeCards value={gameMode ?? null} onChange={pick} />;
 }
-
 
 /**
  * The stream's words in one place: the rounds, then (with a showdown) the showdown word right
@@ -395,7 +398,7 @@ export function ScoringSection({ form, frame }) {
 export function GameModeSection({ form, frame }) {
   const { control, setValue } = form;
   return (
-    <FormSection {...frame} id="mode" title="Game mode">
+    <FormSection {...frame} id="mode" title="How to play & format">
       <ModeField control={control} setValue={setValue} />
     </FormSection>
   );
@@ -406,10 +409,11 @@ export function GameModeSection({ form, frame }) {
  * Super Savvy Showdown), so it sits with the audience.
  */
 function ShowdownTypeField({ control, setValue }) {
-  const [gameMode, showdown, streamType] = useWatch({ control, name: ["gameMode", "showdownConfiguration", "streamType"] });
-  const { presets } = useGameModePresets();
+  const [bundleId, showdown, streamType] = useWatch({ control, name: ["bundleId", "showdownConfiguration", "streamType"] });
+  // A showdown added here starts from the stream's bundle (its prize).
+  const { bundles, byId } = useBundles();
   const superSavvy = streamType === StreamType.SuperSavvy;
-  const setShowdown = (superSavvyOnly) => setValue("showdownConfiguration", { ...(showdown ?? newShowdown(presets[modeId(gameMode)], streamType)), superSavvyOnly }, { shouldDirty: true });
+  const setShowdown = (superSavvyOnly) => setValue("showdownConfiguration", { ...(showdown ?? newShowdown(byId[bundleId] ?? bundles[0], streamType)), superSavvyOnly }, { shouldDirty: true });
   useEffect(() => {
     if (superSavvy && showdown && !showdown.superSavvyOnly) setValue("showdownConfiguration", { ...showdown, superSavvyOnly: true }, { shouldDirty: true });
   }, [superSavvy, showdown, setValue]);
@@ -555,7 +559,7 @@ export const SHOWDOWN_TYPES = [
 ];
 
 /** Showdown word (left out with `word={false}`) and prize, as a one-row M3 data table. */
-export function ShowdownFields({ control, name, validateWord, word = true, label = "Showdown winner", masked = false }) {
+export function ShowdownFields({ control, name, validateWord, word = true, label = "Showdown winner", masked = false, typeSelect = false }) {
   const { m3: c } = useTheme();
   return (
     <EditTable
@@ -564,7 +568,7 @@ export function ShowdownFields({ control, name, validateWord, word = true, label
       reserveRemove
       // The same tracks as the other tables (rounds, raffle, rewards), so the prize lines up with
       // their values; without a word (game mode defaults) that column stays empty.
-      columns={[{ header: "", width: "16px" }, { header: word ? "Word" : "", width: "minmax(96px, 1fr)" }, { header: "", width: "64px" }, { header: "Prize", width: "200px" }]}
+      columns={[{ header: "", width: "16px" }, { header: word ? "Word" : typeSelect ? "Showdown" : "", width: "minmax(96px, 1fr)" }, { header: "", width: "64px" }, { header: "Prize", width: "200px" }]}
       rows={[
         {
           key: "sd",
@@ -574,6 +578,9 @@ export function ShowdownFields({ control, name, validateWord, word = true, label
               <MaskedWord key="w" control={control} name={`${name}.word`} />
             ) : word ? (
               <TextCell key="w" control={control} name={`${name}.word`} label="Showdown word" placeholder="Add a word" rules={wordRules(validateWord)} inputProps={{ autoCapitalize: "none", spellCheck: false }} />
+            ) : typeSelect ? (
+              // Which showdown it is and its prize, in the one row.
+              <SelectCell key="w" control={control} name={`${name}.superSavvyOnly`} label="Showdown" options={SHOWDOWN_TYPES.map((t) => ({ value: t.superSavvyOnly, label: t.label }))} />
             ) : (
               <Typography key="w" variant="bodyLarge" noWrap sx={{ px: 1 }}>
                 {label}
@@ -606,15 +613,18 @@ export function ShowdownEditor({ control, setValue, name, validateWord, superSav
     <>
       {on && (
         <>
-          <ChoiceGroup
-            label="Type"
-            value={type}
-            options={SHOWDOWN_TYPES.map((t, i) => ({ value: i, label: t.label, icon: t.icon }))}
-            onChange={(v) => set({ ...showdown, superSavvyOnly: SHOWDOWN_TYPES[v].superSavvyOnly })}
-            disabled={superSavvy}
-            helperText={superSavvy ? "Super Savvy only streams always run a Super Savvy Showdown." : undefined}
-          />
-          <ShowdownFields control={control} name={name} validateWord={validateWord} word={word} />
+{/* With a word (a stream): the type on its own line. Without (a bundle): in the prize row. */}
+          {word && (
+                      <ChoiceGroup
+              label="Type"
+              value={type}
+              options={SHOWDOWN_TYPES.map((t, i) => ({ value: i, label: t.label, icon: t.icon }))}
+              onChange={(v) => set({ ...showdown, superSavvyOnly: SHOWDOWN_TYPES[v].superSavvyOnly })}
+              disabled={superSavvy}
+              helperText={superSavvy ? "Super Savvy only streams always run a Super Savvy Showdown." : undefined}
+            />
+          )}
+          <ShowdownFields control={control} name={name} validateWord={validateWord} word={word} typeSelect={!word} />
           {/* A caption under the table, like the other tables' notes (not a block that reads like a row). */}
           {note && (
             <Typography variant="bodySmall" color="text.secondary" sx={{ mt: -1 }}>
@@ -863,7 +873,7 @@ export function PillFields({ control, iconUrl, onIconChange, onIconRemove }) {
 }
 
 // ---------------------------------------------------------------- notifications
-function NotificationPreview({ control, title, body }) {
+export function NotificationPreview({ control, title, body }) {
   const t = useWatch({ control, name: title });
   const b = useWatch({ control, name: body });
   const { m3: c } = useTheme();
@@ -884,7 +894,7 @@ function NotificationPreview({ control, title, body }) {
   );
 }
 
-const NOTIFICATIONS = [
+export const NOTIFICATIONS = [
   { prefix: "lobbyOpen", title: "Lobby opens" },
   { prefix: "goingLive", title: "Going live" },
   { prefix: "round1Starts", title: "Round 1 starts", sendAt: true },
@@ -950,7 +960,7 @@ export function NotificationsSection({ form, frame }) {
 }
 
 // ---------------------------------------------------------------- share cards
-const CARDS = [
+export const SHARE_CARDS = [
   { key: "liveHome", title: "Live on home", fields: ["title", "subtitle"] },
   { key: "upcomingHome", title: "Upcoming on home", fields: ["title", "subtitle"] },
   { key: "beatHost", title: "Beat the host", fields: ["header", "title", "subtitle"] },
@@ -985,7 +995,7 @@ export function ShareCardPreview({ control, path, host = "the host" }) {
  * `host` (the stream's host name) fills {host} in the previews; presets show "the host".
  */
 export function ShareCardFields({ form, prefix = "shareableCards", host }) {
-  const items = CARDS.map((card) => ({
+  const items = SHARE_CARDS.map((card) => ({
     key: card.key,
     title: card.title,
     path: `${prefix}.${card.key}`,
@@ -1003,7 +1013,7 @@ export function ShareCardFields({ form, prefix = "shareableCards", host }) {
 }
 
 /** Opens where the presets are kept: Library › Share cards or Library › Notifications. */
-function PresetsLink({ to }) {
+export function PresetsLink({ to }) {
   return (
     <Button variant="tonal" size="small" component={Link} to={to} endIcon={<Icon name="arrow_forward" />}>
       Presets
@@ -1046,7 +1056,6 @@ export function useSectionStatus(form, sections, hosts) {
   const { control } = form;
   const { errors } = useFormState({ control });
   const { formatDate } = useTimezoneFormat();
-  const { presets } = useGameModePresets();
   // Words show here only once unlocked (words password), like everywhere else.
   const { hidden: wordsHidden } = useWordsLock();
   const [title, startDate, hostId, hostName, gameMode, rounds, showdown, scoring, sponsorship, participation, buster, stumper, raffle, cards, streamType, ...notes] = useWatch({
@@ -1058,7 +1067,9 @@ export function useSectionStatus(form, sections, hosts) {
   const { data: sponsorData } = useList({ resource: "Sponsor", dataProviderName: DP.sponsors, pagination: { mode: "off" } });
 
   const mode = GAME_MODES[modeId(gameMode)];
-  const preset = presets[modeId(gameMode)];
+  // The bundle the stream was made from; none when that bundle was deleted since.
+  const { byId } = useBundles();
+  const bundle = byId[form.getValues?.("bundleId")];
   const words = (rounds ?? []).map((r) => r?.word).filter(Boolean);
   const missingWords = (rounds ?? []).length - words.length;
   const host = hosts.find((h) => h.id === hostId);
@@ -1069,12 +1080,13 @@ export function useSectionStatus(form, sections, hosts) {
   // What the game mode would give this stream (Game modes › Stream defaults): the same builder New
   // stream and Fill month use. Each part says if it still matches it, and can go back to it.
   const build = useStreamBuilder();
-  const defaultHost = hosts.find((h) => h.id === preset?.defaultHostId);
-  const template = build({ title, host: defaultHost ?? {}, startDate, gameMode: modeId(gameMode, !!showdown), streamType });
-  const from = (text, isDefault) => `${text} · ${isDefault ? `From ${mode?.label ?? "game mode"}` : "Changed"}`;
+  // Bundles carry no host: any host is the stream's own pick.
+  const defaultHost = undefined;
+  const template = build({ title, host: defaultHost ?? {}, startDate, gameMode: modeId(gameMode, !!showdown), bundleId: bundle?.id, streamType });
+  const from = (text, isDefault) => (bundle ? `${text} · ${isDefault ? `From ${bundle.name}` : "Changed"}` : text);
   const resetTo = (names) => () => names.forEach((n) => form.setValue(n, structuredClone(template[n] ?? null), { shouldDirty: true }));
   // Only a part that differs from the game mode offers the reset.
-  const part = (text, isDefault, names) => ({ summary: from(text, isDefault), onReset: isDefault ? undefined : resetTo(names) });
+  const part = (text, isDefault, names) => ({ summary: from(text, isDefault), onReset: isDefault || !bundle ? undefined : resetTo(names) });
   const sponsorName = sponsorship ? (sponsorData?.data ?? []).find((sp) => sp.title === sponsorship.title)?.name ?? sponsorship.title ?? "Custom sponsor" : "No sponsor";
   const sponsorIsDefault = (sponsorship?.title ?? null) === (template.sponsorship?.title ?? null);
   const rewardsAreDefault = sameJson(participation ?? [], template.defaultRewards) && !on(buster) && (stumper ?? null) === (template.hostStumperBonusXp ?? null);
@@ -1088,7 +1100,7 @@ export function useSectionStatus(form, sections, hosts) {
     },
     // The pictures come from the host: missing ones are added in Hosts.
     host: { todo: [!hostId && "Pick a host", hostId && !form.imageUrl && "Host picture missing", hostId && !form.heroImageUrl && "Stream image missing"].filter(Boolean), ...(hostId ? part(hostLabel(host) || hostName, !defaultHost || hostId === defaultHost.id, ["hostId", "hostName", "imageUrl", "heroImageUrl", "heroCardImageUrl"]) : { summary: "No host" }) },
-    mode: { todo: [], summary: mode?.custom ? `${mode.label} · plays ${GAME_MODES[mode.base]?.label}` : mode?.label ?? "" },
+    mode: { todo: [!mode && "Pick a format"].filter(Boolean), summary: mode?.label ?? "Not picked yet" },
     words: {
       todo: [missingWords > 0 && `${missingWords} ${missingWords === 1 ? "word" : "words"} missing`, (rounds ?? []).length === 0 && "No rounds", showdown && !showdown.word && "Showdown word missing"].filter(Boolean),
       summary: wordsHidden

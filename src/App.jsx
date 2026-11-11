@@ -6,7 +6,6 @@ import { SnackbarHost, useNotificationProvider } from "./shell/notifications";
 import routerBindings, {
   CatchAllNavigate,
   NavigateToResource,
-  UnsavedChangesNotifier,
 } from "@refinedev/react-router";
 import { BrowserRouter, HashRouter, Link, Navigate, Outlet, Route, Routes, useParams } from "react-router";
 import Button from "@mui/material/Button";
@@ -20,10 +19,12 @@ import { authProvider } from "./auth/authProvider";
 import { TimezoneProvider } from "./contexts";
 import { ThemeSettingsProvider } from "./theme/ThemeSettings";
 import { AppShell } from "./shell/AppShell";
+import { UnsavedProvider } from "./shell/unsaved";
 import { SectionLayout } from "./shell/SectionLayout";
 import AppearancePage from "./pages/settings/appearance";
 import DesignSystemPage from "./pages/settings/designSystem";
 import GameModeDetail from "./pages/gameModes/detail";
+import HowToPlayPage from "./pages/gameModes/howToPlay";
 import HostsPage from "./pages/library/hosts";
 import GameModesPage from "./pages/streams/games";
 import SponsorsPage from "./pages/library/sponsors";
@@ -69,8 +70,9 @@ const Router = import.meta.env.MODE === "single" || import.meta.env.MODE === "pa
 // Refine resources: route patterns and the data provider each one uses.
 const resources = [
   { name: "TextSavvyStream", list: "/streams", create: "/streams/create", edit: "/streams/edit/:id", meta: { label: "Streams" } },
-  { name: "GameMode", list: "/game-modes", edit: "/game-modes/:id", meta: { dataProviderName: DP.gameModes } },
-  { name: "WordSet", list: "/game-modes", meta: { dataProviderName: DP.wordSets } },
+  { name: "Bundle", list: "/bundles", edit: "/bundles/:id", meta: { dataProviderName: DP.bundles } },
+  { name: "GameMode", list: "/how-to-play", meta: { dataProviderName: DP.gameModes } },
+  { name: "WordSet", list: "/bundles", meta: { dataProviderName: DP.wordSets } },
   { name: "Host", list: "/hosts", meta: { dataProviderName: DP.hosts } },
   { name: "Sponsor", list: "/sponsors", meta: { dataProviderName: DP.sponsors } },
   { name: "Season", list: "/seasons", meta: { dataProviderName: DP.season } },
@@ -107,7 +109,8 @@ export default function App() {
                   resources={resources}
                   options={{
                     syncWithLocation: true,
-                    warnWhenUnsavedChanges: true,
+                    // Unsaved changes are guarded by UnsavedProvider (shell/unsaved.jsx).
+                    warnWhenUnsavedChanges: false,
                     useNewQueryKeys: true,
                     projectId: "foqooB-QJBW4o-Tx2gzQ",
                     disableTelemetry: true,
@@ -117,15 +120,19 @@ export default function App() {
                     <Route
                       element={
                         <Authenticated key="authenticated-inner" fallback={<CatchAllNavigate to="/login" />}>
-                          <AppShell>
-                            <Outlet />
-                          </AppShell>
+                          <UnsavedProvider>
+                            <AppShell>
+                              <Outlet />
+                            </AppShell>
+                          </UnsavedProvider>
                         </Authenticated>
                       }
                     >
                       <Route index element={<NavigateToResource resource="TextSavvyStream" />} />
                       <Route path="/streams/edit/:id" element={<StreamDetail />} />
-                      <Route path="/game-modes/:id" element={<GameModeDetail />} />
+                      <Route path="/bundles/:id" element={<GameModeDetail />} />
+                      {/* The old addresses of Bundles. */}
+                      <Route path="/game-modes/*" element={<Navigate to="/bundles" replace />} />
                       <Route path="/user-management/edit/:id" element={<LegacyUserRedirect />} />
                       <Route element={<SectionLayout />}>
                       {/* One route for the list and a user's sheet over it, so the list (search, filters, page) stays mounted. */}
@@ -140,12 +147,13 @@ export default function App() {
                       <Route path="/developer" element={<DeveloperPage />} />
                       <Route path="/settings" element={<AppearancePage />} />
                       <Route path="/design-system" element={<DesignSystemPage />} />
-                      <Route path="/game-modes" element={<GameModesPage />} />
-                      <Route path="/games" element={<Navigate to="/game-modes" replace />} />
-                      <Route path="/words" element={<Navigate to="/game-modes" replace />} />
+                      <Route path="/bundles" element={<GameModesPage />} />
+                      <Route path="/games" element={<Navigate to="/bundles" replace />} />
+                      <Route path="/words" element={<Navigate to="/bundles" replace />} />
                       <Route path="/hosts" element={<HostsPage />} />
                       <Route path="/sponsors" element={<SponsorsPage />} />
-                      <Route path="/how-to-play" element={<Navigate to="/game-modes" replace />} />
+                      <Route path="/how-to-play" element={<HowToPlayPage />} />
+                      <Route path="/how-to-play/*" element={<Navigate to="/how-to-play" replace />} />
                       <Route path="/share-config" element={<Navigate to="/share-cards" replace />} />
                       <Route path="/rewards" element={<Navigate to="/daily-puzzle" replace />} />
                       <Route path="/daily-puzzle" element={<DailyPuzzlePage />} />
@@ -179,7 +187,6 @@ export default function App() {
                     </Route>
                   </Routes>
                   <RefineKbar />
-                  <UnsavedChangesNotifier />
                 </Refine>
               </TimezoneProvider>
             </LocalizationProvider>

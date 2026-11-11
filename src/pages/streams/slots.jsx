@@ -18,16 +18,17 @@ import { DP } from "../../providers";
 import { useNotify } from "../../shell/notifications";
 import { StreamType } from "./enums";
 import { TextInput } from "./detail/fields";
-import { ModeField } from "./detail/sections";
-import { modeOf, useGameModePresets, useStreamBuilder } from "./gameModes";
+import { modeOf, useBundles, useStreamBuilder } from "./gameModes";
+import { BundleCards } from "./BundleCards";
+import { ModeCards } from "./ModeCards";
 import { MonthNav } from "./calendar";
 import { AudienceField, HostPicker } from "./pickers";
-import { logoHidden } from "./parts";
-import { isPublic, needsSet, useWordSets } from "./words";
-import { ListAdd, ListGroup, ListItem, ListSwitch } from "../../ds/ListGroup";
+import { ListAdd, ListGroup, ListItem } from "../../ds/ListGroup";
 import { ActionMenu } from "../../ds/ActionMenu";
 import { DEFAULT_TITLE, fillHost, hostLabel } from "./hosts";
 
+// Said on a slot only when it isn't open to everyone.
+const AUDIENCE_TEXT = { [StreamType.Internal]: "Internal", [StreamType.SuperSavvy]: "Super Savvy only" };
 // Streams closer than this to a slot's start count as "already scheduled" for that slot.
 const CONFLICT_MINUTES = 60;
 export const slotTime = (time) => dayjs(`2000-01-01T${time}`).format("h:mm A");
@@ -53,14 +54,6 @@ export const daysText = (days) => {
   return WEEKDAYS.filter((d) => set.has(d.value)).map((d) => d.label).join(", ");
 };
 
-/**
- * A slot's host: its own pick, else (no pick) whoever its game mode's default host is now, so
- * changing the game mode's host moves every slot that follows it.
- */
-export const slotHostId = (slot, presets) => slot.hostId || presets?.[modeOf(slot).id]?.defaultHostId || "";
-/** Slots with their host resolved (see slotHostId); `followsMode` marks the ones that use the default. */
-export const withSlotHosts = (slots, presets) => slots.map((sl) => ({ ...sl, hostId: slotHostId(sl, presets), followsMode: !sl.hostId }));
-
 export function useScheduleSlots() {
   const { data, isLoading } = useList({ resource: "ScheduleSlot", dataProviderName: DP.scheduleSlots, pagination: { mode: "off" } });
   return { slots: data?.data ?? [], isLoading };
@@ -70,14 +63,12 @@ export function useScheduleSlots() {
  * One time slot: when it runs, who hosts and who can join; click to open its fields right below,
  * ⋮ to remove. Every stream it makes is "You vs {host}" with the Default presets.
  */
-function SlotRow({ form, index, hosts, mode, expanded, onToggle, onRemove }) {
+function SlotRow({ form, index, hosts, expanded, onToggle, onRemove }) {
   const { control } = form;
   const at = (k) => `slots.${index}.${k}`;
-  const [time, streamType, hostId, gameMode, showdown, days] = useWatch({ control, name: [at("time"), at("streamType"), at("hostId"), at("gameMode"), at("showdownConfiguration"), at("days")] });
+  const [time, hostId, days, streamType] = useWatch({ control, name: [at("time"), at("hostId"), at("days"), at("streamType")] });
   const { errors } = useFormState({ control, name: `slots.${index}` });
-  const { presets } = useGameModePresets();
-  const shownHost = hostLabel(hosts.find((h) => h.id === slotHostId({ hostId, gameMode: mode ?? gameMode }, presets)));
-  const summary = [daysText(slotDays({ days })), shownHost, mode ? null : modeOf({ gameMode, showdownConfiguration: showdown }).label, streamType === StreamType.Internal ? "Internal" : null].filter(Boolean).join(" · ");
+  const summary = [daysText(slotDays({ days })), hostLabel(hosts.find((h) => h.id === hostId)) || "No host", AUDIENCE_TEXT[streamType]].filter(Boolean).join(" · ");
   return (
     <ListItem
       onClick={onToggle}
@@ -103,7 +94,7 @@ function SlotRow({ form, index, hosts, mode, expanded, onToggle, onRemove }) {
           </Tooltip>
         </>
       }
-      below={expanded && <SlotFields form={form} index={index} hosts={hosts} mode={mode} />}
+      below={expanded && <SlotFields form={form} index={index} hosts={hosts} />}
     />
   );
 }
@@ -145,13 +136,10 @@ function DayButtons({ value, onChange }) {
   );
 }
 
-/** A time slot's fields, open under its row. Words, showdown and rewards come with the set. */
-function SlotFields({ form, index, hosts, mode }) {
-  const { control, setValue } = form;
+/** A time slot's fields, open under its row: its time, its days, its host and who can join. */
+function SlotFields({ form, index, hosts }) {
+  const { control } = form;
   const at = (k) => `slots.${index}.${k}`;
-  const { presets } = useGameModePresets();
-  const watchedMode = useWatch({ control, name: at("gameMode") });
-  const slotMode = mode ?? modeOf({ gameMode: watchedMode }).id;
   return (
     <>
       <Box sx={{ maxWidth: 160 }}>
@@ -183,21 +171,13 @@ function SlotFields({ form, index, hosts, mode }) {
       <Controller
         name={at("hostId")}
         control={control}
-        render={({ field }) => {
-          // Empty: the game mode's default host (followed when it changes); else this slot's own.
-          const fallback = hosts.find((h) => h.id === presets[slotMode]?.defaultHostId);
-          return (
-            <>
-              <ListGroup label="Host">
-                <ListSwitch icon="mic" title="Game mode's host" supporting={fallback ? hostLabel(fallback) : "The game mode has no default host"} checked={!field.value} onChange={(on) => field.onChange(on ? "" : (fallback?.id ?? hosts[0]?.id ?? ""))} />
-              </ListGroup>
-              {!!field.value && <HostPicker hosts={hosts} value={hosts.find((h) => h.id === field.value) ?? null} onChange={(h) => field.onChange(h?.id ?? "")} />}
-            </>
-          );
-        }}
+        rules={{ validate: (v) => (hosts.some((h) => h.id === v) ? true : "Pick a host") }}
+        render={({ field, fieldState }) => (
+          <HostPicker hosts={hosts} value={hosts.find((h) => h.id === field.value) ?? null} onChange={(h) => field.onChange(h?.id ?? "")} error={!!fieldState.error} helperText={fieldState.error?.message} />
+        )}
       />
+      {/* Public or Internal, and (for a public one) Super Savvy only: the streams it makes get this. */}
       <Controller name={at("streamType")} control={control} render={({ field }) => <AudienceField value={field.value} onChange={field.onChange} />} />
-      {!mode && <ModeField control={control} setValue={setValue} prefix={`slots.${index}.`} />}
     </>
   );
 }
@@ -208,7 +188,6 @@ function SlotFields({ form, index, hosts, mode }) {
  */
 export function SlotsSheet({ open, onClose, onBack, instant, slots, hosts, mode }) {
   const notify = useNotify();
-  const { presets } = useGameModePresets();
   const { control, setValue, getValues, trigger, handleSubmit, reset, formState } = useForm({ defaultValues: { slots: [] } });
   const form = { control, setValue, getValues, trigger };
   // The slot whose fields are open under its row (one at a time).
@@ -246,10 +225,9 @@ export function SlotsSheet({ open, onClose, onBack, instant, slots, hosts, mode 
       time: "",
       title: DEFAULT_TITLE,
       days: EVERY_DAY,
-      gameMode: mode ?? "TextChain",
       streamType: StreamType.Public,
-      // Follows the game mode's default host until another is picked.
-      hostId: "",
+      // The only host there is, else picked on the slot.
+      hostId: hosts.length === 1 ? hosts[0].id : "",
       },
       { shouldFocus: false },
     );
@@ -260,6 +238,7 @@ export function SlotsSheet({ open, onClose, onBack, instant, slots, hosts, mode 
       open={open}
       onClose={onClose}
       onBack={onBack}
+      dirty={formState.isDirty}
       instant={instant}
       title="Time slots"
       subtitle={mode ? `${modeOf({ gameMode: mode }).label} · changes apply to the next fill` : "Changes apply to the next fill."}
@@ -281,7 +260,6 @@ export function SlotsSheet({ open, onClose, onBack, instant, slots, hosts, mode 
             form={form}
             index={i}
             hosts={hosts}
-            mode={mode}
             expanded={!closed.includes(f.key)}
             onToggle={() => toggle(f.key)}
             onRemove={() => remove(i)}
@@ -295,10 +273,9 @@ export function SlotsSheet({ open, onClose, onBack, instant, slots, hosts, mode 
 
 /**
  * What filling `month` would do. Each slot gets a stream on its future days unless one already
- * starts within an hour. Ready word sets go to the earliest public streams first (by game mode);
- * with `existing`, this month's streams still missing words take part too.
+ * starts within an hour. Words come later, from a word set.
  */
-function planMonth({ month, slots, streams, sets, hosts, timezone, useWords, existing, mode }) {
+function planMonth({ month, slots, streams, hosts, timezone }) {
   const now = dayjs();
   const active = streams.filter((s) => s.status !== "Canceled");
   const near = (start) => active.some((s) => Math.abs(dayjs(s.startDate).diff(start, "minute")) < CONFLICT_MINUTES);
@@ -313,46 +290,26 @@ function planMonth({ month, slots, streams, sets, hosts, timezone, useWords, exi
       if (start.isBefore(now)) skipped.past += 1;
       else if (near(start)) skipped.taken += 1;
       else if (!hosts.some((h) => h.id === slot.hostId)) skipped.noHost += 1;
-      else planned.push({ slot, start, wordSetId: null });
+      else planned.push({ slot, start });
     });
   }
-
-  const assignments = [];
-  if (useWords) {
-    const queues = {};
-    sets
-      .filter((w) => !w.streamId)
-      .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
-      .forEach((w) => (queues[w.type] ??= []).push(w));
-    const take = (type) => queues[type]?.shift()?.id ?? null;
-    const monthKey = month.format("YYYY-MM");
-    const old = existing
-      ? active.filter((s) => logoHidden(s) && isPublic(s) && (!mode || (s.gameMode ?? "TextChain") === mode) && dayjs(s.startDate).isAfter(now) && dayjs.utc(s.startDate).tz(timezone).format("YYYY-MM") === monthKey && needsSet(s, s.gameMode ?? "TextChain"))
-      : [];
-    const targets = [...planned.filter((p) => p.slot.streamType !== StreamType.Internal).map((p) => ({ when: p.start, p })), ...old.map((s) => ({ when: dayjs(s.startDate), s }))].sort((a, b) => a.when.valueOf() - b.when.valueOf());
-    targets.forEach(({ p, s }) => {
-      if (p) {
-        p.wordSetId = take(p.slot.gameMode);
-      } else {
-        const id = take(s.gameMode ?? "TextChain");
-        if (id) assignments.push({ streamId: s.id, wordSetId: id });
-      }
-    });
-  }
-  return { planned, skipped, assignments };
+  return { planned, skipped };
 }
 
-/** Preview of a month's new streams; adding them (and words for existing ones) is one request. */
+/** Preview of a month's new streams; adding them is one request. */
 export function FillMonthDialog({ open, onClose, instant, initialMonth, slots, streams, hosts, timezone, onFilled, onEditSlots, mode }) {
   const { m3: c, tokens } = useTheme();
   const notify = useNotify();
   const invalidate = useInvalidate();
   const build = useStreamBuilder();
-  const { sets } = useWordSets();
+  // The bundle every stream of this fill starts with (the first one until another is picked).
+  const { bundles } = useBundles();
+  const [pickedBundle, setPickedBundle] = useState(null);
+  const bundleId = bundles.some((b) => b.id === pickedBundle) ? pickedBundle : bundles[0]?.id ?? null;
+  // The format every stream of this fill gets; none picked leaves it to each stream.
+  const [gameMode, setGameMode] = useState(null);
   const { mutateAsync, isPending } = useCustomMutation();
   const [month, setMonth] = useState(initialMonth);
-  const [useWords, setUseWords] = useState(true);
-  const [existing, setExisting] = useState(true);
   // Slots left out of this fill (switched off in the list); all are in when the dialog opens.
   const [offSlots, setOffSlots] = useState([]);
 
@@ -360,35 +317,25 @@ export function FillMonthDialog({ open, onClose, instant, initialMonth, slots, s
     if (!open) return;
     const current = dayjs().tz(timezone).startOf("month");
     setMonth(initialMonth.isBefore(current) ? current : initialMonth);
-    setUseWords(true);
-    setExisting(true);
     setOffSlots([]);
+    setGameMode(null);
     // Reset only when the dialog opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // Each slot's host as it stands now (its own, or its game mode's default).
-  const { presets } = useGameModePresets();
-  const resolved = useMemo(() => withSlotHosts(slots, presets), [slots, presets]);
-  const { planned, skipped, assignments } = useMemo(() => planMonth({ month, slots: resolved.filter((s) => !offSlots.includes(s.id)), streams, sets, hosts, timezone, useWords, existing, mode }), [month, resolved, offSlots, streams, sets, hosts, timezone, useWords, existing, mode]);
-  const withWords = planned.filter((p) => p.wordSetId).length;
-  const hasSets = sets.some((w) => !w.streamId);
+  const { planned, skipped } = useMemo(() => planMonth({ month, slots: slots.filter((s) => !offSlots.includes(s.id)), streams, hosts, timezone }), [month, slots, offSlots, streams, hosts, timezone]);
   const hostName = (id) => hostLabel(hosts.find((h) => h.id === id)) || null;
 
   const create = async () => {
-    const payload = planned.map(({ slot, start, wordSetId }) => {
+    const payload = planned.map(({ slot, start }) => {
       const host = hosts.find((h) => h.id === slot.hostId);
-      // Built like every new stream (game mode defaults + Default presets); words come with the set.
-      return { ...build({ title: DEFAULT_TITLE, host, startDate: start.utc().toISOString(), gameMode: modeOf(slot).id, streamType: slot.streamType }), wordSetId };
+      // Built like every new stream (its bundle + the Default presets); words come later, from a word set.
+      return build({ title: DEFAULT_TITLE, host, startDate: start.utc().toISOString(), bundleId, gameMode, streamType: slot.streamType });
     });
     try {
-      await mutateAsync({ url: "/TextSavvyStream/bulk", method: "post", values: { streams: payload, assignments }, successNotification: false, errorNotification: false });
+      await mutateAsync({ url: "/TextSavvyStream/bulk", method: "post", values: { streams: payload, assignments: [] }, successNotification: false, errorNotification: false });
       invalidate({ resource: "TextSavvyStream", invalidates: ["list"] });
-      invalidate({ resource: "WordSet", dataProviderName: DP.wordSets, invalidates: ["list"] });
-      const parts = [`${payload.length} ${payload.length === 1 ? "stream" : "streams"} added to ${month.format("MMMM")}`];
-      if (withWords) parts.push(`${withWords} with words`);
-      if (assignments.length) parts.push(`${assignments.length} more ${assignments.length === 1 ? "stream" : "streams"} got words`);
-      notify(parts.join(", "));
+      notify(`${payload.length} ${payload.length === 1 ? "stream" : "streams"} added to ${month.format("MMMM")}`);
       onFilled?.(month);
       onClose();
     } catch (e) {
@@ -399,9 +346,9 @@ export function FillMonthDialog({ open, onClose, instant, initialMonth, slots, s
   const skippedText = [
     skipped.taken && `${skipped.taken} ${skipped.taken === 1 ? "time already has" : "times already have"} a stream within an hour`,
     skipped.past && `${skipped.past} ${skipped.past === 1 ? "time is" : "times are"} already past`,
-    skipped.noHost && `${skipped.noHost} ${skipped.noHost === 1 ? "time has" : "times have"} no host (the host was removed)`,
+    skipped.noHost && `${skipped.noHost} ${skipped.noHost === 1 ? "time has" : "times have"} no host`,
   ].filter(Boolean);
-  const nothing = !planned.length && !assignments.length;
+  const nothing = !planned.length;
 
   return (
     // A side sheet, like Time slots: it opens over the page and swaps to Time slots in place.
@@ -424,7 +371,7 @@ export function FillMonthDialog({ open, onClose, instant, initialMonth, slots, s
             Cancel
           </Button>
           <Button onClick={create} disabled={nothing || isPending || !slots.length} startIcon={<Icon name="auto_awesome" />}>
-            {isPending ? "Adding…" : planned.length ? `Add ${planned.length} ${planned.length === 1 ? "stream" : "streams"}` : assignments.length ? "Add words" : "Nothing to add"}
+            {isPending ? "Adding…" : planned.length ? `Add ${planned.length} ${planned.length === 1 ? "stream" : "streams"}` : "Nothing to add"}
           </Button>
         </>
       }
@@ -440,10 +387,21 @@ export function FillMonthDialog({ open, onClose, instant, initialMonth, slots, s
           </Typography>
         ) : (
           <>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              <Typography variant="overline" color="text.secondary" component="div">
+                Bundle
+              </Typography>
+              <BundleCards value={bundleId} onChange={setPickedBundle} />
+            </Box>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              <Typography variant="overline" color="text.secondary" component="div">
+                How to play & format
+              </Typography>
+              <ModeCards value={gameMode} onChange={setGameMode} />
+            </Box>
             <Box sx={{ borderRadius: `${tokens.shape.md}px`, bgcolor: c.surfaceContainer, overflow: "hidden" }}>
-              {resolved.map((slot) => {
+              {slots.map((slot) => {
                 const mine = planned.filter((p) => p.slot.id === slot.id);
-                const filled = mine.filter((p) => p.wordSetId).length;
                 const on = !offSlots.includes(slot.id);
                 return (
                   <Box key={slot.id} sx={{ display: "flex", alignItems: "center", gap: 1.5, px: 2, py: 1.25, "&:not(:last-of-type)": { borderBottom: `1px solid ${c.outlineVariant}` } }}>
@@ -457,19 +415,14 @@ export function FillMonthDialog({ open, onClose, instant, initialMonth, slots, s
                         {fillHost(DEFAULT_TITLE, hostName(slot.hostId))}
                       </Typography>
                       <Typography variant="bodySmall" color={hostName(slot.hostId) ? "text.secondary" : "error"} noWrap component="div">
-                        {daysText(slotDays(slot))}{mode ? "" : ` · ${modeOf(slot).label}`} · {hostName(slot.hostId) ?? "No host"}
-                        {slot.streamType === StreamType.Internal && " · Internal"}
+                        {daysText(slotDays(slot))} · {hostName(slot.hostId) ?? "No host"}
+                        {AUDIENCE_TEXT[slot.streamType] && ` · ${AUDIENCE_TEXT[slot.streamType]}`}
                       </Typography>
                     </Box>
                     <Box sx={{ textAlign: "right", flexShrink: 0, opacity: on ? 1 : 0.5 }}>
                       <Typography variant="labelLarge" component="div">
                         {on ? mine.length : "Off"}
                       </Typography>
-                      {useWords && mine.length > 0 && slot.streamType !== StreamType.Internal && (
-                        <Typography variant="labelSmall" color="text.secondary" component="div">
-                          {filled} with words
-                        </Typography>
-                      )}
                     </Box>
                   </Box>
                 );
@@ -480,16 +433,7 @@ export function FillMonthDialog({ open, onClose, instant, initialMonth, slots, s
                 Skipped: {skippedText.join(", ")}.
               </Typography>
             )}
-            <ListGroup label="Words">
-              <ListSwitch icon="spellcheck" title="Add ready word sets" supporting={hasSets ? "The earliest streams get the oldest ready word sets. Internal times don't use them." : "No word sets are ready. Add some in Streams › Game modes."} checked={useWords && hasSets} disabled={!hasSets} onChange={setUseWords} />
-              {useWords && hasSets && <ListSwitch icon="edit_calendar" title="Also fill streams missing words" supporting="Streams already in this month that are still waiting for words." checked={existing} onChange={setExisting} />}
-            </ListGroup>
-            {useWords && hasSets && (withWords > 0 || assignments.length > 0) && (
-              <Typography variant="bodySmall" color="text.secondary">
-                {[withWords ? `${withWords} new ${withWords === 1 ? "stream gets its" : "streams get their"} words` : null, assignments.length ? `${assignments.length} more ${assignments.length === 1 ? "stream gets" : "streams get"} words` : null].filter(Boolean).join(", ")}.
-              </Typography>
-            )}
-            <Banner icon="hide_image">{`Streams show in the app right away; the game mode logo shows once the words are in. Times are in ${timezone.replace(/_/g, " ")}.`}</Banner>
+            <Banner icon="hide_image">{`Streams show in the app right away; their logo shows once they have a format and their words. Times are in ${timezone.replace(/_/g, " ")}.`}</Banner>
           </>
         )}
     </SideSheet>

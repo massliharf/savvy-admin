@@ -4,12 +4,15 @@ import Slide from "@mui/material/Slide";
 import Typography from "@mui/material/Typography";
 import { useTheme } from "@mui/material/styles";
 import { radius } from "../theme/tokens";
+import { useUnsavedGuard } from "../shell/unsaved";
 
 /**
  * Floating toast (Savvy Admin's white pill with the overlay shadow) for settings-style pages; appears
  * while there are unsaved changes.
  */
-export function SaveBar({ dirty, saving, onSave, onDiscard }) {
+export function SaveBar({ dirty, saving, onSave, onDiscard, guard = true }) {
+  // Leaving the page with unsaved changes asks first.
+  useUnsavedGuard(guard && dirty);
   const { m3: c, tokens } = useTheme();
   return (
     <Slide direction="up" in={dirty} mountOnEnter unmountOnExit>

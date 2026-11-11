@@ -32,7 +32,7 @@ export function StreamLegend() {
   // The same fills as the calendar's streams (useStreamSurface).
   const items = [
     { label: "Scheduled", bg: c.primaryContainer, dot: c.primary },
-    { label: "Needs words", bg: palette.warning.container, dot: palette.warning.color },
+    { label: "Needs setup", bg: palette.warning.container, dot: palette.warning.color },
     { label: "Live", bg: c.errorContainer, dot: c.error },
     { label: "Ended", bg: c.surface3, dot: c.outline },
   ];

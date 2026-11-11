@@ -264,6 +264,7 @@ function SwagSheet({ sheet }) {
     <SideSheet
       open={sheet.open}
       onClose={sheet.close}
+      dirty={formState.isDirty}
       title={isNew ? "New swag item" : sheet.record?.title}
       subtitle={isNew ? undefined : "Swag"}
       footerStart={

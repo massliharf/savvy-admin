@@ -29,14 +29,14 @@ export const isEnded = (s) => s.status === "Completed" || s.status === "Canceled
 
 /** Status badge. Published scheduled streams show none: upcoming is the normal state. */
 export function StatusBadge({ status, draft: needsWords }) {
-  const look = { InProgress: ["live", "Live"], Completed: ["neutral", "Ended"], Canceled: ["error", "Canceled"] }[status] ?? (needsWords ? ["neutral", "Needs words"] : null);
+  const look = { InProgress: ["live", "Live"], Completed: ["neutral", "Ended"], Canceled: ["error", "Canceled"] }[status] ?? (needsWords ? ["neutral", "Needs setup"] : null);
   return look ? <Pill tone={look[0]}>{look[1]}</Pill> : null;
 }
 
 function MetaItem({ icon, children, tooltip, color = "text.secondary" }) {
   const item = (
     <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, minWidth: 0, color, typography: "labelMedium", whiteSpace: "nowrap" }}>
-      <Icon name={icon} size={16} />
+      {icon && <Icon name={icon} size={16} />}
       {/* Ellipsis, not a hard cut, when the card is narrow. */}
       <Box component="span" sx={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
         {children}
@@ -64,7 +64,7 @@ export function StreamMeta({ stream, color }) {
   return (
     <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0, color }}>
       <MetaItem icon={mode.icon} color={color}>
-        {mode.label} · {rounds} {rounds === 1 ? "round" : "rounds"}
+        {[mode.label, `${rounds} ${rounds === 1 ? "round" : "rounds"}`].filter(Boolean).join(" · ")}
       </MetaItem>
       {extras.map((x) => (
         <Tooltip key={x.icon} title={x.tip}>
@@ -210,7 +210,7 @@ export function StreamItem({ stream, variant = "card", onAction, highlight }) {
   // Calendar cells drop ":00" to save room.
   const start = formatDate(stream.startDate, variant === "compact" && formatDate(stream.startDate, "m") === "0" ? "h A" : "h:mm A");
   const corner = tokens.shape[L.radius] - L.inset;
-  const label = `${formatDate(stream.startDate, "ddd, MMM D · h:mm A")} ${showTitle(stream)}, ${host.name}, ${mode.label}${draft ? ", game mode logo hidden until words are in" : ""}${stream.status === "InProgress" ? ", live" : ""}${issues.length ? `, ${issues.join(", ")}` : ""}`;
+  const label = `${formatDate(stream.startDate, "ddd, MMM D · h:mm A")} ${showTitle(stream)}, ${host.name}${mode.label ? `, ${mode.label}` : ""}${draft ? ", logo hidden until words are in" : ""}${stream.status === "InProgress" ? ", live" : ""}${issues.length ? `, ${issues.join(", ")}` : ""}`;
 
   const hero = <StreamHero stream={stream} width={L.hero} corner={corner} />;
   const warning = issues.length > 0 && (
@@ -294,7 +294,8 @@ export function StreamItem({ stream, variant = "card", onAction, highlight }) {
       // The marks give way to the time in narrow cells (a container query on the item's width).
       <ButtonBase {...root} onClick={(e) => e.stopPropagation()} sx={{ ...sx, display: "flex", flexDirection: "column", alignItems: "stretch", px: 1, py: 0.5, containerType: "inline-size" }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, minWidth: 0, minHeight: 16, color: surface.sub }}>
-          <Icon name={mode.icon} size={14} />
+          {/* The format's icon; none until the stream has one. */}
+          {mode.icon && <Icon name={mode.icon} size={14} />}
           <Box sx={{ flex: 1, minWidth: 0, display: "flex", overflow: "hidden" }}>{time}</Box>
           {warning}
           {marks.length > 0 && (

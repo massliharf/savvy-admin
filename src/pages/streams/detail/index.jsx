@@ -16,7 +16,8 @@ import { useTimezoneFormat } from "../../../contexts";
 import { useNotify } from "../../../shell/notifications";
 import { useStreamForm, useWordValidator } from "../form";
 import { DEFAULT_ROUND_SCORING, GameMode, busterFor, durationFor } from "../enums";
-import { useGameModePresets } from "../gameModes";
+import { useBundles } from "../gameModes";
+import { useUnsavedGuard } from "../../../shell/unsaved";
 import { STREAM_TYPES, SetupWarning, StatusBadge, StreamImage, logoHidden } from "../parts";
 import { StreamKeyDialog } from "../StreamKeyDialog";
 import { useHosts, showTitle } from "../hosts";
@@ -41,7 +42,7 @@ import {
 // Sponsor, Rewards, Messaging. `fields` are
 // what each owns, to jump to the first error.
 const SECTIONS = [
-  { id: "mode", group: "Game mode", label: "Game mode", icon: "sports_esports", fields: ["gameMode"] },
+  { id: "mode", group: "How to play & format", label: "How to play & format", icon: "sports_esports", fields: ["gameMode"] },
   { id: "basics", group: "Stream", label: "When & title", icon: "event", fields: ["title", "subtitle", "startDate", "streamType", "headless", "isSpotlighted"] },
   // Words holds the rounds and the showdown word together.
   { id: "words", group: "Game", label: "Words", icon: "spellcheck", fields: ["textSavvyRounds", "showdownConfiguration"] },
@@ -61,7 +62,7 @@ export default function StreamDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const notify = useNotify();
-  const { presets } = useGameModePresets();
+  const { bundles, byId } = useBundles();
   const { formatDate } = useTimezoneFormat();
   const hosts = useHosts();
   const { validateWord } = useWordValidator();
@@ -79,6 +80,8 @@ export default function StreamDetail() {
     successNotification: () => ({ message: "Changes saved", type: "success" }),
   });
   const { query, reset, errors, isDirty, trigger, getValues } = form;
+  // Leaving with unsaved changes asks first (not after the stream was just deleted).
+  const leaveWithoutAsking = useUnsavedGuard(isDirty);
   const stream = query?.data?.data;
   const status = useWatch({ control: form.control, name: "status" });
   const sections = SECTIONS;
@@ -90,7 +93,8 @@ export default function StreamDetail() {
       setLoadedId(stream.id);
       reset({
         ...stream,
-        gameMode: stream.gameMode ?? GameMode.TextChain,
+        // No format until one is picked.
+        gameMode: stream.gameMode ?? null,
         roundScoring: stream.roundScoring ?? DEFAULT_ROUND_SCORING,
         status: stream.status ?? "Scheduled",
         // Same default the form applies (start + 7 min), set here so a fresh load isn't "dirty".
@@ -156,9 +160,13 @@ export default function StreamDetail() {
     const prev = form.getValues("textSavvyRounds.rounds") ?? [];
     // Same as adding a set anywhere else: its words, times and Round Pounder rewards; its showdown
     // (word and prize) or none when the set has none.
-    form.replaceRounds(set.rounds.map((r, i) => ({ ...prev[i], roundIndex: i, word: r.word, durationInSeconds: r.durationInSeconds ?? durationFor(r.word, i), roundBusterReward: r.roundBusterReward ?? prev[i]?.roundBusterReward ?? busterFor(i) })));
+    // A set is words and their times; rewards and the showdown prize stay the stream's (from its bundle).
+    form.replaceRounds(set.rounds.map((r, i) => ({ ...prev[i], roundIndex: i, word: r.word, durationInSeconds: r.durationInSeconds ?? durationFor(r.word, i), roundBusterReward: prev[i]?.roundBusterReward ?? busterFor(i) })));
     const current = form.getValues("showdownConfiguration");
-    form.setValue("showdownConfiguration", set.showdown ? { superSavvyOnly: false, ...current, word: set.showdown.word, prize: set.showdown.prize ?? current?.prize ?? presets[form.gameMode ?? GameMode.TextChain]?.showdown?.prize ?? { rewardType: "Cash", amount: 100 } } : null, { shouldDirty: true });
+    const bundle = byId[form.getValues("bundleId")] ?? bundles[0];
+    // The stream decides whether there's a showdown; a set without a showdown word leaves it waiting for one.
+    if (set.showdown) form.setValue("showdownConfiguration", { superSavvyOnly: !!bundle?.showdown?.superSavvyOnly, ...current, word: set.showdown.word, prize: current?.prize ?? bundle?.showdown?.prize ?? { rewardType: "Cash", amount: 100 } }, { shouldDirty: true });
+    else if (current) form.setValue("showdownConfiguration", { ...current, word: "" }, { shouldDirty: true });
     form.setValue("wordSetId", set.id, { shouldDirty: true });
     notify("Words filled in. Save to keep them.");
   };
@@ -242,7 +250,7 @@ export default function StreamDetail() {
         {/* What's left, at the top, each a link to its section. */}
         {pending.length > 0 && (
           <Banner tone={errorIds.length ? "error" : "warning"} icon={errorIds.length ? "error" : "checklist"}>
-            {logoHidden(stream) ? "The app hides the game mode logo until the words are in. Still to do: " : "Still to do: "}
+            {logoHidden(stream) ? "The app hides the logo until the stream is set up. Still to do: " : "Still to do: "}
             {pending.map((s, i) => (
               <Fragment key={s.id}>
                 {i > 0 && " · "}
@@ -262,7 +270,7 @@ export default function StreamDetail() {
       </DetailBody>
 
       <StreamKeyDialog stream={keyOpen ? stream : null} onClose={() => setKeyOpen(false)} />
-      <WordSetPickerDialog open={picking} type={form.gameMode ?? GameMode.TextChain} stream={{ ...stream, streamType: getValues("streamType") }} onClose={() => setPicking(false)} onPick={applySet} />
+      <WordSetPickerDialog open={picking} stream={{ ...stream, streamType: getValues("streamType") }} onClose={() => setPicking(false)} onPick={applySet} />
 
       <ConfirmDialog
         open={confirmAudience}
@@ -290,6 +298,7 @@ export default function StreamDetail() {
             {
               onSuccess: () => {
                 notify(`“${showTitle(stream)}” deleted`);
+                leaveWithoutAsking();
                 navigate("/streams");
               },
             },

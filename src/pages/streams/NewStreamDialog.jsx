@@ -14,12 +14,14 @@ import { TimePicker } from "@mui/x-date-pickers/TimePicker";
 import { Icon } from "../../ds/Icon";
 import { dayjs, useTimezone } from "../../contexts";
 import { richLen } from "./enums";
-import { GAME_MODES, modeOf, useGameModePresets, useStreamBuilder } from "./gameModes";
+import { GAME_MODES, modeOf, useBundles, useStreamBuilder } from "./gameModes";
+import { BundleCards } from "./BundleCards";
+import { ModeCards } from "./ModeCards";
+import { HostPicker } from "./pickers";
 import { DEFAULT_TITLE, fillHost, hostLabel, titleRule } from "./hosts";
 import { FieldHelper } from "../../ds/FieldHelper";
 import { ListGroup, ListItem, ListSwitch } from "../../ds/ListGroup";
 import { ScopeToggle } from "../../ds/ScopeToggle";
-import { ModeCards } from "./ModeCards";
 import Typography from "@mui/material/Typography";
 import { StreamType } from "./enums";
 
@@ -27,9 +29,10 @@ const defaultStart = (tz) => dayjs().tz(tz).add(1, "day").hour(19).minute(0).sec
 
 function initialState(source, hosts, tz, date) {
   const start = date ? dayjs.tz(`${date}T19:00`, tz) : defaultStart(tz);
-  if (!source) return { gameMode: "TextChain", title: DEFAULT_TITLE, host: null, start: start.isValid() ? start : defaultStart(tz), streamType: "Public" };
+  if (!source) return { gameMode: null, bundleId: null, title: DEFAULT_TITLE, host: null, start: start.isValid() ? start : defaultStart(tz), streamType: "Public" };
   return {
     gameMode: modeOf(source).id,
+    bundleId: source.bundleId ?? null,
     // The copy keeps the title; {host} names whoever hosts it.
     title: source.title || DEFAULT_TITLE,
     host: hosts.find((h) => h.id === source.hostId) ?? null,
@@ -39,7 +42,7 @@ function initialState(source, hosts, tz, date) {
 }
 
 /**
- * Short create flow: game mode, time, audience, title. Everything else (host and sponsor included)
+ * Short create flow: bundle, format, host, time, audience, title. Everything else (host and sponsor included)
  * comes from the game mode (or the duplicated stream) and is changed on the stream.
  */
 export function NewStreamDialog({ open, source, date, hosts, onClose, onCreated }) {
@@ -49,9 +52,10 @@ export function NewStreamDialog({ open, source, date, hosts, onClose, onCreated 
   const [form, setForm] = useState(() => initialState(source, hosts, timezone, date));
   const [submitted, setSubmitted] = useState(false);
   const { mutateAsync: create, isPending } = useCreate();
-  const { presets } = useGameModePresets();
-  const defaultHost = (gameMode) => hosts.find((h) => h.id === presets[gameMode]?.defaultHostId) ?? null;
   const build = useStreamBuilder();
+  // The picked bundle; the first one until another is picked.
+  const { bundles } = useBundles();
+  const bundleId = bundles.some((b) => b.id === form.bundleId) ? form.bundleId : bundles[0]?.id ?? null;
 
   useEffect(() => {
     if (open) {
@@ -66,8 +70,9 @@ export function NewStreamDialog({ open, source, date, hosts, onClose, onCreated 
   // Date and time are picked separately; rebuild the instant in the admin time zone so DST is right.
   const compose = (date, time) =>
     date?.isValid() && time?.isValid() ? dayjs.tz(`${date.format("YYYY-MM-DD")}T${time.format("HH:mm")}`, timezone) : (date ?? time);
-  // Who'll host: the copy's host, else the game mode's default (none: picked on the stream).
-  const host = source ? form.host : defaultHost(form.gameMode);
+  // Who'll host: picked here (a copy starts with its source's host).
+  // With one host in the library there's nothing to pick: it's them.
+  const host = form.host ?? (hosts.length === 1 ? hosts[0] : null);
   const titleLen = richLen(form.title.trim());
   const titleCheck = titleRule(form.title);
   const errors = {
@@ -84,15 +89,16 @@ export function NewStreamDialog({ open, source, date, hosts, onClose, onCreated 
     setSubmitted(true);
     if (!valid) return;
     const startDate = form.start.utc().toISOString();
-    const base = { title: form.title.trim(), host: host ?? {}, startDate, gameMode: form.gameMode, streamType: form.streamType };
-    // A new stream: the game mode's defaults and the Default presets (see useStreamBuilder).
+    const base = { title: form.title.trim(), host: host ?? {}, startDate, gameMode: form.gameMode, bundleId, streamType: form.streamType };
+    // A new stream: its bundle's defaults and the Default presets (see useStreamBuilder). Its game
+    // comes with its word set.
     let values = build(base);
     if (source) {
       // A copy keeps the source's settings (sponsor, rewards, share cards, notifications…); only
       // the time, host and audience are new. Words aren't copied: a word set is used once.
       // eslint-disable-next-line no-unused-vars
       const { id, status, prizePool, totalPrizePool, isDraft, hideGameModeLogo, ...copy } = source;
-      const sameMode = source.gameMode === mode.id;
+      const sameMode = (source.gameMode ?? null) === (mode?.id ?? null);
       const sameHost = source.hostId === host?.id;
       values = {
         ...copy,
@@ -121,17 +127,29 @@ export function NewStreamDialog({ open, source, date, hosts, onClose, onCreated 
     <Dialog open={open} onClose={isPending ? undefined : onClose} fullScreen={fullScreen} maxWidth="sm" fullWidth>
       <DialogTitle>{source ? "Duplicate stream" : "New stream"}</DialogTitle>
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
-        {/* What's played: a game mode, shown like a host card (its logo, name and defaults). Words
-            are added on the stream afterwards. */}
-        <Box role="radiogroup" aria-label="Game mode" sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-          <Typography variant="overline" color="text.secondary" component="div">
-            Game mode
-          </Typography>
-          <ModeCards value={form.gameMode} onChange={(id) => set({ gameMode: id })} />
-        </Box>
+        {/* What the stream starts with: a bundle (points, showdown, rewards). A copy keeps its
+            source's settings. The game comes with the word set, added on the stream afterwards. */}
+        {!source && (
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+            <Typography variant="overline" color="text.secondary" component="div">
+              Bundle
+            </Typography>
+            <BundleCards value={bundleId} onChange={(id) => set({ bundleId: id })} />
+          </Box>
+        )}
+        {/* Its format (logo, pill and How to play in the app). Can wait: it's also picked on the stream. */}
+        {!source && (
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+            <Typography variant="overline" color="text.secondary" component="div">
+              How to play & format
+            </Typography>
+            <ModeCards value={form.gameMode} onChange={(id) => set({ gameMode: id })} />
+          </Box>
+        )}
 
-        {/* The stream itself: its title, when and for whom. The host comes from the game mode (its
-            default host) and is changed on the stream. */}
+        <HostPicker hosts={hosts} value={host} onChange={(h) => set({ host: h })} />
+
+        {/* The stream itself: its title, when and for whom. */}
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
           <Typography variant="overline" color="text.secondary" component="div">
             Stream

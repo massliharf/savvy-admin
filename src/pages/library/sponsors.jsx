@@ -118,6 +118,7 @@ function SponsorSheet({ sheet }) {
     <SideSheet
       open={sheet.open}
       onClose={sheet.close}
+      dirty={formState.isDirty}
       title={isNew ? "New sponsor" : sheet.record?.name}
       subtitle={isNew ? undefined : "Sponsor"}
       footerStart={

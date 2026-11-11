@@ -270,6 +270,7 @@ function UserSheetBody({ id, open, onClose }) {
     <SideSheet
       open={open}
       onClose={onClose}
+      dirty={dirty}
       title={
         <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 1.5, maxWidth: "100%" }}>
           {user && <UserAvatar user={user} size={32} />}

@@ -36,26 +36,17 @@ export const GAME_MODES = {
     hostStumperBonusXp: DEFAULT_HOST_STUMPER_BONUS_XP,
   },
 };
-/**
- * Game modes made in the admin play a built-in game's rules (`base`) under their own name; they're
- * added here as their presets load, so every lookup by id (GAME_MODES[id], modeOf) finds them.
- */
-function registerModes(list) {
-  list.forEach((p) => {
-    const from = GAME_MODES[p.base];
-    if (p.base && from) GAME_MODES[p.id] = { ...from, id: p.id, base: p.base, label: p.name, custom: true };
-  });
-  Object.keys(GAME_MODES).forEach((id) => GAME_MODES[id].custom && !list.some((p) => p.id === id) && delete GAME_MODES[id]);
-}
-/** The built-in game whose rules a mode plays (TextChain or SubText). */
-export const baseOf = (gameMode) => GAME_MODES[gameMode]?.base ?? gameMode ?? GameMode.TextChain;
+/** The game a stream plays (TextChain or SubText); null while it has no format yet. */
+export const baseOf = (gameMode) => GAME_MODES[gameMode]?.id ?? null;
 
 /** Every game mode (one colour each in the calendar). */
 export const BASE_MODES = Object.values(GAME_MODES);
 /** Id of the game mode a stream (or slot) plays. The showdown no longer makes a mode of its own. */
 // eslint-disable-next-line no-unused-vars
-export const modeId = (gameMode, showdown) => gameMode ?? GameMode.TextChain;
-export const modeOf = (s) => GAME_MODES[modeId(s.gameMode)] ?? GAME_MODES.TextChain;
+export const modeId = (gameMode, showdown) => gameMode ?? null;
+/** A stream without a format yet (no word set, none picked): no icon, no name. */
+export const NO_MODE = { id: null, label: "", icon: null };
+export const modeOf = (s) => GAME_MODES[s.gameMode] ?? NO_MODE;
 
 const DEFAULT_SHOWDOWN_PRIZE = { rewardType: RewardType.Cash, amount: 100 };
 /** A fresh Savvy Showdown from the mode preset; Super Savvy only streams get a Super Savvy Showdown. */
@@ -78,13 +69,22 @@ export const NOTIFICATION_DEFAULTS = {
 export function useGameModePresets() {
   const { data, isLoading } = useList({ resource: "GameMode", dataProviderName: DP.gameModes, pagination: { mode: "off" } });
   const presets = Object.fromEntries((data?.data ?? []).map((m) => [m.id, m]));
-  if (data?.data) registerModes(data.data);
   return { presets, isLoading };
 }
 
+/** Bundles (what a new stream starts with), in order and by id. */
+export function useBundles() {
+  const { data, isLoading } = useList({ resource: "Bundle", dataProviderName: DP.bundles, pagination: { mode: "off" } });
+  const bundles = data?.data ?? [];
+  return { bundles, byId: Object.fromEntries(bundles.map((b) => [b.id, b])), isLoading };
+}
+/** A bundle in a line: its showdown and prize ("Savvy Showdown · $100"). */
+export const bundleLine = (b) => (b?.showdown ? [b.showdown.superSavvyOnly ? "Super Savvy Showdown" : "Savvy Showdown", prizeText(b.showdown.prize)].filter(Boolean).join(" · ") : "");
+const prizeText = (r) => (!r?.rewardType ? "" : r.rewardType === "Cash" ? `$${r.amount ?? 0}` : `${r.amount ?? 0} ${{ Sparks: "Sparks", BombPowerup: "Letter Bomb", HintPowerup: "Magniflyer" }[r.rewardType] ?? r.rewardType}`);
+
 /** Rounds / duration / scoring a new stream gets, from the editable preset or the built-in fallback. */
 export function modeDefaults(gameMode, preset) {
-  const mode = GAME_MODES[gameMode];
+  const mode = GAME_MODES[gameMode] ?? GAME_MODES.TextChain;
   return {
     rounds: ROUND_COUNT,
     roundDuration: preset?.roundDurationInSeconds ?? mode.roundDuration,
@@ -96,9 +96,8 @@ export function modeDefaults(gameMode, preset) {
 
 /** Full stream payload for the create endpoint, filled from the game mode preset. Host and mode
  * presentation (display name, hero card image, logo, pill) comes from the libraries on the server. */
-export function streamFromPreset({ title, host, startDate, gameMode, streamType }, preset) {
+export function streamFromPreset({ title, host, startDate, gameMode = null, streamType, bundleId }, preset) {
   const mode = modeDefaults(gameMode, preset);
-  const meta = GAME_MODES[gameMode];
   return {
     title,
     hostId: host.id,
@@ -108,15 +107,18 @@ export function streamFromPreset({ title, host, startDate, gameMode, streamType 
     heroCardImageUrl: host.heroCardImageUrl ?? null,
     startDate,
     streamType,
-    gameMode: meta.id,
-    showdownConfiguration: meta.showdown ? newShowdown(preset, streamType) : null,
+    // Its format (How to play & format) is picked on the stream. None yet.
+    gameMode: GAME_MODES[gameMode]?.id ?? null,
+    bundleId: preset?.id ?? bundleId ?? null,
+    showdownConfiguration: newShowdown(preset, streamType),
     headless: false,
     isSpotlighted: false,
     textSavvyRounds: {
       // Each round's time follows its word (the fifth is always 45 s); Round Pounder 5, 10, 15 … Sparks.
       rounds: Array.from({ length: mode.rounds }, (_, i) => ({ roundIndex: i, word: "", durationInSeconds: durationFor("", i), roundBusterReward: busterFor(i) })),
     },
-    roundScoring: mode.scoring,
+    // SubText gives no points for yellow letters.
+    roundScoring: gameMode === GameMode.SubText ? Object.fromEntries(Object.entries(mode.scoring ?? {}).map(([k, v]) => [k, { ...v, yellowLetterXp: 0 }])) : mode.scoring,
     hostStumperBonusXp: mode.hostStumperBonusXp ?? undefined,
     defaultRewards: mode.defaultRewards,
     entranceFee: { type: EntranceFeeType.Free, amount: 0 },
@@ -125,25 +127,25 @@ export function streamFromPreset({ title, host, startDate, gameMode, streamType 
 }
 
 /**
- * The one way a new stream is put together (New stream and Fill month alike): the game mode's
- * defaults (rounds, scoring, rewards, showdown, host's pictures, default sponsor, share card and
+ * The one way a new stream is put together (New stream and Fill month alike): its bundle's
+ * defaults (rounds, scoring, rewards, showdown, host's pictures, share card and
  * notification presets). Words come later, from a word set.
  */
 export function useStreamBuilder() {
-  const { presets } = useGameModePresets();
-  const { data: sponsors } = useList({ resource: "Sponsor", dataProviderName: DP.sponsors, pagination: { mode: "off" } });
+  const { bundles, byId } = useBundles();
   const { data: share } = useList({ resource: "SharePreset", dataProviderName: DP.sharePresets, pagination: { mode: "off" } });
   const { data: notify } = useList({ resource: "NotificationPreset", dataProviderName: DP.notificationPresets, pagination: { mode: "off" } });
   return (base) => {
-    const preset = presets[base.gameMode];
+    // The stream's bundle (the first one when none is given); its game comes later, with its word set.
+    const preset = byId[base.bundleId] ?? bundles[0];
     const values = streamFromPreset(base, preset);
     // The game mode's presets, else the libraries' Default ones.
     const sharePreset = share?.data?.find((p) => p.id === preset?.defaultSharePresetId) ?? share?.data?.find((p) => p.isDefault) ?? share?.data?.[0];
     const notifyPreset = notify?.data?.find((p) => p.id === preset?.defaultNotificationPresetId) ?? notify?.data?.find((p) => p.isDefault) ?? notify?.data?.[0];
     if (sharePreset) values.shareableCards = structuredClone(sharePreset.cards);
     if (notifyPreset) Object.keys(NOTIFICATION_DEFAULTS).forEach((k) => (values[k] = notifyPreset[k] ?? values[k]));
-    const sponsor = sponsors?.data?.find((sp) => sp.id === preset?.defaultSponsorId);
-    values.sponsorship = sponsor ? { title: sponsor.title, description: sponsor.description, cta: sponsor.cta, imageUrl: sponsor.imageUrl ?? null } : null;
+    // No sponsor to start with: one is picked on the stream.
+    values.sponsorship = null;
     return values;
   };
 }
@@ -151,6 +153,8 @@ export function useStreamBuilder() {
 /** Things a stream still needs before it can go live. */
 export function setupIssues(stream) {
   const issues = [];
+  if (!stream.hostId) issues.push("No host");
+  if (!GAME_MODES[stream.gameMode]) issues.push("Format not picked");
   const rounds = stream.textSavvyRounds?.rounds ?? [];
   const missing = rounds.filter((r) => !r.word).length;
   if (rounds.length === 0) issues.push("No rounds");

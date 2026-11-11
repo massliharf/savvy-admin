@@ -77,14 +77,14 @@ function useStreamPresetUsage(kind, k) {
   return { usedBy, makeDefault };
 }
 
-const KINDS = {
+export const KINDS = {
   share: { resource: "SharePreset", dataProviderName: DP.sharePresets, noun: "Share card preset", title: "Stream share cards", description: "New streams start from the Default.", icon: "style", empty: () => ({ name: "", cards: structuredClone(EMPTY_CARDS) }), summary: (p) => p.cards?.liveHome?.title },
   app: { resource: "AppCardPreset", dataProviderName: DP.appCardPresets, noun: "App share card preset", title: "App share cards", description: "Shared from the profile and after a live show.", icon: "ios_share", puzzle: false, empty: () => ({ name: "", cards: emptyAppCards(false) }), summary: (p) => p.cards?.profileShare?.title },
   puzzle: { resource: "PuzzleCardPreset", dataProviderName: DP.puzzleCardPresets, noun: "Daily puzzle share card preset", title: "Daily puzzle share cards", description: "Shared after today's puzzle.", icon: "extension", puzzle: true, empty: () => ({ name: "", cards: emptyAppCards(true) }), summary: (p) => stripRichText(p.cards?.dailyPuzzleSuccess?.title ?? "") },
   notify: { resource: "NotificationPreset", dataProviderName: DP.notificationPresets, noun: "Notification preset", title: "Notifications", description: "New streams start from the Default.", icon: "notifications", empty: () => ({ name: "", ...Object.fromEntries(NOTIFICATION_KEYS.map((k) => [k, ""])) }), summary: (p) => p.lobbyOpenTitle },
 };
 
-function PresetSheet({ kind, sheet, onSaved }) {
+export function PresetSheet({ kind, sheet, onSaved }) {
   const k = KINDS[kind];
   const isNew = sheet.open && !sheet.record?.id;
   const { save, destroy, saving } = useLibraryMutations(k);
@@ -110,6 +110,7 @@ function PresetSheet({ kind, sheet, onSaved }) {
     <SideSheet
       open={sheet.open}
       onClose={sheet.close}
+      dirty={formState.isDirty}
       title={isNew ? `New ${k.noun.toLowerCase()}` : sheet.record?.name}
       subtitle={isNew ? undefined : k.noun}
       footerStart={

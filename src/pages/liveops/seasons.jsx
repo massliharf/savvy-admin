@@ -225,6 +225,7 @@ function SeasonSheet({ sheet }) {
     <SideSheet
       open={sheet.open}
       onClose={sheet.close}
+      dirty={formState.isDirty}
       title={isNew ? "New season" : sheet.record?.title}
       subtitle={isNew ? undefined : "Season"}
       footerStart={

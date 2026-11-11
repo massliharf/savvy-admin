@@ -31,8 +31,6 @@ import { HostPicker } from "../streams/pickers";
 import { CardGrid, ShopCard } from "../shop/shared";
 import { ConfirmDelete, LibraryToolbar, useLibraryMutations, useSheet } from "./shared";
 import { CardsSkeleton } from "../../ds/Skeletons";
-import { Pill } from "../../ds/Pill";
-import { useGameModePresets } from "../streams/gameModes";
 
 // Each picture kind keeps up to five images; the selected one (imageUrl, streamImageUrl,
 // heroCardImageUrl) is what new streams use.
@@ -46,7 +44,7 @@ const GALLERIES = [
 const galleryOf = (r, g) => r?.[g.list] ?? (r?.[g.pick] ? [r[g.pick]] : []);
 
 /** A host as a large card, like the Shop's: their picture, the name the app shows, then their name. */
-function HostCard({ host, defaultFor, onOpen }) {
+function HostCard({ host, onOpen }) {
   return (
     <ShopCard
       image={host.imageUrl}
@@ -59,8 +57,6 @@ function HostCard({ host, defaultFor, onOpen }) {
           </Typography>
         )
       }
-      // Which game modes start new streams with this host (set on each game mode).
-      pills={defaultFor.length > 0 && <Pill>{defaultFor.length === 1 ? `Default for ${defaultFor[0]}` : `Default for ${defaultFor.length} modes`}</Pill>}
       onOpen={onOpen}
     />
   );
@@ -218,6 +214,7 @@ export function HostSheet({ sheet, stats, existing, onHandOver }) {
     <SideSheet
       open={sheet.open}
       onClose={sheet.close}
+      dirty={formState.isDirty}
       title={isNew ? "New host" : hostLabel(sheet.record)}
       subtitle={isNew ? undefined : `Host · ${sheet.record?.username ?? sheet.record?.id}`}
       headerActions={
@@ -319,8 +316,6 @@ export default function HostsPage() {
   const [handOver, setHandOver] = useState(null);
   const sheet = useSheet();
   const { data, isLoading } = useList({ resource: "Host", dataProviderName: DP.hosts, pagination: { mode: "off" } });
-  const { presets } = useGameModePresets();
-  const defaultsFor = (id) => Object.values(presets).filter((m) => m.defaultHostId === id).map((m) => m.name);
   // `?edit=<id>` opens that host, e.g. from a stream's Home screen section.
   const [params, setParams] = useSearchParams();
   const editId = params.get("edit");
@@ -367,7 +362,7 @@ export default function HostsPage() {
       ) : (
         <CardGrid>
           {hosts.map((h) => (
-            <HostCard key={h.id} host={h} defaultFor={defaultsFor(h.id)} onOpen={() => sheet.openEdit(h)} />
+            <HostCard key={h.id} host={h} onOpen={() => sheet.openEdit(h)} />
           ))}
         </CardGrid>
       )}

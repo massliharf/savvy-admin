@@ -157,7 +157,7 @@ export function HostPicker({ hosts, value, onChange, label = "Host", error, help
 }
 
 /** Game mode picker: the two modes as a connected button group. `value` is a mode id. */
-export function ModeChoice({ value, onChange, label = "Game mode" }) {
+export function ModeChoice({ value, onChange, label = "How to play & format" }) {
   return <ChoiceGroup label={label} value={value} options={Object.values(GAME_MODES).map((m) => ({ value: m.id, label: m.label, icon: m.icon }))} onChange={onChange} />;
 }
 

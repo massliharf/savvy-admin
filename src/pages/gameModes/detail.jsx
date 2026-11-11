@@ -1,134 +1,81 @@
-// A game mode's settings, shown as two tabs of Streams › Game modes: Stream defaults (what a new
-// stream of this mode starts with, in the same groups as a stream's page: Game, Host, Sponsor,
-// Rewards, Messaging) and App (logo, name, home screen pill, How to play).
+// A bundle's settings under Streams › Bundles: what a new stream of it starts with. Game (points
+// per round, the showdown and its prize, rewards) and Messaging. Hosts and sponsors are picked per
+// stream and time slot, not here. How the game shows in the app is edited in Streams › How to play.
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useForm } from "@refinedev/react-hook-form";
-import { useFieldArray, useWatch } from "react-hook-form";
+import { useWatch } from "react-hook-form";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import { Icon } from "../../ds/Icon";
 import { EmptyState } from "../../ds/EmptyState";
 import { FormSection } from "../../ds/FormSection";
-import { ImageField, useFilePreview } from "../../ds/ImageField";
 import { DetailHeader, DetailSkeleton, SectionGroup } from "../../ds/DetailLayout";
-import { ModeLogo } from "../streams/ModeLogo";
+import { IconTile } from "../../ds/IconTile";
+import { TextInput } from "../streams/detail/fields";
 import { SaveBar } from "../../ds/SaveBar";
-import { SelectButton } from "../../ds/SelectButton";
+import Radio from "@mui/material/Radio";
+import { useTheme } from "@mui/material/styles";
+import { ListAdd, ListGroup, ListItem } from "../../ds/ListGroup";
+import { Pill } from "../../ds/Pill";
+import { useSheet } from "../library/shared";
+import { KINDS, PresetSheet } from "../liveops/presets";
 import { useNotify } from "../../shell/notifications";
 import { DP } from "../../providers";
-import { GAME_MODES, useGameModePresets } from "../streams/gameModes";
-import { TextInput } from "../streams/detail/fields";
-import { PillFields, RewardsEditor, ScoringFields, ShowdownEditor } from "../streams/detail/sections";
-import { ListAdd, ListGroup, ListItem } from "../../ds/ListGroup";
-import { ActionMenu } from "../../ds/ActionMenu";
-import { useDragSort } from "../../ds/DragSort";
-import { ImageCell, TextCell } from "../../ds/EditTable";
+import { bundleLine, useBundles } from "../streams/gameModes";
+import { RewardsEditor, ScoringFields, ShowdownEditor } from "../streams/detail/sections";
 import { useDelete, useList } from "@refinedev/core";
 import { ConfirmDialog } from "../../ds/ConfirmDialog";
-import Avatar from "@mui/material/Avatar";
-import { useTheme } from "@mui/material/styles";
-import { cornerFor } from "../../ds/IconTile";
-import { HostPicker, PickCard, PickPlaceholder } from "../streams/pickers";
-import { useHosts } from "../streams/hosts";
 
 
 
 /**
- * One How to Play power-up, edited in its row: the icon (click to change), its name and what it
- * does; drag to reorder, ⋮ to remove.
+ * The library's presets of one kind (share cards or notifications), as the same rows as in
+ * Library: the radio picks the one new streams of this bundle start from, the row opens the
+ * preset in its side sheet to read and edit it, and "Add preset" makes a new one. Picking the
+ * library's Default keeps following it (nothing stored on the bundle).
  */
-function PowerUpRow({ control, setValue, index, onRemove, drag }) {
-  const base = `howToPlay.powerUps.${index}`;
-  const [iconUrl, iconFile, title] = useWatch({ control, name: [`${base}.iconUrl`, `${base}.iconFile`, `${base}.title`] });
-  const src = useFilePreview(iconFile, iconUrl);
-  const name = title || "power-up";
-  return (
-    <ListItem
-      sortable={drag.item(index)}
-      leadingControl={drag.handle(index, name)}
-      leading={<ImageCell src={src} label={`${title || "Power-up"} icon`} onPick={(f) => setValue(`${base}.iconFile`, f, { shouldDirty: true })} />}
-      trailing={<ActionMenu label={`Actions for ${name}`} items={[{ label: "Remove", icon: "delete", tone: "error", onClick: onRemove }]} />}
-    >
-      {/* Name and description stacked with the form's 8px gap, never touching. */}
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-      <TextCell control={control} name={`${base}.title`} label="Power-up name" placeholder="Name" rules={{ required: "Enter a name" }} sx={{ typography: "titleSmall" }} />
-      <TextCell control={control} name={`${base}.description`} label={`What ${name} does`} placeholder="What it does" multiline rules={{ required: "Describe what it does" }} sx={{ typography: "bodyMedium", color: "text.secondary", "& textarea": { py: 0.5 } }} />
-      </Box>
-    </ListItem>
-  );
-}
-
-const NO_SPONSOR = "__none";
-
-/** The mode's default host and sponsor, from the libraries (a sponsor is optional). */
-function useModeDefaults({ control, setValue }) {
+function BundlePresets({ kind, control, setValue, name }) {
+  const k = KINDS[kind];
   const { m3: c } = useTheme();
-  const hosts = useHosts();
-  const { data } = useList({ resource: "Sponsor", dataProviderName: DP.sponsors, pagination: { mode: "off" } });
-  const sponsors = [...(data?.data ?? [])].sort((a, b) => a.name.localeCompare(b.name));
-  const [hostId, sponsorId] = useWatch({ control, name: ["defaultHostId", "defaultSponsorId"] });
-  const host = hosts.find((h) => h.id === hostId) ?? null;
-  const sponsor = sponsors.find((sp) => sp.id === sponsorId) ?? null;
-  const set = (name, v) => setValue(name, v, { shouldDirty: true, shouldTouch: true });
-  const thumb = (src, size) => (
-    <Avatar src={src ?? undefined} alt="" sx={{ width: size, height: size, borderRadius: `${cornerFor(size)}px`, bgcolor: c.surfaceContainerHighest, color: c.onSurfaceVariant }}>
-      <Icon name={src === NO_SPONSOR ? "block" : "handshake"} size={size / 2} />
-    </Avatar>
-  );
-  return { host, sponsor, sponsors, hosts, set, thumb };
-}
-
-/** The mode's default host, picked from Hosts. */
-function ModeHost({ control, setValue }) {
-  const { host, hosts, set } = useModeDefaults({ control, setValue });
-  return <HostPicker hosts={hosts} value={host} onChange={(h) => set("defaultHostId", h?.id ?? null)} label={null} />;
-}
-
-/** The mode's default sponsor, picked from Sponsors (or none). */
-function ModeSponsor({ control, setValue }) {
-  const { sponsor, sponsors, set, thumb } = useModeDefaults({ control, setValue });
+  const sheet = useSheet();
+  const picked = useWatch({ control, name });
+  const { data } = useList({ resource: k.resource, dataProviderName: k.dataProviderName, pagination: { mode: "off" } });
+  const rows = data?.data ?? [];
+  const fallback = rows.find((p) => p.isDefault) ?? rows[0];
+  const current = rows.find((p) => p.id === picked) ?? fallback;
+  const pick = (p) => setValue(name, p.id === fallback?.id ? null : p.id, { shouldDirty: true, shouldTouch: true });
   return (
     <>
-      <PickCard
-        label={null}
-        ariaLabel="Default sponsor"
-        value={sponsor?.id ?? NO_SPONSOR}
-        options={[{ value: NO_SPONSOR, media: thumb(NO_SPONSOR, 32), primary: "No sponsor" }, ...sponsors.map((sp) => ({ value: sp.id, media: thumb(sp.imageUrl, 32), primary: sp.name, secondary: sp.title }))]}
-        onChange={(id) => set("defaultSponsorId", id === NO_SPONSOR ? null : id)}
-        media={sponsor ? thumb(sponsor.imageUrl, 48) : <PickPlaceholder icon="handshake" />}
-        title={sponsor?.name ?? "No sponsor"}
-        supporting={sponsor ? sponsor.title : `${sponsors.length} ${sponsors.length === 1 ? "sponsor" : "sponsors"} in the library`}
-      />
+      <ListGroup label={k.title}>
+        {rows.map((p) => (
+          <ListItem
+            key={p.id}
+            onClick={() => sheet.openEdit(p)}
+            leadingControl={<Radio checked={p.id === current?.id} onChange={() => pick(p)} slotProps={{ input: { "aria-label": `Start new streams from ${p.name}` } }} />}
+            title={p.name}
+            supporting={k.summary(p)}
+            trailing={
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                {p.id === fallback?.id && <Pill>Default</Pill>}
+                <Icon name="chevron_right" style={{ color: c.onSurfaceVariant }} />
+              </Box>
+            }
+          />
+        ))}
+        <ListAdd label="Add preset" onClick={sheet.openNew} />
+      </ListGroup>
+      <PresetSheet kind={kind} sheet={sheet} />
     </>
   );
 }
 
-/** The share card and notification presets new streams of this mode start from. */
-function ModeMessaging({ control, setValue }) {
-  const [shareId, noteId] = useWatch({ control, name: ["defaultSharePresetId", "defaultNotificationPresetId"] });
-  const { data: share } = useList({ resource: "SharePreset", dataProviderName: DP.sharePresets, pagination: { mode: "off" } });
-  const { data: notes } = useList({ resource: "NotificationPreset", dataProviderName: DP.notificationPresets, pagination: { mode: "off" } });
-  const options = (list) => [{ value: "", label: `Library default (${list.find((p) => p.isDefault)?.name ?? "none"})` }, ...list.map((p) => ({ value: p.id, label: p.name }))];
-  const set = (name) => (v) => setValue(name, v || null, { shouldDirty: true, shouldTouch: true });
-  return (
-    <>
-      <SelectButton label="Share cards" value={shareId ?? ""} options={options(share?.data ?? [])} onChange={set("defaultSharePresetId")} helperText="Presets are kept in Library › Share cards." />
-      <SelectButton label="Notifications" value={noteId ?? ""} options={options(notes?.data ?? [])} onChange={set("defaultNotificationPresetId")} helperText="Presets are kept in Library › Notifications." />
-    </>
-  );
-}
-
-/**
- * A game mode's settings on one page: what its new streams start with, then how it shows in the
- * app. Changes save with the floating Save bar.
- */
+/** A game mode's settings on one page: what its new streams start with. Changes save with the floating Save bar. */
 export function GameModeSettings({ id }) {
   const notify = useNotify();
   const navigate = useNavigate();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const { mutate: removeMode, isPending: deleting } = useDelete();
-  const meta = GAME_MODES[id];
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
@@ -143,31 +90,23 @@ export function GameModeSettings({ id }) {
     formState: { isDirty },
   } = useForm({
     refineCoreProps: {
-      resource: "GameMode",
-      dataProviderName: DP.gameModes,
+      resource: "Bundle",
+      dataProviderName: DP.bundles,
       id,
       action: "edit",
       redirect: false,
-      successNotification: () => ({ message: "Game mode saved", type: "success" }),
+      successNotification: () => ({ message: "Bundle saved", type: "success" }),
     },
   });
-  const { fields: powerUps, append, move, remove } = useFieldArray({ control, name: "howToPlay.powerUps" });
-  const powerUpDrag = useDragSort({ count: powerUps.length, onMove: move });
   // The same parts as a stream's page (scoring, rewards) take the form as one object.
   const modeForm = { control, setValue, getValues, trigger };
-  const gameModeIconUrl = useWatch({ control, name: "gameModeIconUrl" });
-  const gameLogoUrl = useWatch({ control, name: "gameLogoUrl" });
   const mode = query?.data?.data;
-  const subText = meta?.base === "SubText";
 
   useEffect(() => {
     if (!mode) return;
     reset({
       ...mode,
       defaultRewards: mode.defaultRewards?.length ? mode.defaultRewards : [{ rewardType: "BombPowerup", amount: 1 }],
-      howToPlay: { powerUps: (mode.howToPlay?.powerUps ?? []).map((p) => ({ ...p, iconFile: null })) },
-      gameModeIconFile: null,
-      gameLogoFile: null,
     });
     setLoaded(true);
   }, [mode, reset]);
@@ -185,67 +124,36 @@ export function GameModeSettings({ id }) {
     }
   };
 
-  const imageHandlers = (fileField, urlField) => ({
-    onChange: (f) => setValue(fileField, f, { shouldDirty: true }),
-    onRemove: () => {
-      setValue(fileField, null, { shouldDirty: true });
-      setValue(urlField, null, { shouldDirty: true });
-    },
-  });
-  const icon = imageHandlers("gameModeIconFile", "gameModeIconUrl");
-  const logo = imageHandlers("gameLogoFile", "gameLogoUrl");
-
-  if (query?.isError) return <EmptyState icon="error" title="Couldn't load this game mode" description={query.error?.message} />;
+  if (query?.isError) return <EmptyState icon="error" title="Couldn't load this bundle" description={query.error?.message} />;
   if (!mode || !loaded) return <DetailSkeleton />;
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2, maxWidth: 880 }}>
       {/* The same groups, in the same order, as a stream's page: it starts with these. */}
       <SectionGroup title="New streams start with">
-          <FormSection id="game" title="Game" description="Points per round and the showdown prize.">
-            <ScoringFields control={control} setValue={setValue} subText={subText} roundCount={5} withStumper={false} />
-            {meta?.showdown && <ShowdownEditor control={control} setValue={setValue} name="showdown" word={false} note="Each stream gets its showdown word from its word set." />}
+          <FormSection id="name" title="Name">
+            <TextInput control={control} name="name" label="Name" max={40} rules={{ validate: (v) => (v?.trim() ? (v.trim().length <= 40 ? true : "Use 40 characters or fewer") : "Enter a name") }} />
           </FormSection>
-          <FormSection id="host" title="Host">
-            <ModeHost control={control} setValue={setValue} />
-          </FormSection>
-          <FormSection id="sponsor" title="Sponsor">
-            <ModeSponsor control={control} setValue={setValue} />
-          </FormSection>
-          <FormSection id="rewards" title="Rewards">
+          <FormSection id="game" title="Game" description="Points per round, the showdown and the rewards.">
+            <ScoringFields control={control} setValue={setValue} subText={false} roundCount={5} withStumper={false} />
+            <ShowdownEditor control={control} setValue={setValue} name="showdown" word={false} note="Each stream gets its showdown word from its word set." />
             <RewardsEditor form={modeForm} keys={["defaultRewards"]} stumper />
           </FormSection>
-          <FormSection id="messaging" title="Messaging">
-            <ModeMessaging control={control} setValue={setValue} />
+      </SectionGroup>
+      {/* The library's presets, as in Library: pick one per kind; a row opens it to edit. */}
+      <SectionGroup title="Messaging">
+          <FormSection id="share" title="Share cards" description="The preset new streams start from. Open one to see and edit its cards.">
+            <BundlePresets kind="share" control={control} setValue={setValue} name="defaultSharePresetId" />
+          </FormSection>
+          <FormSection id="notifications" title="Notifications" description="The preset new streams start from. Open one to see and edit its texts.">
+            <BundlePresets kind="notify" control={control} setValue={setValue} name="defaultNotificationPresetId" />
           </FormSection>
       </SectionGroup>
-      {/* What players see of the mode in the app. */}
-      <SectionGroup title="In the app">
-          <FormSection id="details" title="Name & logo">
-            <ImageField label="Game logo" value={gameLogoUrl} width={336} height={156} fit="contain" onChange={logo.onChange} onRemove={logo.onRemove} />
-            <TextInput control={control} name="name" label="Title" max={40} rules={{ validate: (v) => (v?.trim() ? (v.length <= 40 ? true : "Use 40 characters or fewer") : "Enter a title") }} />
-            <TextInput control={control} name="summary" label="Description" max={120} rules={{ required: "Add a short description", maxLength: { value: 120, message: "Use 120 characters or fewer" } }} />
-          </FormSection>
-          <FormSection id="home" title="Home screen">
-            <PillFields control={control} iconUrl={gameModeIconUrl} onIconChange={icon.onChange} onIconRemove={icon.onRemove} />
-          </FormSection>
-          <FormSection id="howto" title="How to play">
-            <ListGroup label="Power-ups">
-              {powerUps.map((f, i) => (
-                <PowerUpRow key={f.id} control={control} setValue={setValue} index={i} drag={powerUpDrag} onRemove={() => remove(i)} />
-              ))}
-              <ListAdd label="Add power-up" onClick={() => append({ title: "", description: "", iconUrl: "", iconFile: null })} />
-            </ListGroup>
-          </FormSection>
-      </SectionGroup>
-      {/* A mode made here can go again (the server refuses while streams, sets or slots use it). */}
-      {mode.base && (
-        <Box>
-          <Button variant="text" color="error" startIcon={<Icon name="delete" />} disabled={deleting} onClick={() => setConfirmDelete(true)}>
-            Delete game mode
-          </Button>
-        </Box>
-      )}
+      <Box>
+        <Button variant="text" color="error" startIcon={<Icon name="delete" />} disabled={deleting} onClick={() => setConfirmDelete(true)}>
+          Delete bundle
+        </Button>
+      </Box>
       <ConfirmDialog
         open={confirmDelete}
         title={`Delete “${mode.name}”?`}
@@ -255,44 +163,43 @@ export function GameModeSettings({ id }) {
         onConfirm={() => {
           setConfirmDelete(false);
           removeMode(
-            { resource: "GameMode", dataProviderName: DP.gameModes, id, successNotification: false, errorNotification: false, invalidates: ["list"] },
+            { resource: "Bundle", dataProviderName: DP.bundles, id, successNotification: false, errorNotification: false, invalidates: ["list"] },
             {
               onSuccess: () => {
                 notify(`“${mode.name}” deleted`);
-                navigate("/game-modes", { replace: true });
+                navigate("/bundles", { replace: true });
               },
-              onError: (e) => notify(e?.errors?.id?.[0] ?? e?.response?.data?.errors?.id?.[0] ?? "Couldn't delete the game mode", { variant: "error" }),
+              onError: (e) => notify(e?.errors?.id?.[0] ?? e?.response?.data?.errors?.id?.[0] ?? "Couldn't delete the bundle", { variant: "error" }),
             },
           );
         }}
       >
-        Only possible while no stream, word set or time slot uses it.
+        Streams made from it keep what they started with.
       </ConfirmDialog>
       <SaveBar dirty={isDirty} saving={saving} onSave={save} onDiscard={() => reset()} />
     </Box>
   );
 }
 
-/** A game mode's page (opened from its card): what its streams start with and how it shows in the app. */
+/** A bundle's page (opened from its card): what its new streams start with. */
 export default function GameModeDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { presets, isLoading } = useGameModePresets();
-  const preset = presets[id];
-  const meta = GAME_MODES[id];
+  const { byId, isLoading } = useBundles();
+  const bundle = byId[id];
   useEffect(() => {
-    if (preset) document.title = `${preset.name} · Game modes · Savvy Admin`;
-  }, [preset]);
+    if (bundle) document.title = `${bundle.name} · Bundles · Savvy Admin`;
+  }, [bundle]);
   if (isLoading) return <DetailSkeleton />;
-  if (!preset || !meta) return <EmptyState icon="search_off" title="Game mode not found" description="It may have been deleted." />;
+  if (!bundle) return <EmptyState icon="search_off" title="Bundle not found" description="It may have been deleted." />;
   return (
     <Box>
       <DetailHeader
-        onBack={() => navigate(`/game-modes?mode=${id}`)}
-        backLabel="Back to game modes"
-        media={<ModeLogo mode={id} width={72} height={40} />}
-        title={preset.name}
-        subtitle={meta.custom ? `Plays ${GAME_MODES[meta.base]?.label}` : meta.summary}
+        onBack={() => navigate("/bundles")}
+        backLabel="Back to bundles"
+        media={<IconTile icon={bundle.showdown?.superSavvyOnly ? "diamond" : "trophy"} tone={bundle.showdown?.prize?.rewardType === "Cash" ? "green" : "violet"} />}
+        title={bundle.name}
+        subtitle={bundleLine(bundle)}
       />
       <Box sx={{ px: { xs: 2, sm: 3.5 }, py: 3 }}>
         <GameModeSettings key={id} id={id} />

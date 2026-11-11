@@ -1,4 +1,3 @@
-import { useList } from "@refinedev/core";
 import Box from "@mui/material/Box";
 import ButtonBase from "@mui/material/ButtonBase";
 import IconButton from "@mui/material/IconButton";
@@ -6,30 +5,19 @@ import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { useTheme } from "@mui/material/styles";
 import { Icon } from "../../ds/Icon";
-import { DP } from "../../providers";
 import { GAME_MODES, useGameModePresets } from "./gameModes";
-import { hostLabel, useHosts } from "./hosts";
 import { ModeLogo } from "./ModeLogo";
 
 /**
- * Game mode as selectable cards (logo, name and its defaults: host · sponsor). The one game mode
- * picker: New stream, a stream's Game mode section and time slots. `onSettings` adds a settings
+ * Game mode as selectable cards (logo, name and what it plays). The game mode
+ * picker on a stream's Game mode section. `onSettings` adds a settings
  * button to each card (Game modes page), which opens that mode's page.
  */
 export function ModeCards({ value, onChange, onSettings }) {
   const theme = useTheme();
   const { presets } = useGameModePresets();
-  const hosts = useHosts();
-  const { data: sponsorData } = useList({ resource: "Sponsor", dataProviderName: DP.sponsors, pagination: { mode: "off" } });
-  // A game mode's defaults in a line: who hosts, who sponsors.
-  const defaultsOf = (id) => {
-    const p = presets[id];
-    const h = hosts.find((x) => x.id === p?.defaultHostId);
-    const sp = sponsorData?.data?.find((x) => x.id === p?.defaultSponsorId);
-    return [h ? hostLabel(h) : "No default host", sp ? sp.name : "No sponsor"].join(" · ");
-  };
   return (
-    <Box role="radiogroup" aria-label="Game mode" sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(260px, 100%), 1fr))", gap: 1 }}>
+    <Box role="radiogroup" aria-label="How to play & format" sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(260px, 100%), 1fr))", gap: 1 }}>
       {Object.values(GAME_MODES).map((m) => {
         const on = m.id === value;
         const name = presets[m.id]?.name ?? m.label;
@@ -68,7 +56,7 @@ export function ModeCards({ value, onChange, onSettings }) {
                 {name}
               </Typography>
               <Typography variant="bodySmall" color="text.secondary" component="div" noWrap>
-                {defaultsOf(m.id)}
+                {presets[m.id]?.summary ?? m.summary}
               </Typography>
             </Box>
             {on && <Icon name="check_circle" fill size={20} style={{ color: theme.m3.primary }} />}
