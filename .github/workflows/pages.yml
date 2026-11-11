@@ -1,4 +1,6 @@
-# Builds the Pages version (hash routing, relative paths: works under any path) and publishes it.
+# Builds the Pages versions (hash routing, relative paths: they work under any path) and publishes
+# them together: `main` (version 1) at the site root, the `v2` branch under savvy-admin-2/.
+# Pushing to `v2` doesn't deploy by itself: run this workflow again afterwards.
 name: Deploy to GitHub Pages
 
 on:
@@ -23,12 +25,25 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      # Version 2 next to it, in its own folder.
+      - uses: actions/checkout@v4
+        with:
+          ref: v2
+          path: v2
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            v2/package-lock.json
       - run: npm ci
       - run: npm run build:pages
+      - run: npm ci
+        working-directory: v2
+      - run: npm run build:pages
+        working-directory: v2
+      - run: cp -R v2/dist-pages dist-pages/savvy-admin-2
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
