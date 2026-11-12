@@ -8,6 +8,7 @@ import { TimePicker } from "@mui/x-date-pickers/TimePicker";
 import Avatar from "@mui/material/Avatar";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
+import IconButton from "@mui/material/IconButton";
 import ButtonBase from "@mui/material/ButtonBase";
 import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
@@ -48,6 +49,7 @@ const WEEKDAYS = [
 const REPEAT = [
   { value: "once", label: "Once" },
   { value: "recurring", label: "Recurring" },
+  { value: "month", label: "Month" },
 ];
 
 /** The weekdays as round toggle buttons (M T W T F S S, like a calendar app): a picked day is filled blue. */
@@ -86,19 +88,100 @@ function DayButtons({ value, onChange }) {
 }
 
 /**
- * The streams to add: one on `from`, or (with `to`) one on each picked weekday from `from` to
- * `to`. Past times are left out.
+ * A month calendar to pick any days on: ‹ November 2026 › to move between months (picks are kept
+ * across months), M T W T F S S on top, today ringed, past days greyed out.
  */
-function planEvent({ from, to, days, time, timezone }) {
+function MonthDays({ month, onMonth, value, onChange, timezone }) {
+  const { m3: c, tokens } = useTheme();
+  const today = dayjs().tz(timezone).startOf("day");
+  const first = month.startOf("month");
+  const lead = (first.day() + 6) % 7; // blanks before the 1st, Monday first
+  const cells = [...Array(lead).fill(null), ...Array.from({ length: first.daysInMonth() }, (_, i) => first.add(i, "day"))];
+  const toggle = (k) => onChange((cur) => (cur.includes(k) ? cur.filter((x) => x !== k) : [...cur, k]));
+  const atStart = !first.isAfter(today, "month");
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, p: 2, borderRadius: `${tokens.shape.md}px`, border: `1px solid ${c.outlineVariant}` }}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+        <IconButton size="small" aria-label="Previous month" disabled={atStart} onClick={() => onMonth(first.subtract(1, "month"))}>
+          <Icon name="chevron_left" />
+        </IconButton>
+        <Typography variant="titleSmall" sx={{ minWidth: 128, textAlign: "center" }}>
+          {first.format("MMMM YYYY")}
+        </Typography>
+        <IconButton size="small" aria-label="Next month" onClick={() => onMonth(first.add(1, "month"))}>
+          <Icon name="chevron_right" />
+        </IconButton>
+        <Box sx={{ flex: 1 }} />
+        <Typography variant="bodySmall" color="text.secondary">
+          {value.length ? `${value.length} picked` : "Tap days to pick"}
+        </Typography>
+        {value.length > 0 && (
+          <Button variant="text" size="small" onClick={() => onChange([])}>
+            Clear
+          </Button>
+        )}
+      </Box>
+      <Box role="group" aria-label={`Days in ${first.format("MMMM YYYY")}`} sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", rowGap: 0.5, justifyItems: "center" }}>
+        {WEEKDAYS.map((d) => (
+          <Typography key={d.value} variant="labelMedium" color="text.secondary" sx={{ pb: 0.5 }}>
+            {d.letter}
+          </Typography>
+        ))}
+        {cells.map((d, i) => {
+          if (!d) return <Box key={`b${i}`} />;
+          const k = d.format("YYYY-MM-DD");
+          const on = value.includes(k);
+          const isToday = d.isSame(today, "day");
+          return (
+            <ButtonBase
+              key={k}
+              disabled={d.isBefore(today, "day")}
+              onClick={() => toggle(k)}
+              aria-pressed={on}
+              aria-label={d.format("dddd, MMMM D")}
+              sx={{
+                width: 40,
+                height: 40,
+                borderRadius: radius("full"),
+                typography: "bodyMedium",
+                fontWeight: on ? 600 : 400,
+                color: on ? c.onPrimary : c.onSurface,
+                bgcolor: on ? c.primary : "transparent",
+                boxShadow: isToday && !on ? `inset 0 0 0 1px ${c.primary}` : "none",
+                transition: `background-color ${tokens.motion.effects}`,
+                "&:hover": { bgcolor: on ? c.primaryHover : c.ctrlHover },
+                "&.Mui-focusVisible": { outline: `2px solid ${c.focus}`, outlineOffset: 2 },
+                "&.Mui-disabled": { color: c.onSurfaceVariant, opacity: 0.38 },
+              }}
+            >
+              {d.date()}
+            </ButtonBase>
+          );
+        })}
+      </Box>
+    </Box>
+  );
+}
+
+/**
+ * The streams to add: one on `from`; with `to`, one on each picked weekday from `from` to `to`;
+ * with `dates`, one on each of those dates. Past times are left out.
+ */
+function planEvent({ from, to, days, dates, time, timezone }) {
   const now = dayjs();
   const planned = [];
   const skipped = { past: 0 };
-  if (!from?.isValid() || !time?.isValid()) return { planned, skipped };
-  const at = (d) => dayjs.tz(`${d.format("YYYY-MM-DD")}T${time.format("HH:mm")}`, timezone);
   const add = (start) => {
     if (start.isBefore(now)) skipped.past += 1;
     else planned.push(start);
   };
+  // Month: the picked dates.
+  if (dates) {
+    if (time?.isValid()) [...dates].sort().slice(0, MAX_STREAMS).forEach((k) => add(dayjs.tz(`${k}T${time.format("HH:mm")}`, timezone)));
+    return { planned, skipped };
+  }
+  if (!from?.isValid() || !time?.isValid()) return { planned, skipped };
+  const at = (d) => dayjs.tz(`${d.format("YYYY-MM-DD")}T${time.format("HH:mm")}`, timezone);
   if (!to) {
     add(at(from));
     return { planned, skipped };
@@ -131,7 +214,11 @@ export function CreateEventDialog({ open, date, onClose, streams, hosts, timezon
   const [sponsorId, setSponsorId] = useState(NONE);
   const [from, setFrom] = useState(tomorrow);
   const [time, setTime] = useState(() => tomorrow().hour(19));
-  const [recurring, setRecurring] = useState(false);
+  const [repeat, setRepeat] = useState("once");
+  const recurring = repeat === "recurring";
+  const monthly = repeat === "month";
+  const [month, setMonth] = useState(() => tomorrow().startOf("month"));
+  const [dates, setDates] = useState([]);
   const [to, setTo] = useState(() => tomorrow().endOf("month"));
   const [days, setDays] = useState([]);
   const [submitted, setSubmitted] = useState(false);
@@ -148,7 +235,9 @@ export function CreateEventDialog({ open, date, onClose, streams, hosts, timezon
     setSponsorId(NONE);
     setFrom(start);
     setTime(start.hour(19));
-    setRecurring(false);
+    setRepeat("once");
+    setMonth(start.startOf("month"));
+    setDates([start.format("YYYY-MM-DD")]);
     setTo(start.endOf("month"));
     setDays([start.day()]);
     setSubmitted(false);
@@ -159,14 +248,16 @@ export function CreateEventDialog({ open, date, onClose, streams, hosts, timezon
   const setId = bundles.some((b) => b.id === bundleId) ? bundleId : bundles[0]?.id ?? null;
   const sponsor = sponsors.find((sp) => sp.id === sponsorId) ?? null;
   const end = recurring ? to : null;
-  const { planned, skipped } = useMemo(() => planEvent({ from, to: end, days, time, timezone }), [from, end, days, time, timezone]);
+  const picked = monthly ? dates : null;
+  const { planned, skipped } = useMemo(() => planEvent({ from, to: end, days, dates: picked, time, timezone }), [from, end, days, picked, time, timezone]);
 
   const titleCheck = titleRule(title);
   const titleLen = richLen(title.trim());
   const errors = {
     title: titleCheck === true ? null : titleCheck,
     host: !host && "Pick a host",
-    from: !from?.isValid() && "Pick a date",
+    from: !monthly && !from?.isValid() && "Pick a date",
+    dates: monthly && !dates.length && "Pick at least one day",
     time: !time?.isValid() && "Pick a time",
     to: recurring && (!to?.isValid() ? "Pick an end date" : to.isBefore(from, "day") ? "Ends before it starts" : null),
     days: recurring && !days.length && "Pick at least one day",
@@ -207,7 +298,23 @@ export function CreateEventDialog({ open, date, onClose, streams, hosts, timezon
   const count = `${planned.length} ${planned.length === 1 ? "stream" : "streams"}`;
   const dayNames = WEEKDAYS.filter((d) => days.includes(d.value)).map((d) => d.label).join(", ");
   // The plan, spelled out: how many, on which days, when, between which dates.
-  const plan = !from?.isValid()
+  const pickedDates = [...dates].sort().map((k) => dayjs(k));
+  // "Nov 13, 15, 20 · Dec 2": picked days grouped by month.
+  const byMonth = pickedDates.reduce((acc, d) => {
+    const m = d.format("MMM YYYY");
+    (acc[m] ??= []).push(d);
+    return acc;
+  }, {});
+  const dateList = pickedDates.length ? Object.values(byMonth).map((ds) => `${ds[0].format("MMM")} ${ds.map((d) => d.date()).join(", ")}`).join(" · ") : "No days picked";
+  const plan = monthly
+    ? {
+        headline: planned.length ? `${count} will be created` : "No stream will be created",
+        rows: [
+          ["event", dateList],
+          ["schedule", `At ${at}`],
+        ],
+      }
+    : !from?.isValid()
     ? null
     : {
         headline: planned.length ? `${count} will be created` : "No stream will be created",
@@ -228,7 +335,7 @@ export function CreateEventDialog({ open, date, onClose, streams, hosts, timezon
       <DialogTitle sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
         Create event
         <Typography variant="bodyMedium" color="text.secondary" component="span">
-          One stream, or a recurring one on the picked days until its end date.
+          One stream, a recurring one on the picked weekdays, or any days of a month.
         </Typography>
       </DialogTitle>
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2.5, pt: "8px !important" }}>
@@ -241,27 +348,39 @@ export function CreateEventDialog({ open, date, onClose, streams, hosts, timezon
         helperText={<FieldHelper text={show("title") ?? (/\{host\}/i.test(title) && host ? `Shows as “${fillHost(title, hostLabel(host))}”` : "{host} becomes the host's name.")} counter={`${titleLen} / 100`} over={titleLen > 100} />}
       />
       <Box sx={{ display: "flex", gap: 1.5 }}>
-        <DatePicker
-          label="Date"
-          value={from}
-          timezone={timezone}
-          disablePast
-          onChange={setFrom}
-          slots={{ openPickerIcon: pickerIcon("calendar_today") }}
-          slotProps={{ textField: { error: !!show("from"), helperText: show("from") || undefined, sx: { flex: 3 } } }}
-        />
+        {!monthly && (
+          <DatePicker
+            label="Date"
+            value={from}
+            timezone={timezone}
+            disablePast
+            onChange={setFrom}
+            slots={{ openPickerIcon: pickerIcon("calendar_today") }}
+            slotProps={{ textField: { error: !!show("from"), helperText: show("from") || undefined, sx: { flex: 3 } } }}
+          />
+        )}
         <TimePicker
           label="Time"
           value={time}
           timezone={timezone}
           onChange={setTime}
           slots={{ openPickerIcon: pickerIcon("schedule") }}
-          slotProps={{ textField: { error: !!show("time"), helperText: show("time") || undefined, sx: { flex: 2 } } }}
+          slotProps={{ textField: { error: !!show("time"), helperText: show("time") || undefined, sx: { flex: 2, maxWidth: monthly ? "50%" : undefined } } }}
         />
       </Box>
 
-      {/* Once, or recurring: then the days it repeats on and when it ends. */}
-      <ChoiceGroup label="Repeat" value={recurring ? "recurring" : "once"} options={REPEAT} onChange={(v) => setRecurring(v === "recurring")} />
+      {/* Once; recurring (the weekdays it repeats on and when it ends); or picked days of a month. */}
+      <ChoiceGroup label="Repeat" value={repeat} options={REPEAT} onChange={(v) => v && setRepeat(v)} />
+      {monthly && month?.isValid() && (
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
+          <MonthDays month={month} onMonth={setMonth} value={dates} onChange={setDates} timezone={timezone} />
+          {show("dates") && (
+            <Typography variant="bodySmall" color="error">
+              {show("dates")}
+            </Typography>
+          )}
+        </Box>
+      )}
       {recurring && (
         <>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
