@@ -241,7 +241,7 @@ export function PresetsButton({ kind }) {
   );
 }
 
-/** Streams › Scoring: the scoring presets streams pick from. */
+/** Library › Gameplay › Scoring: the scoring presets streams pick from. */
 export function ScoringPage() {
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3, maxWidth: FORM_WIDTH }}>

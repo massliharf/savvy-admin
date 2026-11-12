@@ -1,4 +1,4 @@
-// Streams › Game sets — what a new stream starts with: who can join, the showdown and its prize,
+// Library › Gameplay › Game sets — what a new stream starts with: who can join, the showdown and its prize,
 // rewards and messaging. A card opens that game set's settings.
 import { useState } from "react";
 import { useNavigate } from "react-router";

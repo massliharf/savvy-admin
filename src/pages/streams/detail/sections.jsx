@@ -400,7 +400,7 @@ export function WordsSection({ form, validateWord, onPickWords, frame }) {
  * Showdown), both connected button groups. Scoring comes from the mode and can be changed here.
  */
 /**
- * Which scoring preset (Streams › Scoring) the stream plays: picking one fills in its points;
+ * Which scoring preset (Library › Gameplay › Scoring) the stream plays: picking one fills in its points;
  * points changed by hand show as Custom.
  */
 function ScoringPresetField({ control, setValue, subText }) {

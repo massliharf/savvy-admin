@@ -141,7 +141,7 @@ export function useStreamBuilder() {
   return (base) => {
     // The stream's game set (the first one when none is given); its game comes later, with its word set.
     const set = byId[base.bundleId] ?? bundles[0];
-    // Points per round from the game set's scoring preset, else the Default one (Streams › Scoring).
+    // Points per round from the game set's scoring preset, else the Default one (Library › Gameplay › Scoring).
     const points = scoring?.data?.find((p) => p.id === set?.defaultScoringPresetId) ?? scoring?.data?.find((p) => p.isDefault) ?? scoring?.data?.[0];
     const preset = set && points ? { ...set, roundScoring: points.roundScoring } : set;
     const values = streamFromPreset(base, preset);

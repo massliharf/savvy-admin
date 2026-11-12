@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Link, useLocation } from "react-router";
 import { useGetIdentity, useLogout } from "@refinedev/core";
 import Box from "@mui/material/Box";
@@ -225,8 +225,19 @@ function NavRail({ pathname, expanded, onToggle }) {
           </Typography>
           <Box aria-hidden sx={{ position: "absolute", left: 12, width: 24, top: "50%", borderTop: `1px solid ${c.border}`, ...fade(!expanded) }} />
         </Box>
-        {tabs.map((t) => (
-          <RailItem key={t.path} to={t.path} icon={t.icon} label={t.label} active={currentPath === t.path} expanded={expanded} />
+        {tabs.map((t, i) => (
+          <Fragment key={t.path}>
+            {/* A sub-heading where a new section starts; closed, a shorter hairline. */}
+            {t.section && t.section !== tabs[i - 1]?.section && (
+              <Box sx={{ position: "relative", height: 26, display: "flex", alignItems: "flex-end", pb: 0.5, mt: 0.5 }}>
+                <Typography variant="labelSmall" component="div" sx={{ pl: "10px", color: c.onSurfaceVariant, whiteSpace: "nowrap", ...fade(expanded) }}>
+                  {t.section}
+                </Typography>
+                <Box aria-hidden sx={{ position: "absolute", left: 18, width: 12, top: "50%", borderTop: `1px solid ${c.border}`, ...fade(!expanded) }} />
+              </Box>
+            )}
+            <RailItem to={t.path} icon={t.icon} label={t.label} active={currentPath === t.path} expanded={expanded} />
+          </Fragment>
         ))}
       </Box>
     );

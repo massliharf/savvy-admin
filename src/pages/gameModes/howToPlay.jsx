@@ -1,5 +1,5 @@
-// Streams › Game modes — each game as players see it in the app: its title, its logo and the
-// power-ups its How to play shows (picked from Streams › Power-ups). One card per game; a card
+// Library › Gameplay › Game modes — each game as players see it in the app: its title, its logo and the
+// power-ups its How to play shows (picked from Library › Gameplay › Power-ups). One card per game; a card
 // opens that game in a side sheet.
 import { useEffect } from "react";
 import { useForm, useWatch } from "react-hook-form";
@@ -30,11 +30,11 @@ function PowerUpPicker({ control, setValue }) {
   const toggle = (id, on) =>
     setValue(
       "powerUpIds",
-      // Kept in the order of Streams › Power-ups.
+      // Kept in the order of Library › Gameplay › Power-ups.
       powerUps.map((p) => p.id).filter((x) => (x === id ? on : picked.includes(x))),
       { shouldDirty: true },
     );
-  if (powerUps.length === 0) return <EmptyState compact icon="bolt" title="No power-ups yet" description="Add them in Streams › Power-ups." />;
+  if (powerUps.length === 0) return <EmptyState compact icon="bolt" title="No power-ups yet" description="Add them in Library › Gameplay › Power-ups." />;
   return (
     <ListGroup label="Power-ups">
       {powerUps.map((p) => (

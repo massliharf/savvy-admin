@@ -4,21 +4,11 @@
 // its own icon for the expanded rail.
 export const DESTINATIONS = [
   {
-    // Running the show, in the order it happens: game sets and word sets make the streams (one by one,
-    // or repeating with Create event) the schedule shows.
+    // Running the show: the schedule of streams (made one by one, or repeating with Create event).
     id: "streams",
     label: "Streams",
     icon: "live_tv",
-    tabs: [
-      { icon: "calendar_month", label: "Schedule", path: "/streams" },
-      // What a new stream starts with, its words and its points.
-      { icon: "inventory_2", label: "Game sets", path: "/game-sets" },
-      { icon: "spellcheck", label: "Word sets", path: "/word-sets" },
-      { icon: "scoreboard", label: "Scoring", path: "/scoring" },
-      // What players see of each game in the app (title, logo, power-ups); each opens in a side sheet.
-      { icon: "sports_esports", label: "Game modes", path: "/game-modes" },
-      { icon: "auto_fix_high", label: "Power-ups", path: "/power-ups" },
-    ],
+    tabs: [{ icon: "calendar_month", label: "Schedule", path: "/streams" }],
   },
   {
     // The pieces streams reuse, in the order a stream uses them:
@@ -32,6 +22,13 @@ export const DESTINATIONS = [
       { icon: "ballot", label: "Polls & trivia", path: "/polling" },
       { icon: "ios_share", label: "Share cards", path: "/share-cards" },
       { icon: "notifications", label: "Notifications", path: "/notifications" },
+      // `section` puts a sub-heading above the first page that has it. Gameplay: what a new stream
+      // starts with (game set, words, points) and what players see of each game (title, logo, power-ups).
+      { icon: "inventory_2", label: "Game sets", path: "/game-sets", section: "Gameplay" },
+      { icon: "spellcheck", label: "Word sets", path: "/word-sets", section: "Gameplay" },
+      { icon: "scoreboard", label: "Scoring", path: "/scoring", section: "Gameplay" },
+      { icon: "sports_esports", label: "Game modes", path: "/game-modes", section: "Gameplay" },
+      { icon: "auto_fix_high", label: "Power-ups", path: "/power-ups", section: "Gameplay" },
     ],
   },
   {

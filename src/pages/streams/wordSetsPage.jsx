@@ -1,4 +1,4 @@
-// Streams › Word sets — the words streams play. A word set is its words and the game mode it's
+// Library › Gameplay › Word sets — the words streams play. A word set is its words and the game mode it's
 // written for (TextChain or SubText); rewards and the prize come from the stream's game set.
 import { useMemo, useState } from "react";
 import { useCustomMutation, useInvalidate, useList } from "@refinedev/core";

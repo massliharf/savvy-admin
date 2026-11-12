@@ -1,5 +1,5 @@
-// Streams › Power-ups — the power-ups a game mode's How to play can show: icon, name and what it
-// does. Each game mode picks its own (Streams › Game modes). Same cards and sheet as Sponsors.
+// Library › Gameplay › Power-ups — the power-ups a game mode's How to play can show: icon, name and what it
+// does. Each game mode picks its own (Library › Gameplay › Game modes). Same cards and sheet as Sponsors.
 import { useEffect, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { useList } from "@refinedev/core";

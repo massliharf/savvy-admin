@@ -259,7 +259,7 @@ export const seedCashWins = (users) => {
 };
 
 // ---------------------------------------------------------------- configs (live data)
-// Power-ups (Streams › Power-ups): each game mode picks the ones its How to play shows.
+// Power-ups (Library › Gameplay › Power-ups): each game mode picks the ones its How to play shows.
 export const seedPowerUps = () => [
   { id: "powerup-letter-bomb", title: "Letter Bomb", description: "Removes four letters from the board that are not part of the word", iconUrl: img("02d1bda4-eff8-43f9-89e0-e639620efc31") },
   { id: "powerup-better-bomb", title: "Better Bomb", description: "Removes 8 irrelevant letters from keyboard", iconUrl: img("5502cb74-4380-43a1-a23b-9dccc61188ac") },
@@ -358,7 +358,7 @@ const bundle = (id, name, prize, superSavvyOnly) => ({
   defaultNotificationPresetId: null,
 });
 export const DEFAULT_BUNDLE_ID = "bundle-cash-savvy";
-// Scoring presets (Streams › Scoring): points per round. New streams start from the Default; a
+// Scoring presets (Library › Gameplay › Scoring): points per round. New streams start from the Default; a
 // stream can pick another one.
 export const seedScoringPresets = () => [{ id: "scoring-standard", name: "Standard", roundScoring: structuredClone(BUNDLE_SCORING), isDefault: true }];
 export const seedBundles = () => [

@@ -151,7 +151,7 @@ export function GameSetPicker({ value, onChange, label = "Game set" }) {
       onChange={onChange}
       media={set ? tile(set, 48) : <PickPlaceholder icon="inventory_2" />}
       title={set?.name ?? "No game sets yet"}
-      supporting={set ? bundleLine(set) : "Add one in Streams › Game sets."}
+      supporting={set ? bundleLine(set) : "Add one in Library › Gameplay › Game sets."}
     />
   );
 }

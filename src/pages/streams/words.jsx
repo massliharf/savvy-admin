@@ -1,6 +1,6 @@
 // Word sets — what one stream plays: a word per round with its time and Round Pounder reward, and
 // the Savvy Showdown word with its prize, as in a stream's Words. A public stream uses a set
-// once; Internal test streams may reuse sets. Listed under Streams › Game modes, per game mode.
+// once; Internal test streams may reuse sets. Listed under Library › Gameplay › Game modes, per game mode.
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useCustomMutation, useInvalidate, useList } from "@refinedev/core";
 import { useFieldArray, useForm } from "react-hook-form";
@@ -337,7 +337,7 @@ export function WordSetPickerDialog({ open, stream, header, confirmLabel = "Use 
       <DialogContent dividers sx={{ p: 0 }}>
         {header}
         {usable.length === 0 ? (
-          <EmptyState compact icon="spellcheck" title="No word sets available" description="Add more in Streams › Word sets." />
+          <EmptyState compact icon="spellcheck" title="No word sets available" description="Add more in Library › Gameplay › Word sets." />
         ) : (
           <SelectList label="Word sets" items={usable} value={picked?.id} onChange={(id) => setPicked(usable.find((w) => w.id === id))} renderItem={(w) => <WordSetSummary set={w} hidden={hidden} />} />
         )}
