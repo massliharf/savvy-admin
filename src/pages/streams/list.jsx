@@ -26,7 +26,7 @@ import { WordSetPickerDialog, useWordSetActions, useWordsLock } from "./words";
 import { StreamSummary } from "./pickers";
 import { useHosts, showTitle } from "./hosts";
 import { MonthCalendar, MonthNav, StreamLegend, WeekCalendar, WeekNav } from "./calendar";
-import { CreateEventSheet } from "./events";
+import { CreateEventDialog } from "./events";
 import { radius } from "../../theme/tokens";
 import { useEnterOnChange } from "../../ds/useEnterOnChange";
 import { CardsSkeleton } from "../../ds/Skeletons";
@@ -372,7 +372,7 @@ export default function StreamList() {
         onClose={() => navigate("/streams")}
         onCreated={onCreated}
       />
-      <CreateEventSheet open={eventOpen} date={eventDate} onClose={() => setEventOpen(false)} streams={streams} hosts={hosts} timezone={timezone} onCreated={(start) => setMonth(start.tz(timezone).startOf("month"))} />
+      <CreateEventDialog open={eventOpen} date={eventDate} onClose={() => setEventOpen(false)} streams={streams} hosts={hosts} timezone={timezone} onCreated={(start) => setMonth(start.tz(timezone).startOf("month"))} />
       <StreamKeyDialog stream={keyStream} onClose={() => setKeyStream(null)} />
       {unlockDialog}
       {/* A word set's "Assign to a stream", the other way round: this stream, then its set. */}

@@ -9,11 +9,15 @@ import Avatar from "@mui/material/Avatar";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import ButtonBase from "@mui/material/ButtonBase";
+import Dialog from "@mui/material/Dialog";
+import DialogActions from "@mui/material/DialogActions";
+import DialogContent from "@mui/material/DialogContent";
+import DialogTitle from "@mui/material/DialogTitle";
 import TextField from "@mui/material/TextField";
+import useMediaQuery from "@mui/material/useMediaQuery";
 import Typography from "@mui/material/Typography";
 import { useTheme } from "@mui/material/styles";
 import { Icon } from "../../ds/Icon";
-import { SideSheet } from "../../ds/SideSheet";
 import { Banner } from "../../ds/Banner";
 import { FieldHelper } from "../../ds/FieldHelper";
 import { ChoiceGroup } from "../../ds/SelectButton";
@@ -27,8 +31,6 @@ import { GameSetPicker, HostPicker, PickCard, PickPlaceholder } from "./pickers"
 import { DEFAULT_TITLE, fillHost, hostLabel, titleRule } from "./hosts";
 import { richLen } from "./enums";
 
-// Streams closer than this to a new one's start count as "already scheduled" for it.
-const CONFLICT_MINUTES = 60;
 // A long range stops here, so one click can't flood the schedule.
 const MAX_STREAMS = 200;
 const NONE = "__none__";
@@ -85,19 +87,16 @@ function DayButtons({ value, onChange }) {
 
 /**
  * The streams to add: one on `from`, or (with `to`) one on each picked weekday from `from` to
- * `to`. Past times and times with a stream within an hour are left out.
+ * `to`. Past times are left out.
  */
-function planEvent({ from, to, days, time, streams, timezone }) {
+function planEvent({ from, to, days, time, timezone }) {
   const now = dayjs();
-  const active = streams.filter((s) => s.status !== "Canceled");
-  const near = (start) => active.some((s) => Math.abs(dayjs(s.startDate).diff(start, "minute")) < CONFLICT_MINUTES);
   const planned = [];
-  const skipped = { taken: 0, past: 0 };
+  const skipped = { past: 0 };
   if (!from?.isValid() || !time?.isValid()) return { planned, skipped };
   const at = (d) => dayjs.tz(`${d.format("YYYY-MM-DD")}T${time.format("HH:mm")}`, timezone);
   const add = (start) => {
     if (start.isBefore(now)) skipped.past += 1;
-    else if (near(start)) skipped.taken += 1;
     else planned.push(start);
   };
   if (!to) {
@@ -112,8 +111,11 @@ function planEvent({ from, to, days, time, streams, timezone }) {
 }
 
 /** "Create event": one stream, or a recurring one on the picked weekdays until its end date. */
-export function CreateEventSheet({ open, date, onClose, streams, hosts, timezone, onCreated }) {
-  const { m3: c } = useTheme();
+export function CreateEventDialog({ open, date, onClose, streams, hosts, timezone, onCreated }) {
+  const theme = useTheme();
+  const c = theme.m3;
+  const { tokens } = theme;
+  const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
   const notify = useNotify();
   const invalidate = useInvalidate();
   const build = useStreamBuilder();
@@ -157,7 +159,7 @@ export function CreateEventSheet({ open, date, onClose, streams, hosts, timezone
   const setId = bundles.some((b) => b.id === bundleId) ? bundleId : bundles[0]?.id ?? null;
   const sponsor = sponsors.find((sp) => sp.id === sponsorId) ?? null;
   const end = recurring ? to : null;
-  const { planned, skipped } = useMemo(() => planEvent({ from, to: end, days, time, streams, timezone }), [from, end, days, time, streams, timezone]);
+  const { planned, skipped } = useMemo(() => planEvent({ from, to: end, days, time, timezone }), [from, end, days, time, timezone]);
 
   const titleCheck = titleRule(title);
   const titleLen = richLen(title.trim());
@@ -204,35 +206,32 @@ export function CreateEventSheet({ open, date, onClose, streams, hosts, timezone
   const at = time?.isValid() ? time.format("h:mm A") : "…";
   const count = `${planned.length} ${planned.length === 1 ? "stream" : "streams"}`;
   const dayNames = WEEKDAYS.filter((d) => days.includes(d.value)).map((d) => d.label).join(", ");
-  const summary = !from?.isValid()
+  // The plan, spelled out: how many, on which days, when, between which dates.
+  const plan = !from?.isValid()
     ? null
-    : recurring
-      ? `Adds ${count}: ${dayNames || "no days"} at ${at}, ${from.format("MMM D")} – ${to?.isValid() ? to.format("MMM D, YYYY") : "…"}.`
-      : planned.length
-        ? `Adds 1 stream on ${from.format("ddd, MMM D, YYYY")} at ${at}.`
-        : `Adds no stream on ${from.format("ddd, MMM D")} at ${at}.`;
-  const skippedText = [
-    skipped.taken && `${skipped.taken} ${skipped.taken === 1 ? "day already has" : "days already have"} a stream within an hour`,
-    skipped.past && `${skipped.past} ${skipped.past === 1 ? "time is" : "times are"} already past`,
-  ].filter(Boolean);
+    : {
+        headline: planned.length ? `${count} will be created` : "No stream will be created",
+        rows: recurring
+          ? [
+              ["event_repeat", dayNames ? `Every ${dayNames}` : "No days picked"],
+              ["schedule", `At ${at}`],
+              ["date_range", `${from.format("ddd, MMM D")} – ${to?.isValid() ? to.format("ddd, MMM D, YYYY") : "pick an end date"}`],
+            ]
+          : [
+              ["event", from.format("dddd, MMM D, YYYY")],
+              ["schedule", `At ${at}`],
+            ],
+      };
 
   return (
-    <SideSheet
-      open={open}
-      onClose={onClose}
-      title="Create event"
-      subtitle="One stream, or a recurring one on the picked days until its end date."
-      actions={
-        <>
-          <Button variant="text" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={create} disabled={isPending || (submitted && (!valid || !planned.length))} startIcon={<Icon name="event_repeat" />}>
-            {isPending ? "Adding…" : planned.length ? `Add ${count}` : "Nothing to add"}
-          </Button>
-        </>
-      }
-    >
+    <Dialog open={open} onClose={isPending ? undefined : onClose} fullScreen={fullScreen} maxWidth="sm" fullWidth>
+      <DialogTitle sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+        Create event
+        <Typography variant="bodyMedium" color="text.secondary" component="span">
+          One stream, or a recurring one on the picked days until its end date.
+        </Typography>
+      </DialogTitle>
+      <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2.5, pt: "8px !important" }}>
       <TextField
         label="Title"
         value={title}
@@ -302,12 +301,34 @@ export function CreateEventSheet({ open, date, onClose, streams, hosts, timezone
         supporting={sponsor ? sponsor.title : `${sponsors.length} ${sponsors.length === 1 ? "sponsor" : "sponsors"} in the library`}
       />
 
-      {summary && (
-        <Typography variant="bodyMedium" color="text.secondary">
-          {[summary, skippedText.length ? `Skipped: ${skippedText.join(", ")}.` : null, planned.length >= MAX_STREAMS ? `Stops at ${MAX_STREAMS} streams.` : null].filter(Boolean).join(" ")}
-        </Typography>
+      {plan && (
+        <Box role="status" sx={{ display: "flex", flexDirection: "column", gap: 1, p: 2, borderRadius: `${tokens.shape.md}px`, bgcolor: planned.length ? c.primaryContainer : c.surfaceContainerHigh, color: planned.length ? c.onPrimaryContainer : c.onSurface }}>
+          <Typography variant="titleMedium">{plan.headline}</Typography>
+          {plan.rows.map(([icon, text]) => (
+            <Box key={icon} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <Icon name={icon} size={18} style={{ flexShrink: 0 }} />
+              <Typography variant="bodyMedium">{text}</Typography>
+            </Box>
+          ))}
+        </Box>
       )}
+      {/* Days that won't get a stream: a warning, so it isn't missed under the summary. */}
+      {skipped.past > 0 && planned.length > 0 && (
+        <Banner tone="warning" icon="history">
+          {skipped.past === 1 ? "1 day is" : `${skipped.past} days are`} left out: {at} has already passed on {skipped.past === 1 ? "it" : "them"}.
+        </Banner>
+      )}
+      {planned.length >= MAX_STREAMS && <Banner tone="warning">Stops at {MAX_STREAMS} streams; pick an earlier end date for the rest.</Banner>}
       <Banner icon="hide_image">Streams show in the app right away; their game mode logo shows once each has its word set.</Banner>
-    </SideSheet>
+      </DialogContent>
+      <DialogActions>
+        <Button variant="text" onClick={onClose} disabled={isPending}>
+          Cancel
+        </Button>
+        <Button onClick={create} disabled={isPending || !planned.length || (submitted && !valid)}>
+          {isPending ? "Creating…" : "Create"}
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }

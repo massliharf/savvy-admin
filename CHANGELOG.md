@@ -12,6 +12,6 @@ Proposed changes to the Savvy admin dashboard design. Not released yet.
 - **The game mode comes with the word set.** TextChain or SubText is the stream's word set's; picking another set changes it. Every stream view (calendar, list, cards) shows its game mode logo and its word set, which picks another set right there (upcoming and live streams; ended ones keep theirs).
 - **A word set is its words and its game mode.** No logo, filter, rewards or showdown prize; rewards and the prize come from the stream's game set.
 - **Time slots are simpler:** time, days, host, and who can join. No game mode.
-- **Create event replaces Fill month and time slots.** One stream on a date and time, with its game set, host and sponsor; or Recurring, on the picked weekdays (M T W T F S S) until an end date. Days that already have a stream within an hour are skipped.
+- **Create event replaces Fill month and time slots.** One stream on a date and time, with its game set, host and sponsor; or Recurring, on the picked weekdays (M T W T F S S) until an end date. It opens as a centered dialog; a summary card spells out how many streams, on which days, at what time and between which dates, and Create stays disabled until there's something to add. Streams are added even when another one is at the same time.
 - **Game set messaging shows the library's presets.** Pick one per kind, or open a preset in a side sheet to edit it there.
 - **Unsaved changes ask before leaving.** On pages and when closing a side sheet.
