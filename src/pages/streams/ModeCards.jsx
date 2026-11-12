@@ -17,7 +17,7 @@ export function ModeCards({ value, onChange, onSettings }) {
   const theme = useTheme();
   const { presets } = useGameModePresets();
   return (
-    <Box role="radiogroup" aria-label="How to play & format" sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(260px, 100%), 1fr))", gap: 1 }}>
+    <Box role="radiogroup" aria-label="Game mode" sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(260px, 100%), 1fr))", gap: 1 }}>
       {Object.values(GAME_MODES).map((m) => {
         const on = m.id === value;
         const name = presets[m.id]?.name ?? m.label;

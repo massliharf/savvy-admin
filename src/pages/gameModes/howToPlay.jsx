@@ -1,79 +1,70 @@
-// Streams › How to play — what players see of each game in the app: its logo, name and
-// description, the home screen pill and the How to play power-ups. One card per game; a card
+// Streams › Game modes — each game as players see it in the app: its title, its logo and the
+// power-ups its How to play shows (picked from Streams › Power-ups). One card per game; a card
 // opens that game in a side sheet.
 import { useEffect } from "react";
-import { useFieldArray, useForm, useWatch } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
+import Checkbox from "@mui/material/Checkbox";
 import Typography from "@mui/material/Typography";
-import { ActionMenu } from "../../ds/ActionMenu";
-import { useDragSort } from "../../ds/DragSort";
-import { ImageCell, TextCell } from "../../ds/EditTable";
-import { ImageField, useFilePreview } from "../../ds/ImageField";
-import { ListAdd, ListGroup, ListItem } from "../../ds/ListGroup";
+import { ImageField } from "../../ds/ImageField";
+import { IconTile } from "../../ds/IconTile";
+import { ListGroup, ListItem } from "../../ds/ListGroup";
 import { SideSheet } from "../../ds/SideSheet";
 import { CardsSkeleton } from "../../ds/Skeletons";
+import { EmptyState } from "../../ds/EmptyState";
 import { MODE_LOGOS } from "../../assets";
 import { DP } from "../../providers";
 import { useLibraryMutations, useSheet } from "../library/shared";
 import { CardGrid, ShopCard } from "../shop/shared";
 import { TextInput } from "../streams/detail/fields";
-import { PillFields } from "../streams/detail/sections";
 import { useGameModePresets } from "../streams/gameModes";
+import { usePowerUps } from "./powerUps";
 
 const powerUpCount = (n) => `${n} ${n === 1 ? "power-up" : "power-ups"}`;
 
-/**
- * One How to Play power-up, edited in its row: the icon (click to change), its name and what it
- * does; drag to reorder, ⋮ to remove.
- */
-function PowerUpRow({ control, setValue, index, onRemove, drag }) {
-  const base = `howToPlay.powerUps.${index}`;
-  const [iconUrl, iconFile, title] = useWatch({ control, name: [`${base}.iconUrl`, `${base}.iconFile`, `${base}.title`] });
-  const src = useFilePreview(iconFile, iconUrl);
-  const name = title || "power-up";
+/** The power-ups as rows with a checkbox: the checked ones show in this game's How to play. */
+function PowerUpPicker({ control, setValue }) {
+  const { powerUps } = usePowerUps();
+  const picked = useWatch({ control, name: "powerUpIds" }) ?? [];
+  const toggle = (id, on) =>
+    setValue(
+      "powerUpIds",
+      // Kept in the order of Streams › Power-ups.
+      powerUps.map((p) => p.id).filter((x) => (x === id ? on : picked.includes(x))),
+      { shouldDirty: true },
+    );
+  if (powerUps.length === 0) return <EmptyState compact icon="bolt" title="No power-ups yet" description="Add them in Streams › Power-ups." />;
   return (
-    <ListItem
-      sortable={drag.item(index)}
-      leadingControl={drag.handle(index, name)}
-      leading={<ImageCell src={src} label={`${title || "Power-up"} icon`} onPick={(f) => setValue(`${base}.iconFile`, f, { shouldDirty: true })} />}
-      trailing={<ActionMenu label={`Actions for ${name}`} items={[{ label: "Remove", icon: "delete", tone: "error", onClick: onRemove }]} />}
-    >
-      {/* Name and description stacked with the form's 8px gap, never touching. */}
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-        <TextCell control={control} name={`${base}.title`} label="Power-up name" placeholder="Name" rules={{ required: "Enter a name" }} sx={{ typography: "titleSmall" }} />
-        <TextCell control={control} name={`${base}.description`} label={`What ${name} does`} placeholder="What it does" multiline rules={{ required: "Describe what it does" }} sx={{ typography: "bodyMedium", color: "text.secondary", "& textarea": { py: 0.5 } }} />
-      </Box>
-    </ListItem>
+    <ListGroup label="Power-ups">
+      {powerUps.map((p) => (
+        <ListItem
+          key={p.id}
+          onClick={() => toggle(p.id, !picked.includes(p.id))}
+          leadingControl={<Checkbox checked={picked.includes(p.id)} onChange={(e) => toggle(p.id, e.target.checked)} onClick={(e) => e.stopPropagation()} slotProps={{ input: { "aria-label": `Show ${p.title}` } }} />}
+          leading={<IconTile src={p.iconUrl} icon="bolt" />}
+          title={p.title}
+          supporting={p.description}
+        />
+      ))}
+    </ListGroup>
   );
 }
 
-function HowToPlaySheet({ sheet }) {
-  const { save, saving } = useLibraryMutations({ resource: "GameMode", dataProviderName: DP.gameModes, noun: "How to play & format" });
-  const { control, reset, handleSubmit, setValue, setError, formState } = useForm({ defaultValues: { name: "", summary: "", howToPlay: { powerUps: [] } } });
-  const { fields: powerUps, append, move, remove } = useFieldArray({ control, name: "howToPlay.powerUps" });
-  const drag = useDragSort({ count: powerUps.length, onMove: move });
-  const [gameLogoUrl, gameModeIconUrl] = useWatch({ control, name: ["gameLogoUrl", "gameModeIconUrl"] });
+function GameModeSheet({ sheet }) {
+  const { save, saving } = useLibraryMutations({ resource: "GameMode", dataProviderName: DP.gameModes, noun: "Game mode" });
+  const { control, reset, handleSubmit, setValue, setError, formState } = useForm({ defaultValues: { name: "", gameLogoUrl: null, gameLogoFile: null, powerUpIds: [] } });
+  const gameLogoUrl = useWatch({ control, name: "gameLogoUrl" });
 
   useEffect(() => {
     if (!sheet.open) return;
     const r = sheet.record;
-    reset({ ...r, howToPlay: { powerUps: (r.howToPlay?.powerUps ?? []).map((p) => ({ ...p, iconFile: null })) }, gameModeIconFile: null, gameLogoFile: null });
+    reset({ name: r.name ?? "", gameLogoUrl: r.gameLogoUrl ?? MODE_LOGOS[r.id] ?? null, gameLogoFile: null, powerUpIds: r.powerUpIds ?? [] });
   }, [sheet.open, sheet.record, reset]);
 
-  // The whole game mode goes back (the endpoint replaces it); only these fields change here.
   const submit = handleSubmit(async (v) => {
-    if (await save(sheet.record.id, v, setError)) sheet.close();
+    if (await save(sheet.record.id, { name: v.name, gameLogoUrl: v.gameLogoUrl, gameLogoFile: v.gameLogoFile, powerUpIds: v.powerUpIds }, setError)) sheet.close();
   });
-  const image = (fileField, urlField) => ({
-    onChange: (f) => setValue(fileField, f, { shouldDirty: true }),
-    onRemove: () => {
-      setValue(fileField, null, { shouldDirty: true });
-      setValue(urlField, null, { shouldDirty: true });
-    },
-  });
-  const logo = image("gameLogoFile", "gameLogoUrl");
-  const icon = image("gameModeIconFile", "gameModeIconUrl");
 
   return (
     <SideSheet
@@ -81,7 +72,7 @@ function HowToPlaySheet({ sheet }) {
       onClose={sheet.close}
       dirty={formState.isDirty}
       title={sheet.record?.name}
-      subtitle="How to play & format"
+      subtitle="Game mode"
       actions={
         <>
           <Button variant="text" onClick={sheet.close}>
@@ -93,26 +84,30 @@ function HowToPlaySheet({ sheet }) {
         </>
       }
     >
-      <ImageField label="Game logo" value={gameLogoUrl} width={336} height={156} fit="contain" onChange={logo.onChange} onRemove={logo.onRemove} />
+      <ImageField
+        label="Logo"
+        value={gameLogoUrl}
+        width={336}
+        height={156}
+        fit="contain"
+        onChange={(f) => setValue("gameLogoFile", f, { shouldDirty: true })}
+        onRemove={() => {
+          setValue("gameLogoFile", null, { shouldDirty: true });
+          setValue("gameLogoUrl", null, { shouldDirty: true });
+        }}
+      />
       <TextInput control={control} name="name" label="Title" max={40} rules={{ validate: (v) => (v?.trim() ? (v.length <= 40 ? true : "Use 40 characters or fewer") : "Enter a title") }} />
-      <TextInput control={control} name="summary" label="Description" max={120} rules={{ required: "Add a short description", maxLength: { value: 120, message: "Use 120 characters or fewer" } }} />
       <Box>
         <Typography variant="titleSmall" component="div" sx={{ mb: 1.5 }}>
           Power-ups
         </Typography>
-        <ListGroup label="Power-ups">
-          {powerUps.map((f, i) => (
-            <PowerUpRow key={f.id} control={control} setValue={setValue} index={i} drag={drag} onRemove={() => remove(i)} />
-          ))}
-          <ListAdd label="Add power-up" onClick={() => append({ title: "", description: "", iconUrl: "", iconFile: null })} />
-        </ListGroup>
+        <PowerUpPicker control={control} setValue={setValue} />
       </Box>
-      <PillFields control={control} iconUrl={gameModeIconUrl} onIconChange={icon.onChange} onIconRemove={icon.onRemove} />
     </SideSheet>
   );
 }
 
-export default function HowToPlayPage() {
+export default function GameModesPage() {
   const sheet = useSheet();
   const { presets, isLoading } = useGameModePresets();
   const modes = Object.values(presets);
@@ -134,7 +129,7 @@ export default function HowToPlayPage() {
                 title={m.name}
                 meta={
                   <Typography variant="bodySmall" color="text.secondary" component="div" noWrap>
-                    {powerUpCount(m.howToPlay?.powerUps?.length ?? 0)}
+                    {powerUpCount(m.powerUpIds?.length ?? 0)}
                   </Typography>
                 }
                 onOpen={() => sheet.openEdit(m)}
@@ -143,7 +138,7 @@ export default function HowToPlayPage() {
           })}
         </CardGrid>
       )}
-      <HowToPlaySheet sheet={sheet} />
+      <GameModeSheet sheet={sheet} />
     </Box>
   );
 }

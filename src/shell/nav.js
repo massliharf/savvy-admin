@@ -4,16 +4,20 @@
 // its own icon for the expanded rail.
 export const DESTINATIONS = [
   {
-    // Running the show, in the order it happens: game modes (word sets, time slots, Fill month;
-    // settings under Advanced) make the streams the schedule shows.
+    // Running the show, in the order it happens: game sets and word sets make the streams (one by one,
+    // or repeating with Create event) the schedule shows.
     id: "streams",
     label: "Streams",
     icon: "live_tv",
     tabs: [
       { icon: "calendar_month", label: "Schedule", path: "/streams" },
-      { icon: "sports_esports", label: "Bundles", path: "/bundles" },
-      // What players see of each game in the app; each game opens in a side sheet.
-      { icon: "help", label: "How to play & format", path: "/how-to-play" },
+      // What a new stream starts with, its words and its points.
+      { icon: "inventory_2", label: "Game sets", path: "/game-sets" },
+      { icon: "spellcheck", label: "Word sets", path: "/word-sets" },
+      { icon: "scoreboard", label: "Scoring", path: "/scoring" },
+      // What players see of each game in the app (title, logo, power-ups); each opens in a side sheet.
+      { icon: "sports_esports", label: "Game modes", path: "/game-modes" },
+      { icon: "auto_fix_high", label: "Power-ups", path: "/power-ups" },
     ],
   },
   {
@@ -81,7 +85,7 @@ export function findDestination(pathname) {
 }
 
 /** Single-record pages (own header, no section tabs, no "New stream" FAB). */
-export const isRecordPage = (pathname) => [/^\/streams\/edit\/[^/]+$/, /^\/bundles\/[^/]+$/].some((re) => re.test(pathname));
+export const isRecordPage = (pathname) => [/^\/streams\/edit\/[^/]+$/, /^\/game-sets\/[^/]+$/].some((re) => re.test(pathname));
 
 export function findTab(destination, pathname) {
   return destination?.tabs.find((t) => matches(pathname, t.path)) ?? null;

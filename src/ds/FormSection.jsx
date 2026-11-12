@@ -22,7 +22,7 @@ function StatusPill({ status }) {
  * A titled card that groups related fields. `id` is used as a scroll anchor. `status` ({ state,
  * summary, todo }) puts its summary under the title and a missing / errors pill by it. `collapsible` sections fold
  * to their title, pill and a one-line `status.summary`; `open` and `onToggle` control that.
- * `status.onReset` adds a "Reset to game mode" button.
+ * `status.onReset` adds a "Reset to game set" button.
  */
 export function FormSection({ id, title, description, action, status, collapsible, open = true, onToggle, children }) {
   const { m3: c } = useTheme();
@@ -64,18 +64,22 @@ export function FormSection({ id, title, description, action, status, collapsibl
         ) : (
           heading
         )}
-        {/* A part that came from the bundle and was changed here goes back to it in one click. */}
-        {status?.onReset && (
-          <Button variant="text" size="small" startIcon={<Icon name="undo" size={16} />} onClick={status.onReset} sx={{ alignSelf: "center", flexShrink: 0 }}>
-            Reset to bundle
-          </Button>
-        )}
-        {!folded && action}
-        {/* Fold chevron at the far end of the row, after the section's buttons. */}
-        {collapsible && (
-          <IconButton aria-label={open ? `Collapse ${title}` : `Expand ${title}`} aria-expanded={open} aria-controls={`${id}-body`} onClick={onToggle} sx={{ alignSelf: "center", ml: "auto", mr: -1 }}>
-            <Icon name={open ? "keyboard_arrow_up" : "keyboard_arrow_down"} size={20} />
-          </IconButton>
+        {/* The section's buttons sit on one centered row: reset, its own action, then the fold chevron. */}
+        {(status?.onReset || (!folded && action) || collapsible) && (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, alignSelf: "center", flexShrink: 0, ml: "auto" }}>
+            {/* A part that came from the game set and was changed here goes back to it in one click. */}
+            {status?.onReset && (
+              <Button variant="text" size="small" startIcon={<Icon name="undo" size={16} />} onClick={status.onReset}>
+                Reset to game set
+              </Button>
+            )}
+            {!folded && action}
+            {collapsible && (
+              <IconButton aria-label={open ? `Collapse ${title}` : `Expand ${title}`} aria-expanded={open} aria-controls={`${id}-body`} onClick={onToggle} sx={{ mr: -1 }}>
+                <Icon name={open ? "keyboard_arrow_up" : "keyboard_arrow_down"} size={20} />
+              </IconButton>
+            )}
+          </Box>
         )}
       </Box>
       {!folded && (

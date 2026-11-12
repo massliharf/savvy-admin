@@ -14,14 +14,14 @@ import { ListAdd, ListGroup, ListItem } from "../../ds/ListGroup";
 import { FormSection } from "../../ds/FormSection";
 import { DP } from "../../providers";
 import { TextInput } from "../streams/detail/fields";
-import { NOTIFICATION_KEYS, NotificationRows, ShareCardFields } from "../streams/detail/sections";
+import { NOTIFICATION_KEYS, NotificationRows, SCORE_BRACKETS, ScoringFields, ShareCardFields, sameScoring } from "../streams/detail/sections";
 import { ConfirmDelete, useLibraryMutations, useSheet } from "../library/shared";
 import { Pill } from "../../ds/Pill";
 import { EmptyState } from "../../ds/EmptyState";
 import { ContainerCard } from "../../ds/ContainerCard";
 import { RowsSkeleton } from "../../ds/Skeletons";
 import { useNotify } from "../../shell/notifications";
-import { stripRichText } from "../streams/enums";
+import { DEFAULT_ROUND_SCORING, stripRichText } from "../streams/enums";
 import { AppCardRows, cardsOf } from "./appCards";
 
 const EMPTY_CARDS = {
@@ -55,7 +55,9 @@ function useAppPreset(share, puzzle) {
 const STREAM_SHARE_KEYS = ["liveHome", "upcomingHome", "beatHost", "didNotBeatHost"];
 /** Does this stream still carry the preset's texts (its own copy unchanged)? */
 const streamUses = (kind, p, s) =>
-  kind === "share"
+  kind === "scoring"
+    ? sameScoring(p.roundScoring, s.roundScoring)
+    : kind === "share"
     ? STREAM_SHARE_KEYS.every((key) => ["header", "title", "subtitle"].every((f) => norm(p.cards?.[key]?.[f]) === norm(s.shareableCards?.[key]?.[f])))
     : NOTIFICATION_KEYS.every((key) => norm(p[key]) === norm(s[key]));
 
@@ -63,7 +65,7 @@ const streamUses = (kind, p, s) =>
 function useStreamPresetUsage(kind, k) {
   const notify = useNotify();
   const { mutateAsync } = useUpdate();
-  const { data } = useList({ resource: "TextSavvyStream", filters: [{ field: "status", operator: "eq", value: "Scheduled" }], pagination: { current: 1, pageSize: 500 }, queryOptions: { enabled: kind === "share" || kind === "notify" } });
+  const { data } = useList({ resource: "TextSavvyStream", filters: [{ field: "status", operator: "eq", value: "Scheduled" }], pagination: { current: 1, pageSize: 500 }, queryOptions: { enabled: kind === "share" || kind === "notify" || kind === "scoring" } });
   const streams = data?.data ?? [];
   const usedBy = (p) => streams.filter((s) => streamUses(kind, p, s)).length;
   const makeDefault = async (p) => {
@@ -81,6 +83,7 @@ export const KINDS = {
   share: { resource: "SharePreset", dataProviderName: DP.sharePresets, noun: "Share card preset", title: "Stream share cards", description: "New streams start from the Default.", icon: "style", empty: () => ({ name: "", cards: structuredClone(EMPTY_CARDS) }), summary: (p) => p.cards?.liveHome?.title },
   app: { resource: "AppCardPreset", dataProviderName: DP.appCardPresets, noun: "App share card preset", title: "App share cards", description: "Shared from the profile and after a live show.", icon: "ios_share", puzzle: false, empty: () => ({ name: "", cards: emptyAppCards(false) }), summary: (p) => p.cards?.profileShare?.title },
   puzzle: { resource: "PuzzleCardPreset", dataProviderName: DP.puzzleCardPresets, noun: "Daily puzzle share card preset", title: "Daily puzzle share cards", description: "Shared after today's puzzle.", icon: "extension", puzzle: true, empty: () => ({ name: "", cards: emptyAppCards(true) }), summary: (p) => stripRichText(p.cards?.dailyPuzzleSuccess?.title ?? "") },
+  scoring: { resource: "ScoringPreset", dataProviderName: DP.scoringPresets, noun: "Scoring preset", title: "Scoring", description: "Points per round. Each game set picks one (else the Default); a stream can pick another.", icon: "scoreboard", empty: () => ({ name: "", roundScoring: structuredClone(DEFAULT_ROUND_SCORING) }), summary: (p) => `Solve bonus ${SCORE_BRACKETS.map((k) => (p.roundScoring?.[k]?.solveBonusXp ?? 0).toLocaleString()).join(" / ")}` },
   notify: { resource: "NotificationPreset", dataProviderName: DP.notificationPresets, noun: "Notification preset", title: "Notifications", description: "New streams start from the Default.", icon: "notifications", empty: () => ({ name: "", ...Object.fromEntries(NOTIFICATION_KEYS.map((k) => [k, ""])) }), summary: (p) => p.lobbyOpenTitle },
 };
 
@@ -90,7 +93,7 @@ export function PresetSheet({ kind, sheet, onSaved }) {
   const { save, destroy, saving } = useLibraryMutations(k);
   const [confirm, setConfirm] = useState(false);
   const form = useForm({ defaultValues: k.empty() });
-  const { control, reset, handleSubmit, setError, formState } = form;
+  const { control, reset, handleSubmit, setError, setValue, formState } = form;
 
   useEffect(() => {
     if (sheet.open) reset({ ...k.empty(), ...sheet.record });
@@ -132,7 +135,7 @@ export function PresetSheet({ kind, sheet, onSaved }) {
       }
     >
       <TextInput control={control} name="name" label="Preset name" rules={{ validate: (v) => (v?.trim() ? true : "Enter a name") }} />
-      {kind === "share" ? <ShareCardFields form={form} prefix="cards" /> : kind === "notify" ? <NotificationRows form={form} /> : <AppCardRows form={form} puzzle={k.puzzle} prefix="cards." label={k.title} />}
+      {kind === "scoring" ? <ScoringFields control={control} setValue={setValue} subText={false} roundCount={5} /> : kind === "share" ? <ShareCardFields form={form} prefix="cards" /> : kind === "notify" ? <NotificationRows form={form} /> : <AppCardRows form={form} puzzle={k.puzzle} prefix="cards." label={k.title} />}
       <ConfirmDelete
         open={confirm}
         title={`Delete ${sheet.record?.name}?`}
@@ -149,12 +152,15 @@ export function PresetSheet({ kind, sheet, onSaved }) {
   );
 }
 
-/** The presets of one kind as a titled section: list rows that open their sheet, ending with "Add preset". */
-export function PresetList({ kind, share }) {
+/**
+ * The presets of one kind as a titled section: list rows that open their sheet, ending with "Add
+ * preset". `bare` leaves out the section card (inside a side sheet).
+ */
+export function PresetList({ kind, share, bare = false }) {
   const k = KINDS[kind];
   const app = useAppPreset(share, !!k.puzzle);
   const usage = useStreamPresetUsage(kind, k);
-  const forStreams = kind === "share" || kind === "notify";
+  const forStreams = kind === "share" || kind === "notify" || kind === "scoring";
   // Stream presets: the default is the one new streams start from (the first one if none is set).
   const defaultId = (rows) => (rows.find((p) => p.isDefault) ?? rows[0])?.id;
   const { m3: c } = useTheme();
@@ -194,11 +200,53 @@ export function PresetList({ kind, share }) {
       <ListAdd label="Add preset" onClick={sheet.openNew} />
     </ListGroup>
   );
+  const editor = <PresetSheet kind={kind} sheet={sheet} onSaved={share ? (saved) => sheet.record?.id && app.inUse(sheet.record) && app.use(saved, true) : undefined} />;
+  if (bare)
+    return (
+      <>
+        {list}
+        {editor}
+      </>
+    );
   return (
     <FormSection id={kind} title={k.title} description={k.description}>
       {list}
-      <PresetSheet kind={kind} sheet={sheet} onSaved={share ? (saved) => sheet.record?.id && app.inUse(sheet.record) && app.use(saved, true) : undefined} />
+      {editor}
     </FormSection>
+  );
+}
+
+/**
+ * "Presets" on a stream's section: the presets of that kind in a side sheet over the stream, so
+ * nothing on the stream is lost. Each preset opens its own sheet on top to edit.
+ */
+export function PresetsButton({ kind }) {
+  const k = KINDS[kind];
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button variant="tonal" size="small" onClick={() => setOpen(true)}>
+        Presets
+      </Button>
+      <SideSheet
+        open={open}
+        onClose={() => setOpen(false)}
+        title={`${k.title} presets`}
+        subtitle={k.description}
+        actions={<Button onClick={() => setOpen(false)}>Done</Button>}
+      >
+        <PresetList kind={kind} bare />
+      </SideSheet>
+    </>
+  );
+}
+
+/** Streams › Scoring: the scoring presets streams pick from. */
+export function ScoringPage() {
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 3, maxWidth: FORM_WIDTH }}>
+      <PresetList kind="scoring" />
+    </Box>
   );
 }
 

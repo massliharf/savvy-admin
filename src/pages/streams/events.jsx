@@ -1,0 +1,313 @@
+// Streams › Schedule — "Create event": one stream on a date, or, with an end date, a stream on the
+// picked weekdays between the two dates. With its game set, host and sponsor; the words (and with
+// them the game mode) come later, from a word set on each stream.
+import { useEffect, useMemo, useState } from "react";
+import { useCustomMutation, useInvalidate, useList } from "@refinedev/core";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import { TimePicker } from "@mui/x-date-pickers/TimePicker";
+import Avatar from "@mui/material/Avatar";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import ButtonBase from "@mui/material/ButtonBase";
+import TextField from "@mui/material/TextField";
+import Typography from "@mui/material/Typography";
+import { useTheme } from "@mui/material/styles";
+import { Icon } from "../../ds/Icon";
+import { SideSheet } from "../../ds/SideSheet";
+import { Banner } from "../../ds/Banner";
+import { FieldHelper } from "../../ds/FieldHelper";
+import { ChoiceGroup } from "../../ds/SelectButton";
+import { cornerFor } from "../../ds/IconTile";
+import { radius } from "../../theme/tokens";
+import { dayjs } from "../../contexts";
+import { DP } from "../../providers";
+import { useNotify } from "../../shell/notifications";
+import { useBundles, useStreamBuilder } from "./gameModes";
+import { GameSetPicker, HostPicker, PickCard, PickPlaceholder } from "./pickers";
+import { DEFAULT_TITLE, fillHost, hostLabel, titleRule } from "./hosts";
+import { richLen } from "./enums";
+
+// Streams closer than this to a new one's start count as "already scheduled" for it.
+const CONFLICT_MINUTES = 60;
+// A long range stops here, so one click can't flood the schedule.
+const MAX_STREAMS = 200;
+const NONE = "__none__";
+
+// Weekdays (0 = Sunday, as dayjs counts), Monday first.
+const WEEKDAYS = [
+  { value: 1, label: "Mon", letter: "M" },
+  { value: 2, label: "Tue", letter: "T" },
+  { value: 3, label: "Wed", letter: "W" },
+  { value: 4, label: "Thu", letter: "T" },
+  { value: 5, label: "Fri", letter: "F" },
+  { value: 6, label: "Sat", letter: "S" },
+  { value: 0, label: "Sun", letter: "S" },
+];
+const REPEAT = [
+  { value: "once", label: "Once" },
+  { value: "recurring", label: "Recurring" },
+];
+
+/** The weekdays as round toggle buttons (M T W T F S S, like a calendar app): a picked day is filled blue. */
+function DayButtons({ value, onChange }) {
+  const { m3: c, tokens } = useTheme();
+  // `onChange` is a state setter: each tap toggles from the latest days.
+  const toggle = (d) => onChange((cur) => (cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d]));
+  return (
+    <Box role="group" aria-label="Days" sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+      {WEEKDAYS.map((d) => {
+        const on = value.includes(d.value);
+        return (
+          <ButtonBase
+            key={d.value}
+            onClick={() => toggle(d.value)}
+            aria-pressed={on}
+            aria-label={d.label}
+            sx={{
+              width: 36,
+              height: 36,
+              borderRadius: radius("full"),
+              typography: "labelLarge",
+              color: on ? c.onPrimary : c.onSurface,
+              bgcolor: on ? c.primary : c.ctrl,
+              transition: `background-color ${tokens.motion.effects}`,
+              "&:hover": { bgcolor: on ? c.primaryHover : c.ctrlHover },
+              "&.Mui-focusVisible": { outline: `2px solid ${c.focus}`, outlineOffset: 2 },
+            }}
+          >
+            {d.letter}
+          </ButtonBase>
+        );
+      })}
+    </Box>
+  );
+}
+
+/**
+ * The streams to add: one on `from`, or (with `to`) one on each picked weekday from `from` to
+ * `to`. Past times and times with a stream within an hour are left out.
+ */
+function planEvent({ from, to, days, time, streams, timezone }) {
+  const now = dayjs();
+  const active = streams.filter((s) => s.status !== "Canceled");
+  const near = (start) => active.some((s) => Math.abs(dayjs(s.startDate).diff(start, "minute")) < CONFLICT_MINUTES);
+  const planned = [];
+  const skipped = { taken: 0, past: 0 };
+  if (!from?.isValid() || !time?.isValid()) return { planned, skipped };
+  const at = (d) => dayjs.tz(`${d.format("YYYY-MM-DD")}T${time.format("HH:mm")}`, timezone);
+  const add = (start) => {
+    if (start.isBefore(now)) skipped.past += 1;
+    else if (near(start)) skipped.taken += 1;
+    else planned.push(start);
+  };
+  if (!to) {
+    add(at(from));
+    return { planned, skipped };
+  }
+  if (!to.isValid() || to.isBefore(from, "day")) return { planned, skipped };
+  for (let d = from.startOf("day"); !d.isAfter(to, "day") && planned.length < MAX_STREAMS; d = d.add(1, "day")) {
+    if (days.includes(d.day())) add(at(d));
+  }
+  return { planned, skipped };
+}
+
+/** "Create event": one stream, or a recurring one on the picked weekdays until its end date. */
+export function CreateEventSheet({ open, date, onClose, streams, hosts, timezone, onCreated }) {
+  const { m3: c } = useTheme();
+  const notify = useNotify();
+  const invalidate = useInvalidate();
+  const build = useStreamBuilder();
+  const { mutateAsync, isPending } = useCustomMutation();
+  const { bundles } = useBundles();
+  const { data: sponsorData } = useList({ resource: "Sponsor", dataProviderName: DP.sponsors, pagination: { mode: "off" } });
+  const sponsors = [...(sponsorData?.data ?? [])].sort((a, b) => a.name.localeCompare(b.name));
+
+  const tomorrow = () => dayjs().tz(timezone).add(1, "day").startOf("day");
+  const [title, setTitle] = useState(DEFAULT_TITLE);
+  const [bundleId, setBundleId] = useState(null);
+  const [host, setHost] = useState(null);
+  const [sponsorId, setSponsorId] = useState(NONE);
+  const [from, setFrom] = useState(tomorrow);
+  const [time, setTime] = useState(() => tomorrow().hour(19));
+  const [recurring, setRecurring] = useState(false);
+  const [to, setTo] = useState(() => tomorrow().endOf("month"));
+  const [days, setDays] = useState([]);
+  const [submitted, setSubmitted] = useState(false);
+
+  // Each time it opens: one stream at 7 PM, tomorrow or on the day it was opened from (a calendar
+  // day's +).
+  useEffect(() => {
+    if (!open) return;
+    const picked = date ? dayjs.tz(date, timezone).startOf("day") : null;
+    const start = picked?.isValid() && !picked.isBefore(dayjs().tz(timezone), "day") ? picked : tomorrow();
+    setTitle(DEFAULT_TITLE);
+    setBundleId(null);
+    setHost(hosts[0] ?? null);
+    setSponsorId(NONE);
+    setFrom(start);
+    setTime(start.hour(19));
+    setRecurring(false);
+    setTo(start.endOf("month"));
+    setDays([start.day()]);
+    setSubmitted(false);
+    // Reset only when the sheet opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const setId = bundles.some((b) => b.id === bundleId) ? bundleId : bundles[0]?.id ?? null;
+  const sponsor = sponsors.find((sp) => sp.id === sponsorId) ?? null;
+  const end = recurring ? to : null;
+  const { planned, skipped } = useMemo(() => planEvent({ from, to: end, days, time, streams, timezone }), [from, end, days, time, streams, timezone]);
+
+  const titleCheck = titleRule(title);
+  const titleLen = richLen(title.trim());
+  const errors = {
+    title: titleCheck === true ? null : titleCheck,
+    host: !host && "Pick a host",
+    from: !from?.isValid() && "Pick a date",
+    time: !time?.isValid() && "Pick a time",
+    to: recurring && (!to?.isValid() ? "Pick an end date" : to.isBefore(from, "day") ? "Ends before it starts" : null),
+    days: recurring && !days.length && "Pick at least one day",
+  };
+  const show = (k) => (submitted ? errors[k] || null : null);
+  const valid = !Object.values(errors).some(Boolean);
+
+  const create = async () => {
+    setSubmitted(true);
+    if (!valid || !planned.length) return;
+    const payload = planned.map((start) => {
+      // Built like every new stream (its game set + its presets); words and the game mode come
+      // later, from a word set.
+      const values = build({ title: title.trim(), host, startDate: start.utc().toISOString(), bundleId: setId });
+      values.sponsorship = sponsor ? { title: sponsor.title, description: sponsor.description, cta: sponsor.cta, imageUrl: sponsor.imageUrl ?? null, sponsorshipImageFile: null } : null;
+      return values;
+    });
+    try {
+      await mutateAsync({ url: "/TextSavvyStream/bulk", method: "post", values: { streams: payload, assignments: [] }, successNotification: false, errorNotification: false });
+      invalidate({ resource: "TextSavvyStream", invalidates: ["list"] });
+      notify(`${payload.length} ${payload.length === 1 ? "stream" : "streams"} added`);
+      onCreated?.(planned[0]);
+      onClose();
+    } catch (e) {
+      notify(e?.response?.data?.detail ?? "Couldn't add the streams", { variant: "error" });
+    }
+  };
+
+  const thumb = (src, size) => (
+    <Avatar src={src === NONE ? undefined : src ?? undefined} alt="" sx={{ width: size, height: size, borderRadius: `${cornerFor(size)}px`, bgcolor: c.surfaceContainerHighest, color: c.onSurfaceVariant }}>
+      <Icon name={src === NONE ? "block" : "handshake"} size={size / 2} />
+    </Avatar>
+  );
+  const pickerIcon = (name) => () => <Icon name={name} />;
+
+  // What it adds, in one line.
+  const at = time?.isValid() ? time.format("h:mm A") : "…";
+  const count = `${planned.length} ${planned.length === 1 ? "stream" : "streams"}`;
+  const dayNames = WEEKDAYS.filter((d) => days.includes(d.value)).map((d) => d.label).join(", ");
+  const summary = !from?.isValid()
+    ? null
+    : recurring
+      ? `Adds ${count}: ${dayNames || "no days"} at ${at}, ${from.format("MMM D")} – ${to?.isValid() ? to.format("MMM D, YYYY") : "…"}.`
+      : planned.length
+        ? `Adds 1 stream on ${from.format("ddd, MMM D, YYYY")} at ${at}.`
+        : `Adds no stream on ${from.format("ddd, MMM D")} at ${at}.`;
+  const skippedText = [
+    skipped.taken && `${skipped.taken} ${skipped.taken === 1 ? "day already has" : "days already have"} a stream within an hour`,
+    skipped.past && `${skipped.past} ${skipped.past === 1 ? "time is" : "times are"} already past`,
+  ].filter(Boolean);
+
+  return (
+    <SideSheet
+      open={open}
+      onClose={onClose}
+      title="Create event"
+      subtitle="One stream, or a recurring one on the picked days until its end date."
+      actions={
+        <>
+          <Button variant="text" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={create} disabled={isPending || (submitted && (!valid || !planned.length))} startIcon={<Icon name="event_repeat" />}>
+            {isPending ? "Adding…" : planned.length ? `Add ${count}` : "Nothing to add"}
+          </Button>
+        </>
+      }
+    >
+      <TextField
+        label="Title"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        error={!!show("title")}
+        // {host} is filled with each stream's host wherever the title shows; say how it reads now.
+        helperText={<FieldHelper text={show("title") ?? (/\{host\}/i.test(title) && host ? `Shows as “${fillHost(title, hostLabel(host))}”` : "{host} becomes the host's name.")} counter={`${titleLen} / 100`} over={titleLen > 100} />}
+      />
+      <Box sx={{ display: "flex", gap: 1.5 }}>
+        <DatePicker
+          label="Date"
+          value={from}
+          timezone={timezone}
+          disablePast
+          onChange={setFrom}
+          slots={{ openPickerIcon: pickerIcon("calendar_today") }}
+          slotProps={{ textField: { error: !!show("from"), helperText: show("from") || undefined, sx: { flex: 3 } } }}
+        />
+        <TimePicker
+          label="Time"
+          value={time}
+          timezone={timezone}
+          onChange={setTime}
+          slots={{ openPickerIcon: pickerIcon("schedule") }}
+          slotProps={{ textField: { error: !!show("time"), helperText: show("time") || undefined, sx: { flex: 2 } } }}
+        />
+      </Box>
+
+      {/* Once, or recurring: then the days it repeats on and when it ends. */}
+      <ChoiceGroup label="Repeat" value={recurring ? "recurring" : "once"} options={REPEAT} onChange={(v) => setRecurring(v === "recurring")} />
+      {recurring && (
+        <>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
+            <Typography variant="labelLarge" color="text.secondary">
+              Repeats on
+            </Typography>
+            <DayButtons value={days} onChange={setDays} />
+            {show("days") && (
+              <Typography variant="bodySmall" color="error">
+                {show("days")}
+              </Typography>
+            )}
+          </Box>
+          <DatePicker
+            label="End date"
+            value={to}
+            timezone={timezone}
+            disablePast
+            minDate={from}
+            onChange={setTo}
+            slots={{ openPickerIcon: pickerIcon("event") }}
+            slotProps={{ textField: { error: !!show("to"), helperText: show("to") || undefined } }}
+          />
+        </>
+      )}
+
+      <GameSetPicker value={setId} onChange={setBundleId} />
+      <HostPicker hosts={hosts} value={host} onChange={setHost} error={!!show("host")} helperText={show("host") || undefined} />
+      <PickCard
+        label="Sponsor"
+        ariaLabel="Sponsor"
+        value={sponsor ? sponsor.id : NONE}
+        options={[{ value: NONE, media: thumb(NONE, 32), primary: "No sponsor" }, ...sponsors.map((sp) => ({ value: sp.id, media: thumb(sp.imageUrl, 32), primary: sp.name, secondary: sp.title }))]}
+        onChange={setSponsorId}
+        media={sponsor ? thumb(sponsor.imageUrl, 48) : <PickPlaceholder icon="handshake" />}
+        title={sponsor ? sponsor.name : "No sponsor"}
+        supporting={sponsor ? sponsor.title : `${sponsors.length} ${sponsors.length === 1 ? "sponsor" : "sponsors"} in the library`}
+      />
+
+      {summary && (
+        <Typography variant="bodyMedium" color="text.secondary">
+          {[summary, skippedText.length ? `Skipped: ${skippedText.join(", ")}.` : null, planned.length >= MAX_STREAMS ? `Stops at ${MAX_STREAMS} streams.` : null].filter(Boolean).join(" ")}
+        </Typography>
+      )}
+      <Banner icon="hide_image">Streams show in the app right away; their game mode logo shows once each has its word set.</Banner>
+    </SideSheet>
+  );
+}

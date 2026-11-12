@@ -96,8 +96,10 @@ export function modeDefaults(gameMode, preset) {
 
 /** Full stream payload for the create endpoint, filled from the game mode preset. Host and mode
  * presentation (display name, hero card image, logo, pill) comes from the libraries on the server. */
-export function streamFromPreset({ title, host, startDate, gameMode = null, streamType, bundleId }, preset) {
+export function streamFromPreset({ title, host, startDate, gameMode = null, streamType: given, bundleId }, preset) {
   const mode = modeDefaults(gameMode, preset);
+  // Who can join comes from the game set (a duplicate keeps its source's).
+  const streamType = given ?? preset?.streamType ?? StreamType.Public;
   return {
     title,
     hostId: host.id,
@@ -127,7 +129,7 @@ export function streamFromPreset({ title, host, startDate, gameMode = null, stre
 }
 
 /**
- * The one way a new stream is put together (New stream and Fill month alike): its bundle's
+ * The one way a new stream is put together (New stream and Create event alike): its bundle's
  * defaults (rounds, scoring, rewards, showdown, host's pictures, share card and
  * notification presets). Words come later, from a word set.
  */
@@ -135,9 +137,13 @@ export function useStreamBuilder() {
   const { bundles, byId } = useBundles();
   const { data: share } = useList({ resource: "SharePreset", dataProviderName: DP.sharePresets, pagination: { mode: "off" } });
   const { data: notify } = useList({ resource: "NotificationPreset", dataProviderName: DP.notificationPresets, pagination: { mode: "off" } });
+  const { data: scoring } = useList({ resource: "ScoringPreset", dataProviderName: DP.scoringPresets, pagination: { mode: "off" } });
   return (base) => {
-    // The stream's bundle (the first one when none is given); its game comes later, with its word set.
-    const preset = byId[base.bundleId] ?? bundles[0];
+    // The stream's game set (the first one when none is given); its game comes later, with its word set.
+    const set = byId[base.bundleId] ?? bundles[0];
+    // Points per round from the game set's scoring preset, else the Default one (Streams › Scoring).
+    const points = scoring?.data?.find((p) => p.id === set?.defaultScoringPresetId) ?? scoring?.data?.find((p) => p.isDefault) ?? scoring?.data?.[0];
+    const preset = set && points ? { ...set, roundScoring: points.roundScoring } : set;
     const values = streamFromPreset(base, preset);
     // The game mode's presets, else the libraries' Default ones.
     const sharePreset = share?.data?.find((p) => p.id === preset?.defaultSharePresetId) ?? share?.data?.find((p) => p.isDefault) ?? share?.data?.[0];

@@ -27,7 +27,7 @@ export function SideSheet({ open, onClose, onBack, title, subtitle, children, ac
       anchor="right"
       open={open}
       onClose={guarded(onClose)}
-      // `instant`: one view of a sheet swapping to another (e.g. Fill month ↔ Time slots), no slide.
+      // `instant`: one view of a sheet swapping to another (one sheet's views), no slide.
       transitionDuration={instant ? 0 : undefined}
       // The paper never scrolls (only the form inside does): otherwise wheel or focus scrolling
       // could push the whole sheet, header and footer included, up and leave a blank area below.

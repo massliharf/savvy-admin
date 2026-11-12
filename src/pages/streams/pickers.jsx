@@ -26,7 +26,8 @@ import { SelectList } from "../../ds/SelectList";
 import { useTimezoneFormat } from "../../contexts";
 import { StatusBadge, StreamImage, logoHidden } from "./parts";
 import { StreamType } from "./enums";
-import { GAME_MODES } from "./gameModes";
+import { GAME_MODES, bundleLine, useBundles } from "./gameModes";
+import { IconTile } from "../../ds/IconTile";
 import { hostLabel, showTitle } from "./hosts";
 
 export function HostAvatar({ host, size = 32, sx }) {
@@ -136,6 +137,25 @@ export function PickPlaceholder({ icon }) {
   );
 }
 
+/** The game set as a PickCard, like Host and Sponsor: its showdown tile, name and prize. */
+export function GameSetPicker({ value, onChange, label = "Game set" }) {
+  const { bundles } = useBundles();
+  const tile = (b, size) => <IconTile icon={b.showdown?.superSavvyOnly ? "diamond" : "trophy"} tone={b.showdown?.prize?.rewardType === "Cash" ? "green" : "violet"} size={size} />;
+  const set = bundles.find((b) => b.id === value) ?? bundles[0];
+  return (
+    <PickCard
+      label={label}
+      ariaLabel={label}
+      value={set?.id ?? ""}
+      options={bundles.map((b) => ({ value: b.id, media: tile(b, 32), primary: b.name, secondary: bundleLine(b) }))}
+      onChange={onChange}
+      media={set ? tile(set, 48) : <PickPlaceholder icon="inventory_2" />}
+      title={set?.name ?? "No game sets yet"}
+      supporting={set ? bundleLine(set) : "Add one in Streams › Game sets."}
+    />
+  );
+}
+
 /** The host as a PickCard; "Edit …" in the menu when `onEdit` is given (edits the Hosts library). */
 export function HostPicker({ hosts, value, onChange, label = "Host", error, helperText, exclude, onEdit }) {
   const list = exclude ? hosts.filter((h) => h.id !== exclude) : hosts;
@@ -157,7 +177,7 @@ export function HostPicker({ hosts, value, onChange, label = "Host", error, help
 }
 
 /** Game mode picker: the two modes as a connected button group. `value` is a mode id. */
-export function ModeChoice({ value, onChange, label = "How to play & format" }) {
+export function ModeChoice({ value, onChange, label = "Game mode" }) {
   return <ChoiceGroup label={label} value={value} options={Object.values(GAME_MODES).map((m) => ({ value: m.id, label: m.label, icon: m.icon }))} onChange={onChange} />;
 }
 
@@ -212,12 +232,32 @@ export function AudienceField({ value, onChange, error, superSavvySwitch = true 
   );
 }
 
+/** A stream in one line: its image, title and status, then when, the host and an optional note. */
+export function StreamSummary({ stream: s, note }) {
+  const { formatDate } = useTimezoneFormat();
+  return (
+    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, minWidth: 0 }}>
+      <StreamImage stream={s} size={40} />
+      <Box sx={{ minWidth: 0 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}>
+          <Typography variant="titleSmall" noWrap>
+            {showTitle(s)}
+          </Typography>
+          <StatusBadge status={s.status} draft={logoHidden(s)} />
+        </Box>
+        <Typography variant="bodySmall" color="text.secondary" noWrap component="div">
+          {[formatDate(s.startDate, "ddd, MMM D · h:mm A"), s.hostDisplayName || s.hostName, note].filter(Boolean).join(" · ")}
+        </Typography>
+      </Box>
+    </Box>
+  );
+}
+
 /**
  * Dialog that picks one upcoming stream (assigning words, polls, …). `describe(stream)` adds a
  * line of context; `disabledReason(stream)` greys a stream out with that reason.
  */
 export function StreamPickerDialog({ open, title, header, streams, describe, disabledReason, toggle, confirmLabel = "Assign", busy, onConfirm, onClose, emptyText = "Upcoming streams will show here." }) {
-  const { formatDate } = useTimezoneFormat();
   const [picked, setPicked] = useState(null);
   useEffect(() => {
     if (open) setPicked(null);
@@ -241,36 +281,7 @@ export function StreamPickerDialog({ open, title, header, streams, describe, dis
             items={items}
             value={picked?.id}
             onChange={(id) => setPicked(items.find((s) => s.id === id))}
-            renderItem={(s) => (
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1.5,
-                  minWidth: 0,
-                }}
-              >
-                <StreamImage stream={s} size={40} />
-                <Box sx={{ minWidth: 0 }}>
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1,
-                      minWidth: 0,
-                    }}
-                  >
-                    <Typography variant="titleSmall" noWrap>
-                      {showTitle(s)}
-                    </Typography>
-                    <StatusBadge status={s.status} draft={logoHidden(s)} />
-                  </Box>
-                  <Typography variant="bodySmall" color="text.secondary" noWrap component="div">
-                    {[formatDate(s.startDate, "ddd, MMM D · h:mm A"), s.hostDisplayName || s.hostName, disabledReason?.(s) || describe?.(s)].filter(Boolean).join(" · ")}
-                  </Typography>
-                </Box>
-              </Box>
-            )}
+            renderItem={(s) => <StreamSummary stream={s} note={disabledReason?.(s) || describe?.(s)} />}
           />
         )}
       </DialogContent>

@@ -29,13 +29,13 @@ export function NewModeDialog({ open, onClose, onCreated }) {
       const res = await create({ resource: "Bundle", dataProviderName: DP.bundles, values: { name: name.trim() }, successNotification: false, errorNotification: false, invalidates: ["list"] });
       onCreated(res.data);
     } catch (e) {
-      setError(e?.errors?.name?.[0] ?? e?.response?.data?.errors?.name?.[0] ?? e?.message ?? "Couldn't create the bundle");
+      setError(e?.errors?.name?.[0] ?? e?.response?.data?.errors?.name?.[0] ?? e?.message ?? "Couldn't create the game set");
     }
   };
 
   return (
     <Dialog open={open} onClose={isPending ? undefined : onClose} maxWidth="xs" fullWidth>
-      <DialogTitle>New bundle</DialogTitle>
+      <DialogTitle>New game set</DialogTitle>
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
         <TextField
           label="Name"
@@ -47,7 +47,7 @@ export function NewModeDialog({ open, onClose, onCreated }) {
           }}
           onKeyDown={(e) => e.key === "Enter" && submit()}
           error={!!error}
-          helperText={error ?? "How the bundle is called in the admin, e.g. Cash game · Savvy Showdown."}
+          helperText={error ?? "How the game set is called in the admin, e.g. Cash game · Savvy Showdown."}
           inputProps={{ maxLength: 40 }}
           sx={{ mt: 1 }}
         />

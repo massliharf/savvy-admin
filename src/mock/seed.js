@@ -259,13 +259,15 @@ export const seedCashWins = (users) => {
 };
 
 // ---------------------------------------------------------------- configs (live data)
+// Power-ups (Streams › Power-ups): each game mode picks the ones its How to play shows.
+export const seedPowerUps = () => [
+  { id: "powerup-letter-bomb", title: "Letter Bomb", description: "Removes four letters from the board that are not part of the word", iconUrl: img("02d1bda4-eff8-43f9-89e0-e639620efc31") },
+  { id: "powerup-better-bomb", title: "Better Bomb", description: "Removes 8 irrelevant letters from keyboard", iconUrl: img("5502cb74-4380-43a1-a23b-9dccc61188ac") },
+  { id: "powerup-greenie", title: "Greenie", description: "Highlights one Green letter on game board", iconUrl: img("3c5a0401-91c7-49c6-a6fd-391add8701c2") },
+  { id: "powerup-magniflyer", title: "Magniflyer", description: "Highlights one letter that is in the word", iconUrl: img("a81b18a2-d500-4c21-a797-06d12b3bc252") },
+];
 export const seedHowToPlay = () => ({
-  powerUps: [
-    { title: "Letter Bomb", description: "Removes four letters from the board that are not part of the word", iconUrl: img("02d1bda4-eff8-43f9-89e0-e639620efc31") },
-    { title: "Better Bomb", description: "Removes 8 irrelevant letters from keyboard", iconUrl: img("5502cb74-4380-43a1-a23b-9dccc61188ac") },
-    { title: "Greenie", description: "Highlights one Green letter on game board", iconUrl: img("3c5a0401-91c7-49c6-a6fd-391add8701c2") },
-    { title: "Magniflyer", description: "Highlights one letter that is in the word", iconUrl: img("a81b18a2-d500-4c21-a797-06d12b3bc252") },
-  ],
+  powerUps: seedPowerUps().map(({ id, ...p }) => p),
 });
 
 // Game mode presets (prototype: not part of the production API yet). Each mode carries the
@@ -349,10 +351,16 @@ const bundle = (id, name, prize, superSavvyOnly) => ({
   hostStumperBonusXp: 500,
   defaultRewards: [{ rewardType: "BombPowerup", amount: 1 }],
   showdown: { prize, superSavvyOnly },
+  // Who can join new streams of this game set: Public (or Super Savvy only) or Internal.
+  streamType: "Public",
+  defaultScoringPresetId: null,
   defaultSharePresetId: null,
   defaultNotificationPresetId: null,
 });
 export const DEFAULT_BUNDLE_ID = "bundle-cash-savvy";
+// Scoring presets (Streams › Scoring): points per round. New streams start from the Default; a
+// stream can pick another one.
+export const seedScoringPresets = () => [{ id: "scoring-standard", name: "Standard", roundScoring: structuredClone(BUNDLE_SCORING), isDefault: true }];
 export const seedBundles = () => [
   bundle("bundle-cash-super-savvy", "Cash game · Super Savvy Showdown", { rewardType: "Cash", amount: 100 }, true),
   bundle("bundle-sparks-savvy", "Sparks game · Savvy Showdown", { rewardType: "Sparks", amount: 500 }, false),
@@ -361,7 +369,7 @@ export const seedBundles = () => [
 
 // Two game modes, Savvy TextChain and Savvy SubText: five rounds, then a Savvy Showdown.
 export const SHOWDOWN_DEFAULTS = { prize: { rewardType: "Cash", amount: 100 }, superSavvyOnly: false };
-export const seedGameModes = () => seedBaseModes().map((m) => ({ ...m, name: `Savvy ${m.name}`, summary: MODE_SUMMARY[m.id], roundCount: 5, showdown: SHOWDOWN_DEFAULTS }));
+export const seedGameModes = () => seedBaseModes().map((m) => ({ ...m, name: `Savvy ${m.name}`, summary: MODE_SUMMARY[m.id], roundCount: 5, showdown: SHOWDOWN_DEFAULTS, powerUpIds: seedPowerUps().map((p) => p.id) }));
 const seedBaseModes = () => [
   {
     id: "TextChain",

@@ -22,7 +22,8 @@ import { useTimezoneFormat } from "../../contexts";
 import { DP } from "../../providers";
 import { useNotify } from "../../shell/notifications";
 import { StreamType, ROUND_COUNT, durationFor } from "./enums";
-import { TextInput } from "./detail/fields";
+import { SelectInput, TextInput } from "./detail/fields";
+import { BASE_MODES, GAME_MODES } from "./gameModes";
 import { RoundTimeCell, wordRules } from "./detail/sections";
 import { EditTable, TextCell } from "../../ds/EditTable";
 import Card from "@mui/material/Card";
@@ -168,7 +169,7 @@ function WordTokens({ set, hidden }) {
 /** One line about the set besides its words: how many rounds, and whether it has a showdown word. */
 export function setDetails(set) {
   const n = set.rounds?.length ?? 0;
-  return `${n} ${n === 1 ? "round" : "rounds"}${set.showdown ? " + showdown" : ""}`;
+  return [GAME_MODES[set.gameMode]?.label, `${n} ${n === 1 ? "round" : "rounds"}${set.showdown ? " + showdown" : ""}`].filter(Boolean).join(" · ");
 }
 
 /** Name, words and details of a set; used in the set pickers. */
@@ -234,7 +235,7 @@ function SetWordsEditor({ control, setValue, getValues, fields, append, remove, 
         onAdd={() => append({ roundIndex: fields.length, word: "", durationInSeconds: durationFor("", fields.length) })}
       />
       <Typography variant="bodySmall" color="text.secondary" sx={{ mt: -1 }}>
-        Leave the showdown word empty for a set without one. Rewards and the showdown prize come from the stream's bundle.
+        Leave the showdown word empty for a set without one. Rewards and the showdown prize come from the stream's game set.
       </Typography>
     </>
   );
@@ -246,15 +247,15 @@ export function WordSetSheet({ open, set, onClose, validateWord }) {
   const invalidate = useInvalidate();
   const { mutateAsync, isPending } = useCustomMutation();
   const isNew = !set?.id;
-  const { control, setValue, getValues, handleSubmit, reset, formState, setError } = useForm({ defaultValues: { title: "", rounds: [], hasShowdown: true, showdown: { ...NO_SHOWDOWN } } });
+  const { control, setValue, getValues, handleSubmit, reset, formState, setError } = useForm({ defaultValues: { title: "", gameMode: "", rounds: [], hasShowdown: true, showdown: { ...NO_SHOWDOWN } } });
   const { fields, append, remove } = useFieldArray({ control, name: "rounds" });
 
   // A new set starts with the game mode's rounds and round duration.
   const fresh = () => blankRounds(ROUND_COUNT);
   useEffect(() => {
     if (!open) return;
-    if (set?.id) reset({ title: set.title ?? "", rounds: (set.rounds ?? []).map((r) => ({ ...r })), hasShowdown: !!set.showdown, showdown: { word: set.showdown?.word ?? "" } });
-    else reset({ title: "", rounds: fresh(), hasShowdown: true, showdown: { ...NO_SHOWDOWN } });
+    if (set?.id) reset({ title: set.title ?? "", gameMode: set.gameMode ?? "", rounds: (set.rounds ?? []).map((r) => ({ ...r })), hasShowdown: !!set.showdown, showdown: { word: set.showdown?.word ?? "" } });
+    else reset({ title: "", gameMode: "", rounds: fresh(), hasShowdown: true, showdown: { ...NO_SHOWDOWN } });
     // Reset only when the sheet opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, set]);
@@ -264,6 +265,7 @@ export function WordSetSheet({ open, set, onClose, validateWord }) {
     handleSubmit(async (v) => {
       const values = {
         title: v.title.trim(),
+        gameMode: v.gameMode || null,
         rounds: v.rounds.map((r, i) => ({ word: r.word, durationInSeconds: r.durationInSeconds ?? durationFor(r.word, i) })),
         showdown: v.showdown?.word?.trim() ? { word: v.showdown.word.trim() } : null,
       };
@@ -271,7 +273,7 @@ export function WordSetSheet({ open, set, onClose, validateWord }) {
         await mutateAsync({ url: isNew ? "/admin/word-sets" : `/admin/word-sets/${set.id}`, method: isNew ? "post" : "put", dataProviderName: DP.wordSets, values, successNotification: false, errorNotification: false });
         invalidate({ resource: "WordSet", dataProviderName: DP.wordSets, invalidates: ["list"] });
         notify(isNew ? `“${v.title.trim()}” added` : "Word set saved");
-        if (addAnother) reset({ title: "", rounds: fresh(), hasShowdown: v.hasShowdown, showdown: { ...NO_SHOWDOWN } });
+        if (addAnother) reset({ title: "", gameMode: v.gameMode, rounds: fresh(), hasShowdown: v.hasShowdown, showdown: { ...NO_SHOWDOWN } });
         else onClose();
       } catch (e) {
         const errors = e?.response?.data?.errors;
@@ -304,6 +306,7 @@ export function WordSetSheet({ open, set, onClose, validateWord }) {
       }
     >
       <TextInput control={control} name="title" label="Name" max={40} rules={{ validate: (v) => (v?.trim() ? (v.trim().length <= 40 ? true : "Use 40 characters or fewer") : "Enter a name") }} />
+      <SelectInput control={control} name="gameMode" label="Game mode" options={BASE_MODES.map((m) => ({ value: m.id, label: m.label }))} rules={{ required: "Pick a game mode" }} />
       <SetWordsEditor control={control} setValue={setValue} getValues={getValues} fields={fields} append={append} remove={remove} validateWord={validateWord} />
     </SideSheet>
   );
@@ -313,23 +316,28 @@ export function WordSetSheet({ open, set, onClose, validateWord }) {
  * From a stream's detail page: pick a set for its words. A public
  * stream can only take sets no other public stream uses; an Internal one can take any.
  */
-export function WordSetPickerDialog({ open, stream, onClose, onPick }) {
+export function WordSetPickerDialog({ open, stream, header, confirmLabel = "Use this set", busy, onClose, onPick }) {
   const { sets } = useWordSets();
   const { hidden } = useWordsLock();
+  // The stream's current set opens picked, at the top of the list.
+  const current = stream ? sets.find((w) => w.streamId === stream.id) : null;
   const [picked, setPicked] = useState(null);
   useEffect(() => {
-    if (open) setPicked(null);
-  }, [open]);
+    if (open) setPicked(current ?? null);
+    // Only when the dialog opens (or the sets arrive): a pick made here stays.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, current?.id]);
   const publicStream = stream ? isPublic(stream) : true;
   const usable = sets
     .filter((w) => !publicStream || !w.streamId || w.streamId === stream?.id)
-    .sort((a, b) => Number(!!a.streamId) - Number(!!b.streamId) || Date.parse(a.createdAt) - Date.parse(b.createdAt));
+    .sort((a, b) => Number(b === current) - Number(a === current) || Number(!!a.streamId) - Number(!!b.streamId) || Date.parse(a.createdAt) - Date.parse(b.createdAt));
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth scroll="paper">
       <DialogTitle>Pick a word set</DialogTitle>
       <DialogContent dividers sx={{ p: 0 }}>
+        {header}
         {usable.length === 0 ? (
-          <EmptyState compact icon="spellcheck" title="No word sets available" description="Add more in Streams › Bundles." />
+          <EmptyState compact icon="spellcheck" title="No word sets available" description="Add more in Streams › Word sets." />
         ) : (
           <SelectList label="Word sets" items={usable} value={picked?.id} onChange={(id) => setPicked(usable.find((w) => w.id === id))} renderItem={(w) => <WordSetSummary set={w} hidden={hidden} />} />
         )}
@@ -338,8 +346,8 @@ export function WordSetPickerDialog({ open, stream, onClose, onPick }) {
         <Button variant="text" onClick={onClose}>
           Cancel
         </Button>
-        <Button disabled={!picked} onClick={() => onPick(picked)}>
-          Use this set
+        <Button disabled={!picked || picked.id === current?.id || busy} onClick={() => onPick(picked)}>
+          {confirmLabel}
         </Button>
       </DialogActions>
     </Dialog>

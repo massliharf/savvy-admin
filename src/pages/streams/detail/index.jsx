@@ -24,9 +24,9 @@ import { useHosts, showTitle } from "../hosts";
 import { WordSetPickerDialog } from "../words";
 import {
   DetailsSection,
-  GameModeSection,
   HostSection,
   ScoringSection,
+  scoringForMode,
   NotificationsSection,
   RaffleSection,
   RewardsSection,
@@ -37,15 +37,15 @@ import {
   STATUS_OPTIONS,
 } from "./sections";
 
-// As in New stream: game mode, then the stream's own part (title, when, visibility), then the parts
-// the game mode presets, grouped and ordered as in Game modes › Stream defaults: Game, Host,
+// The stream's own part (title, when, visibility), then the parts its game set presets (the game
+// mode comes with the word set, under Words), grouped and ordered as in Game modes › Stream defaults: Game, Host,
 // Sponsor, Rewards, Messaging. `fields` are
 // what each owns, to jump to the first error.
 const SECTIONS = [
-  { id: "mode", group: "How to play & format", label: "How to play & format", icon: "sports_esports", fields: ["gameMode"] },
   { id: "basics", group: "Stream", label: "When & title", icon: "event", fields: ["title", "subtitle", "startDate", "streamType", "headless", "isSpotlighted"] },
   // Words holds the rounds and the showdown word together.
-  { id: "words", group: "Game", label: "Words", icon: "spellcheck", fields: ["textSavvyRounds", "showdownConfiguration"] },
+  // Words holds the word set and the game mode it brings.
+  { id: "words", group: "Game", label: "Words", icon: "spellcheck", fields: ["gameMode", "textSavvyRounds", "showdownConfiguration"] },
   { id: "game", group: "Game", label: "Scoring", icon: "scoreboard", fields: ["roundScoring"] },
   // The host brings their pictures (host picture, stream image, hero card).
   { id: "host", group: "Host", label: "Host", icon: "person", fields: ["hostId", "hostName", "imageUrl", "heroImageUrl"] },
@@ -81,8 +81,9 @@ export default function StreamDetail() {
   });
   const { query, reset, errors, isDirty, trigger, getValues } = form;
   // Leaving with unsaved changes asks first (not after the stream was just deleted).
-  const leaveWithoutAsking = useUnsavedGuard(isDirty);
   const stream = query?.data?.data;
+  // Only a loaded stream can have changes: a missing one ("Stream not found") never asks.
+  const leaveWithoutAsking = useUnsavedGuard(isDirty && !!stream);
   const status = useWatch({ control: form.control, name: "status" });
   const sections = SECTIONS;
   // The form renders only once it holds the stream's values, so fields don't animate in empty.
@@ -168,6 +169,11 @@ export default function StreamDetail() {
     if (set.showdown) form.setValue("showdownConfiguration", { superSavvyOnly: !!bundle?.showdown?.superSavvyOnly, ...current, word: set.showdown.word, prize: current?.prize ?? bundle?.showdown?.prize ?? { rewardType: "Cash", amount: 100 } }, { shouldDirty: true });
     else if (current) form.setValue("showdownConfiguration", { ...current, word: "" }, { shouldDirty: true });
     form.setValue("wordSetId", set.id, { shouldDirty: true });
+    // The set is written for a game mode: the stream plays it.
+    if (set.gameMode) {
+      form.setValue("gameMode", set.gameMode, { shouldDirty: true });
+      form.setValue("roundScoring", scoringForMode(form.getValues("roundScoring"), set.gameMode, bundle?.roundScoring), { shouldDirty: true });
+    }
     notify("Words filled in. Save to keep them.");
   };
   // react-hook-form's `errors` proxy updates after render; read the latest state directly.
@@ -189,7 +195,6 @@ export default function StreamDetail() {
   const audience = STREAM_TYPES[getValues("streamType")];
   const body = {
     basics: <DetailsSection key="basics" form={form} frame={frame("basics")} />,
-    mode: <GameModeSection key="mode" form={form} frame={frame("mode")} />,
     words: <WordsSection key="words" form={form} validateWord={validateWord} onPickWords={() => setPicking(true)} frame={frame("words")} />,
     game: <ScoringSection key="game" form={form} frame={frame("game")} />,
     host: <HostSection key="host" form={form} hosts={hosts} frame={frame("host")} />,

@@ -134,7 +134,7 @@ function FormDemos() {
       <FormSection id="ds-rounds" title="Rounds editor" description="A stream's words and every word set.">
         <RoundsEditor form={{ control, setValue, getValues, trigger }} name="rounds" fields={fields} append={append} remove={remove} validateWord={() => true} />
       </FormSection>
-      <FormSection id="ds-rewards" title="Rewards editor" description="A stream's Rewards section and a bundle's defaults.">
+      <FormSection id="ds-rewards" title="Rewards editor" description="A stream's Rewards section and a game set's defaults.">
         <RewardsEditor form={{ control, setValue, getValues, trigger }} />
       </FormSection>
       <FormSection id="ds-table" title="Edit table" description="Every short list (rounds, winners, answers, sizes, inventory, power-ups): segmented rows, values edited right in their cells, no dialogs.">
@@ -289,11 +289,8 @@ export default function DesignSystemPage() {
         </Row>
         <Row>
           <Button startIcon={<Icon name="add" />}>New stream</Button>
-          <Button variant="tonal" startIcon={<Icon name="auto_awesome" />}>
-            Fill month
-          </Button>
-          <Button variant="outlined" startIcon={<Icon name="schedule" />}>
-            Time slots
+          <Button variant="tonal" startIcon={<Icon name="event_repeat" />}>
+            Create event
           </Button>
           <Button color="error">Delete</Button>
           <Button variant="text" endIcon={<Icon name="arrow_forward" />}>
@@ -458,7 +455,7 @@ export default function DesignSystemPage() {
         <Tabs value={tab} onChange={(_, v) => setTab(v)}>
           <Tab label="Schedule" />
           <Tab label="Words" />
-          <Tab label="Bundles" />
+          <Tab label="Game sets" />
         </Tabs>
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
           <Banner>Prices come from RevenueCat; here you set the Sparks each pack grants.</Banner>

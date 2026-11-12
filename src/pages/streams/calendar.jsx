@@ -52,7 +52,7 @@ export function StreamLegend() {
  * Month grid (weeks start on Sunday, like the agenda). On wide screens each day lists all its
  * streams; on phones a day shows dots and selecting it lists that day's streams underneath.
  */
-export function MonthCalendar({ month, streams, timezone, onCreate, selected, onSelect }) {
+export function MonthCalendar({ month, streams, timezone, onCreate, selected, onSelect, onAction }) {
   const { m3: c, tokens } = useTheme();
   const compact = useMediaQuery((t) => t.breakpoints.down("md"));
   const surfaceOf = useStreamSurface(true);
@@ -166,7 +166,7 @@ export function MonthCalendar({ month, streams, timezone, onCreate, selected, on
                 )}
               </Box>
               {items.map((s) => (
-                <StreamItem key={s.id} stream={s} variant="compact" />
+                <StreamItem key={s.id} stream={s} variant="compact" onAction={onAction} />
               ))}
             </Box>
           );
@@ -242,7 +242,7 @@ export function WeekCalendar({ week, streams, timezone, onCreate, onAction }) {
             <Box sx={{ px: 1, py: 0.75 }}>{dayHeader(day, key)}</Box>
             <Box sx={{ p: 0.75, display: "flex", flexDirection: "column", gap: 0.75 }}>
               {items.map((s) => (
-                <StreamItem key={s.id} stream={s} variant="compact" />
+                <StreamItem key={s.id} stream={s} variant="compact" onAction={onAction} />
               ))}
             </Box>
           </Box>

@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useForm } from "@refinedev/react-hook-form";
-import { useWatch } from "react-hook-form";
+import { Controller, useWatch } from "react-hook-form";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import { Icon } from "../../ds/Icon";
@@ -23,7 +23,9 @@ import { KINDS, PresetSheet } from "../liveops/presets";
 import { useNotify } from "../../shell/notifications";
 import { DP } from "../../providers";
 import { bundleLine, useBundles } from "../streams/gameModes";
-import { RewardsEditor, ScoringFields, ShowdownEditor } from "../streams/detail/sections";
+import { RewardsEditor, ShowdownEditor } from "../streams/detail/sections";
+import { AudienceField } from "../streams/pickers";
+import { StreamType } from "../streams/enums";
 import { useDelete, useList } from "@refinedev/core";
 import { ConfirmDialog } from "../../ds/ConfirmDialog";
 
@@ -95,17 +97,19 @@ export function GameModeSettings({ id }) {
       id,
       action: "edit",
       redirect: false,
-      successNotification: () => ({ message: "Bundle saved", type: "success" }),
+      successNotification: () => ({ message: "Game set saved", type: "success" }),
     },
   });
   // The same parts as a stream's page (scoring, rewards) take the form as one object.
   const modeForm = { control, setValue, getValues, trigger };
   const mode = query?.data?.data;
+  const streamType = useWatch({ control, name: "streamType" });
 
   useEffect(() => {
     if (!mode) return;
     reset({
       ...mode,
+      streamType: mode.streamType ?? StreamType.Public,
       defaultRewards: mode.defaultRewards?.length ? mode.defaultRewards : [{ rewardType: "BombPowerup", amount: 1 }],
     });
     setLoaded(true);
@@ -124,7 +128,7 @@ export function GameModeSettings({ id }) {
     }
   };
 
-  if (query?.isError) return <EmptyState icon="error" title="Couldn't load this bundle" description={query.error?.message} />;
+  if (query?.isError) return <EmptyState icon="error" title="Couldn't load this game set" description={query.error?.message} />;
   if (!mode || !loaded) return <DetailSkeleton />;
 
   return (
@@ -134,9 +138,15 @@ export function GameModeSettings({ id }) {
           <FormSection id="name" title="Name">
             <TextInput control={control} name="name" label="Name" max={40} rules={{ validate: (v) => (v?.trim() ? (v.trim().length <= 40 ? true : "Use 40 characters or fewer") : "Enter a name") }} />
           </FormSection>
-          <FormSection id="game" title="Game" description="Points per round, the showdown and the rewards.">
-            <ScoringFields control={control} setValue={setValue} subText={false} roundCount={5} withStumper={false} />
-            <ShowdownEditor control={control} setValue={setValue} name="showdown" word={false} note="Each stream gets its showdown word from its word set." />
+          {/* Public or Internal, and (for a public one) Super Savvy only: new streams of this game set get it. */}
+          <FormSection id="audience" title="Who can join">
+            <Controller name="streamType" control={control} render={({ field }) => <AudienceField value={field.value} onChange={field.onChange} />} />
+          </FormSection>
+          <FormSection id="scoring" title="Scoring" description="The preset new streams start from. Open one to see and edit its points.">
+            <BundlePresets kind="scoring" control={control} setValue={setValue} name="defaultScoringPresetId" />
+          </FormSection>
+          <FormSection id="game" title="Game" description="The showdown and the rewards.">
+            <ShowdownEditor control={control} setValue={setValue} name="showdown" word={false} superSavvy={streamType === StreamType.SuperSavvy} note="Each stream gets its showdown word from its word set." />
             <RewardsEditor form={modeForm} keys={["defaultRewards"]} stumper />
           </FormSection>
       </SectionGroup>
@@ -151,7 +161,7 @@ export function GameModeSettings({ id }) {
       </SectionGroup>
       <Box>
         <Button variant="text" color="error" startIcon={<Icon name="delete" />} disabled={deleting} onClick={() => setConfirmDelete(true)}>
-          Delete bundle
+          Delete game set
         </Button>
       </Box>
       <ConfirmDialog
@@ -167,9 +177,9 @@ export function GameModeSettings({ id }) {
             {
               onSuccess: () => {
                 notify(`“${mode.name}” deleted`);
-                navigate("/bundles", { replace: true });
+                navigate("/game-sets", { replace: true });
               },
-              onError: (e) => notify(e?.errors?.id?.[0] ?? e?.response?.data?.errors?.id?.[0] ?? "Couldn't delete the bundle", { variant: "error" }),
+              onError: (e) => notify(e?.errors?.id?.[0] ?? e?.response?.data?.errors?.id?.[0] ?? "Couldn't delete the game set", { variant: "error" }),
             },
           );
         }}
@@ -188,15 +198,15 @@ export default function GameModeDetail() {
   const { byId, isLoading } = useBundles();
   const bundle = byId[id];
   useEffect(() => {
-    if (bundle) document.title = `${bundle.name} · Bundles · Savvy Admin`;
+    if (bundle) document.title = `${bundle.name} · Game sets · Savvy Admin`;
   }, [bundle]);
   if (isLoading) return <DetailSkeleton />;
-  if (!bundle) return <EmptyState icon="search_off" title="Bundle not found" description="It may have been deleted." />;
+  if (!bundle) return <EmptyState icon="search_off" title="Game set not found" description="It may have been deleted." />;
   return (
     <Box>
       <DetailHeader
-        onBack={() => navigate("/bundles")}
-        backLabel="Back to bundles"
+        onBack={() => navigate("/game-sets")}
+        backLabel="Back to game sets"
         media={<IconTile icon={bundle.showdown?.superSavvyOnly ? "diamond" : "trophy"} tone={bundle.showdown?.prize?.rewardType === "Cash" ? "green" : "violet"} />}
         title={bundle.name}
         subtitle={bundleLine(bundle)}

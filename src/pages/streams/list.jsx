@@ -22,9 +22,11 @@ import { GAME_MODES, modeOf } from "./gameModes";
 import { STREAM_TYPES, StreamItem, logoHidden } from "./parts";
 import { NewStreamDialog } from "./NewStreamDialog";
 import { StreamKeyDialog } from "./StreamKeyDialog";
+import { WordSetPickerDialog, useWordSetActions, useWordsLock } from "./words";
+import { StreamSummary } from "./pickers";
 import { useHosts, showTitle } from "./hosts";
 import { MonthCalendar, MonthNav, StreamLegend, WeekCalendar, WeekNav } from "./calendar";
-import { FillMonthDialog, SlotsSheet, useScheduleSlots } from "./slots";
+import { CreateEventSheet } from "./events";
 import { radius } from "../../theme/tokens";
 import { useEnterOnChange } from "../../ds/useEnterOnChange";
 import { CardsSkeleton } from "../../ds/Skeletons";
@@ -115,24 +117,21 @@ export default function StreamList() {
   const [active, setActive] = useState([]);
   const [view, setView] = useState("calendar");
   const [keyStream, setKeyStream] = useState(null);
+  // The stream whose word set is being picked (the small button on each stream).
+  const [wordsFor, setWordsFor] = useState(null);
+  const { assign, busy: assigning } = useWordSetActions();
+  // Picking a set shows its words: the words password first, like opening a set.
+  const { unlock, dialog: unlockDialog } = useWordsLock();
   const [deleting, setDeleting] = useState(null);
   const [highlight, setHighlight] = useState(null);
-  const [fillOpen, setFillOpen] = useState(false);
-  const [slotsOpen, setSlotsOpen] = useState(false);
-  // Fill month and Time slots are two views of one sheet: switching between them doesn't slide.
-  const [swap, setSwap] = useState(false);
-  // The new view opens first and the old one closes a frame later, so there's no empty frame.
-  const showSheet = (view) => {
-    setSwap(true);
-    (view === "fill" ? setFillOpen : setSlotsOpen)(true);
-    requestAnimationFrame(() => requestAnimationFrame(() => (view === "fill" ? setSlotsOpen : setFillOpen)(false)));
+  // "Create event": one stream or a recurring one; the only way to add streams (`date` from a
+  // calendar day's +).
+  const [eventOpen, setEventOpen] = useState(false);
+  const [eventDate, setEventDate] = useState(null);
+  const createEvent = (date = null) => {
+    setEventDate(date);
+    setEventOpen(true);
   };
-  const closeSheet = () => {
-    setSwap(false);
-    setFillOpen(false);
-    setSlotsOpen(false);
-  };
-  const { slots } = useScheduleSlots();
   const [month, setMonth] = useState(() => dayjs().tz(timezone).startOf("month"));
   // The calendar always opens on the month.
   const [range, setRange] = useState("month");
@@ -217,7 +216,14 @@ export default function StreamList() {
     setQuery("");
   };
 
-  const createOn = (day) => navigate(`/streams/create?date=${day.format("YYYY-MM-DD")}`);
+  const createOn = (day) => createEvent(day.format("YYYY-MM-DD"));
+  // The old New stream link (/streams/create, with ?date=) opens Create event; ?from= still duplicates.
+  useEffect(() => {
+    if (!creating || duplicateFrom) return;
+    createEvent(createDate);
+    navigate("/streams", { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [creating, duplicateFrom]);
   const dayStreams = matching
     .filter((s) => dayjs.utc(s.startDate).tz(timezone).format("YYYY-MM-DD") === selectedDay.format("YYYY-MM-DD"))
     .sort((a, b) => Date.parse(a.startDate) - Date.parse(b.startDate));
@@ -226,6 +232,7 @@ export default function StreamList() {
     if (action === "edit") navigate(`/streams/edit/${stream.id}`);
     if (action === "duplicate") navigate(`/streams/create?from=${stream.id}`);
     if (action === "key") setKeyStream(stream);
+    if (action === "words") unlock(() => setWordsFor(stream));
     if (action === "delete") setDeleting(stream);
   };
 
@@ -266,13 +273,9 @@ export default function StreamList() {
         {/* One toolbar line: search, then range and view next to it; the page actions on the right. */}
         <PageToolbar
           search={<SearchField value={query} onChange={setQuery} placeholder="Search title or host" />}
-          // Fill month holds the weekly time slots too: they're edited from there, over it.
-          secondary={[{ label: "Fill month", icon: "auto_awesome", onClick: () => {
-            setSwap(false);
-            setFillOpen(true);
-          } }]}
-          actionLabel="New stream"
-          onAction={() => navigate("/streams/create")}
+          actionLabel="Create event"
+          actionIcon="event_repeat"
+          onAction={() => createEvent()}
         >
           {view === "calendar" ? (
             <ScopeToggle label="Calendar range" all={false} value={range} options={[{ value: "month", label: "Month" }, { value: "week", label: "Week" }]} onChange={changeRange} />
@@ -302,7 +305,7 @@ export default function StreamList() {
           {isLoading ? (
             <Skeleton variant="rounded" height={560} sx={{ borderRadius: radius("lg") }} />
           ) : (
-            <MonthCalendar month={month} streams={matching} timezone={timezone} onCreate={createOn} selected={selectedDay} onSelect={setSelectedDay} />
+            <MonthCalendar month={month} streams={matching} timezone={timezone} onCreate={createOn} selected={selectedDay} onSelect={setSelectedDay} onAction={onAction} />
           )}
           {/* Phones: the calendar shows dots, the selected day's streams are listed here. */}
           <Box sx={{ display: { xs: "flex", md: "none" }, flexDirection: "column", gap: 1 }}>
@@ -336,8 +339,8 @@ export default function StreamList() {
               Clear filters
             </Button>
           ) : (
-            <Button color="secondary" startIcon={<Icon name="add" />} onClick={() => navigate("/streams/create")}>
-              New stream
+            <Button color="secondary" startIcon={<Icon name="event_repeat" />} onClick={() => createEvent()}>
+              Create event
             </Button>
           )}
         </EmptyState>
@@ -362,24 +365,32 @@ export default function StreamList() {
       )}
 
       <NewStreamDialog
-        open={creating && (!duplicateFrom || !!source)}
+        open={creating && !!duplicateFrom && !!source}
         source={source}
         date={createDate}
         hosts={hosts}
         onClose={() => navigate("/streams")}
         onCreated={onCreated}
       />
-      <FillMonthDialog open={fillOpen} onClose={closeSheet} instant={swap} initialMonth={range === "week" && view === "calendar" ? week.startOf("month") : month} slots={slots} streams={streams} hosts={hosts} timezone={timezone} onFilled={(m) => setMonth(m)} onEditSlots={() => showSheet("slots")} />
-      {/* Opened from Fill month; back (or saving) returns there with the new times. */}
-      <SlotsSheet
-        open={slotsOpen}
-        instant={swap}
-        onClose={closeSheet}
-        onBack={() => showSheet("fill")}
-        slots={slots}
-        hosts={hosts}
-      />
+      <CreateEventSheet open={eventOpen} date={eventDate} onClose={() => setEventOpen(false)} streams={streams} hosts={hosts} timezone={timezone} onCreated={(start) => setMonth(start.tz(timezone).startOf("month"))} />
       <StreamKeyDialog stream={keyStream} onClose={() => setKeyStream(null)} />
+      {unlockDialog}
+      {/* A word set's "Assign to a stream", the other way round: this stream, then its set. */}
+      <WordSetPickerDialog
+        open={!!wordsFor}
+        stream={wordsFor}
+        header={
+          wordsFor && (
+            <Box sx={{ px: 3, py: 2, borderBottom: (t) => `1px solid ${t.m3.outlineVariant}` }}>
+              <StreamSummary stream={wordsFor} />
+            </Box>
+          )
+        }
+        confirmLabel="Assign"
+        busy={assigning}
+        onClose={() => setWordsFor(null)}
+        onPick={async (set) => (await assign(set, wordsFor)) && setWordsFor(null)}
+      />
       <ConfirmDialog open={!!deleting} title="Delete stream?" tone="error" confirmLabel="Delete" onCancel={() => setDeleting(null)} onConfirm={confirmDelete}>
         “{deleting && showTitle(deleting)}” and its rounds will be removed. This can't be undone.
       </ConfirmDialog>

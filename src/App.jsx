@@ -24,9 +24,11 @@ import { SectionLayout } from "./shell/SectionLayout";
 import AppearancePage from "./pages/settings/appearance";
 import DesignSystemPage from "./pages/settings/designSystem";
 import GameModeDetail from "./pages/gameModes/detail";
-import HowToPlayPage from "./pages/gameModes/howToPlay";
+import GameModesPage from "./pages/gameModes/howToPlay";
+import PowerUpsPage from "./pages/gameModes/powerUps";
 import HostsPage from "./pages/library/hosts";
-import GameModesPage from "./pages/streams/games";
+import GameSetsPage from "./pages/streams/games";
+import WordSetsPage from "./pages/streams/wordSetsPage";
 import SponsorsPage from "./pages/library/sponsors";
 
 import StreamList from "./pages/streams/list";
@@ -41,7 +43,7 @@ import SwagPage from "./pages/shop/swag";
 import OrdersPage from "./pages/shop/orders";
 import SeasonsPage from "./pages/liveops/seasons";
 import PollsPage from "./pages/liveops/polls";
-import NotificationsPage from "./pages/liveops/presets";
+import NotificationsPage, { ScoringPage } from "./pages/liveops/presets";
 import ReferralsPage, { ShareCardsPage } from "./pages/liveops/sharing";
 import DailyPuzzlePage from "./pages/liveops/dailyPuzzle";
 
@@ -70,9 +72,11 @@ const Router = import.meta.env.MODE === "single" || import.meta.env.MODE === "pa
 // Refine resources: route patterns and the data provider each one uses.
 const resources = [
   { name: "TextSavvyStream", list: "/streams", create: "/streams/create", edit: "/streams/edit/:id", meta: { label: "Streams" } },
-  { name: "Bundle", list: "/bundles", edit: "/bundles/:id", meta: { dataProviderName: DP.bundles } },
-  { name: "GameMode", list: "/how-to-play", meta: { dataProviderName: DP.gameModes } },
-  { name: "WordSet", list: "/bundles", meta: { dataProviderName: DP.wordSets } },
+  { name: "Bundle", list: "/game-sets", edit: "/game-sets/:id", meta: { label: "Game sets", dataProviderName: DP.bundles } },
+  { name: "WordSet", list: "/word-sets", meta: { dataProviderName: DP.wordSets } },
+  { name: "ScoringPreset", list: "/scoring", meta: { dataProviderName: DP.scoringPresets } },
+  { name: "GameMode", list: "/game-modes", meta: { dataProviderName: DP.gameModes } },
+  { name: "PowerUp", list: "/power-ups", meta: { dataProviderName: DP.powerUps } },
   { name: "Host", list: "/hosts", meta: { dataProviderName: DP.hosts } },
   { name: "Sponsor", list: "/sponsors", meta: { dataProviderName: DP.sponsors } },
   { name: "Season", list: "/seasons", meta: { dataProviderName: DP.season } },
@@ -130,9 +134,9 @@ export default function App() {
                     >
                       <Route index element={<NavigateToResource resource="TextSavvyStream" />} />
                       <Route path="/streams/edit/:id" element={<StreamDetail />} />
-                      <Route path="/bundles/:id" element={<GameModeDetail />} />
-                      {/* The old addresses of Bundles. */}
-                      <Route path="/game-modes/*" element={<Navigate to="/bundles" replace />} />
+                      <Route path="/game-sets/:id" element={<GameModeDetail />} />
+                      {/* The old addresses of Game sets (Bundles). */}
+                      <Route path="/bundles/*" element={<Navigate to="/game-sets" replace />} />
                       <Route path="/user-management/edit/:id" element={<LegacyUserRedirect />} />
                       <Route element={<SectionLayout />}>
                       {/* One route for the list and a user's sheet over it, so the list (search, filters, page) stays mounted. */}
@@ -147,13 +151,16 @@ export default function App() {
                       <Route path="/developer" element={<DeveloperPage />} />
                       <Route path="/settings" element={<AppearancePage />} />
                       <Route path="/design-system" element={<DesignSystemPage />} />
-                      <Route path="/bundles" element={<GameModesPage />} />
-                      <Route path="/games" element={<Navigate to="/bundles" replace />} />
-                      <Route path="/words" element={<Navigate to="/bundles" replace />} />
+                      <Route path="/game-sets" element={<GameSetsPage />} />
+                      <Route path="/word-sets" element={<WordSetsPage />} />
+                      <Route path="/scoring" element={<ScoringPage />} />
+                      <Route path="/game-modes" element={<GameModesPage />} />
+                      <Route path="/power-ups" element={<PowerUpsPage />} />
+                      <Route path="/games" element={<Navigate to="/game-sets" replace />} />
+                      <Route path="/words" element={<Navigate to="/word-sets" replace />} />
                       <Route path="/hosts" element={<HostsPage />} />
                       <Route path="/sponsors" element={<SponsorsPage />} />
-                      <Route path="/how-to-play" element={<HowToPlayPage />} />
-                      <Route path="/how-to-play/*" element={<Navigate to="/how-to-play" replace />} />
+                      <Route path="/how-to-play/*" element={<Navigate to="/game-modes" replace />} />
                       <Route path="/share-config" element={<Navigate to="/share-cards" replace />} />
                       <Route path="/rewards" element={<Navigate to="/daily-puzzle" replace />} />
                       <Route path="/daily-puzzle" element={<DailyPuzzlePage />} />

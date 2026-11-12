@@ -1,7 +1,6 @@
 // Sections of the stream detail page. Each receives the stream form (useStreamForm) as `form`.
 import { useEffect, useRef } from "react";
 import { Controller, useFormState, useWatch } from "react-hook-form";
-import { Link } from "react-router";
 import { useList } from "@refinedev/core";
 import Avatar from "@mui/material/Avatar";
 import Box from "@mui/material/Box";
@@ -18,11 +17,12 @@ import { ImageField, useFilePreview } from "../../../ds/ImageField";
 import { ColorSwatches } from "../../../ds/ColorSwatches";
 import { cornerFor } from "../../../ds/IconTile";
 import { DEFAULT_ROUND_DURATION, ROUND_COUNT, GameMode, busterFor, durationFor, NON_CASH_REWARDS, RAFFLE_REWARD_OPTIONS, RewardType, StreamType, richLen, stripRichText } from "../enums";
-import { ModeCards } from "../ModeCards";
+import { ModeLogo } from "../ModeLogo";
+import { PresetsButton } from "../../liveops/presets";
 import { AudienceField, HostPicker, PickCard, PickPlaceholder } from "../pickers";
 import { HostSheet } from "../../library/hosts";
 import { fillHost, hostLabel, titleRule } from "../hosts";
-import { useWordsLock } from "../words";
+import { useWordSets, useWordsLock } from "../words";
 import { useSheet } from "../../library/shared";
 import { GAME_MODES, baseOf, modeId, newShowdown, useBundles, useStreamBuilder } from "../gameModes";
 import { DP } from "../../../providers";
@@ -30,8 +30,8 @@ import { useTimezoneFormat } from "../../../contexts";
 import { DateTimeInput, NumberInput, RewardCell, TextInput, rewardText } from "./fields";
 import { EditTable, NumberCell, SelectCell, TextCell, cellSx } from "../../../ds/EditTable";
 import { radius } from "../../../theme/tokens";
-import { ListGroup, ListSwitch } from "../../../ds/ListGroup";
-import { Choice, ChoiceGroup } from "../../../ds/SelectButton";
+import { ListGroup, ListItem, ListSwitch } from "../../../ds/ListGroup";
+import { Choice, ChoiceGroup, SelectButton } from "../../../ds/SelectButton";
 import { EditRows, ItemDialog, firstError, useItemEditor } from "../../../ds/ItemDialog";
 
 const lengthRule = (label, min, max) => ({
@@ -319,24 +319,36 @@ export function RoundsEditor({ form, name, fields, append, remove, validateWord,
 }
 
 /**
- * The stream's format: one of the How to play & format presets (TextChain, SubText). It decides
- * the logo, the pill and How to play in the app.
+ * Points for a game mode: SubText gives none for yellow letters; back on TextChain they return to
+ * the game set's (`from`).
  */
-export function ModeField({ control, setValue, prefix = "" }) {
-  const [gameMode, bundleId, scoring] = useWatch({ control, name: [`${prefix}gameMode`, `${prefix}bundleId`, `${prefix}roundScoring`] });
-  const { bundles, byId } = useBundles();
-  const pick = (id) => {
-    setValue(`${prefix}gameMode`, id, { shouldDirty: true });
-    // SubText gives no points for yellow letters; back on TextChain they return to the bundle's.
-    if (!scoring) return;
-    const from = (byId[bundleId] ?? bundles[0])?.roundScoring;
-    const next = structuredClone(scoring);
-    Object.keys(next).forEach((bracket) => {
-      if (next[bracket]) next[bracket].yellowLetterXp = id === GameMode.SubText ? 0 : (from?.[bracket]?.yellowLetterXp ?? next[bracket].yellowLetterXp);
-    });
-    setValue(`${prefix}roundScoring`, next, { shouldDirty: true });
-  };
-  return <ModeCards value={gameMode ?? null} onChange={pick} />;
+export function scoringForMode(scoring, id, from) {
+  if (!scoring) return scoring;
+  const next = structuredClone(scoring);
+  Object.keys(next).forEach((bracket) => {
+    if (next[bracket]) next[bracket].yellowLetterXp = id === GameMode.SubText ? 0 : (from?.[bracket]?.yellowLetterXp ?? next[bracket].yellowLetterXp);
+  });
+  return next;
+}
+
+/**
+ * The stream's word set and the game mode it brings (logo and name). A stream plays its word
+ * set's game mode; "Pick a word set" changes both.
+ */
+function WordSetRow({ form }) {
+  const [wordSetId, gameMode, id] = useWatch({ control: form.control, name: ["wordSetId", "gameMode", "id"] });
+  const { sets } = useWordSets();
+  const set = sets.find((w) => w.id === wordSetId) ?? sets.find((w) => w.streamId === id);
+  const mode = GAME_MODES[gameMode];
+  return (
+    <ListGroup label="Word set">
+      <ListItem
+        leading={mode ? <ModeLogo mode={mode.id} width={72} height={40} /> : <Icon name="spellcheck" size={20} />}
+        title={set ? set.title || "Untitled set" : "No word set yet"}
+        supporting={mode ? mode.label : "The game mode comes with the word set."}
+      />
+    </ListGroup>
+  );
 }
 
 /**
@@ -368,6 +380,7 @@ export function WordsSection({ form, validateWord, onPickWords, frame }) {
       }
     >
       {dialog}
+      <WordSetRow form={form} />
       {/* Each round's word, time and Round Pounder, all in view (words masked while locked). */}
       <RoundsEditor form={form} name="textSavvyRounds.rounds" fields={roundFields} append={appendRound} remove={removeRound} subText={baseOf(gameMode) === GameMode.SubText} validateWord={validateWord} masked={masked} />
       {showdown && (
@@ -386,20 +399,32 @@ export function WordsSection({ form, validateWord, onPickWords, frame }) {
  * Game mode (Savvy TextChain or Savvy SubText) and its showdown (Savvy Showdown or Super Savvy
  * Showdown), both connected button groups. Scoring comes from the mode and can be changed here.
  */
-/** This stream's points per round; the section's summary says if they're still the game mode's. */
-export function ScoringSection({ form, frame }) {
-  return (
-    <FormSection {...frame} id="game" title="Scoring">
-      <ScoringFields control={form.control} setValue={form.setValue} subText={baseOf(form.gameMode) === GameMode.SubText} roundCount={form.roundFields?.length ?? 5} withStumper={false} />
-    </FormSection>
-  );
+/**
+ * Which scoring preset (Streams › Scoring) the stream plays: picking one fills in its points;
+ * points changed by hand show as Custom.
+ */
+function ScoringPresetField({ control, setValue, subText }) {
+  const scoring = useWatch({ control, name: "roundScoring" });
+  const { data } = useList({ resource: "ScoringPreset", dataProviderName: DP.scoringPresets, pagination: { mode: "off" } });
+  const presets = data?.data ?? [];
+  const current = presets.find((p) => sameScoring(p.roundScoring, scoring));
+  const pick = (id) => {
+    const p = presets.find((x) => x.id === id);
+    if (!p) return;
+    const next = structuredClone(p.roundScoring);
+    // SubText gives no points for yellow letters.
+    if (subText) Object.values(next).forEach((b) => b && (b.yellowLetterXp = 0));
+    setValue("roundScoring", next, { shouldDirty: true, shouldValidate: true });
+  };
+  return <SelectButton label="Scoring preset" value={current?.id ?? ""} placeholder="Custom" options={presets.map((p) => ({ value: p.id, label: p.name }))} onChange={pick} sx={{ maxWidth: 320 }} />;
 }
 
-export function GameModeSection({ form, frame }) {
-  const { control, setValue } = form;
+/** This stream's points per round: a scoring preset, then this stream's copy. */
+export function ScoringSection({ form, frame }) {
   return (
-    <FormSection {...frame} id="mode" title="How to play & format">
-      <ModeField control={control} setValue={setValue} />
+    <FormSection {...frame} id="game" title="Scoring" action={<PresetsLink kind="scoring" />}>
+      <ScoringPresetField control={form.control} setValue={form.setValue} subText={baseOf(form.gameMode) === GameMode.SubText} />
+      <ScoringFields control={form.control} setValue={form.setValue} subText={baseOf(form.gameMode) === GameMode.SubText} roundCount={form.roundFields?.length ?? 5} withStumper={false} />
     </FormSection>
   );
 }
@@ -441,6 +466,9 @@ const SCORE_ROWS = [
   { key: "solveBonusXp", label: "Solve bonus" },
   { key: "timeBonusXp", label: "Time bonus" },
 ];
+export const SCORE_BRACKETS = BRACKETS.map((b) => b.key);
+/** The same points per round (yellow letters left out: SubText streams give none). */
+export const sameScoring = (a, b) => SCORE_BRACKETS.every((k) => SCORE_ROWS.every(({ key: f }) => f === "yellowLetterXp" || Number(a?.[k]?.[f] ?? 0) === Number(b?.[k]?.[f] ?? 0)));
 const TIME_BONUS = Array.from({ length: 25 }, (_, i) => (i + 1) * 100);
 const xpRules = { validate: (v) => (v == null || Number.isNaN(v) ? "Required" : v < 0 ? "Min 0" : v > 10000 ? "Max 10,000" : true) };
 
@@ -946,7 +974,7 @@ export function NotificationsSection({ form, frame }) {
     NOTIFICATION_KEYS.forEach((k) => setValue(k, p[k] ?? "", { shouldDirty: true }));
   };
   return (
-    <FormSection {...frame} id="notifications-card" title="Notifications" action={<PresetsLink to="/notifications" />}>
+    <FormSection {...frame} id="notifications-card" title="Notifications" action={<PresetsLink kind="notify" />}>
       <Choice
         label="Preset"
         value={match?.id ?? CUSTOM}
@@ -1012,13 +1040,9 @@ export function ShareCardFields({ form, prefix = "shareableCards", host }) {
   );
 }
 
-/** Opens where the presets are kept: Library › Share cards or Library › Notifications. */
-export function PresetsLink({ to }) {
-  return (
-    <Button variant="tonal" size="small" component={Link} to={to} endIcon={<Icon name="arrow_forward" />}>
-      Presets
-    </Button>
-  );
+/** The presets of this kind (share, notify, scoring) in a side sheet, without leaving the stream. */
+export function PresetsLink({ kind }) {
+  return <PresetsButton kind={kind} />;
 }
 
 /** A stream's share cards: a preset from Library › Share cards, then this stream's copy. */
@@ -1033,7 +1057,7 @@ export function ShareCardsSection({ form, hosts = [], frame }) {
   const match = presets.find((p) => sameJson(p.cards, cards));
   const apply = (id) => setValue("shareableCards", structuredClone(presets.find((x) => x.id === id).cards), { shouldDirty: true });
   return (
-    <FormSection {...frame} id="share" title="Share cards" action={<PresetsLink to="/share-cards" />}>
+    <FormSection {...frame} id="share" title="Share cards" action={<PresetsLink kind="share" />}>
       <Choice
         label="Preset"
         value={match?.id ?? CUSTOM}
@@ -1064,6 +1088,7 @@ export function useSectionStatus(form, sections, hosts) {
   });
   const { data: shareData } = useList({ resource: "SharePreset", dataProviderName: DP.sharePresets, pagination: { mode: "off" } });
   const { data: noteData } = useList({ resource: "NotificationPreset", dataProviderName: DP.notificationPresets, pagination: { mode: "off" } });
+  const { data: scoringData } = useList({ resource: "ScoringPreset", dataProviderName: DP.scoringPresets, pagination: { mode: "off" } });
   const { data: sponsorData } = useList({ resource: "Sponsor", dataProviderName: DP.sponsors, pagination: { mode: "off" } });
 
   const mode = GAME_MODES[modeId(gameMode)];
@@ -1074,6 +1099,7 @@ export function useSectionStatus(form, sections, hosts) {
   const missingWords = (rounds ?? []).length - words.length;
   const host = hosts.find((h) => h.id === hostId);
   const sharePreset = (shareData?.data ?? []).find((p) => sameJson(p.cards, cards));
+  const scoringPreset = (scoringData?.data ?? []).find((p) => sameScoring(p.roundScoring, scoring));
   const notePreset = (noteData?.data ?? []).find((p) => NOTIFICATION_KEYS.every((k, i) => (p[k] ?? "") === (notes[i] ?? "")));
   const on = (v) => (Array.isArray(v) ? v.length > 0 : !!v);
   const participationReward = Array.isArray(participation) ? participation[0] : participation;
@@ -1100,14 +1126,14 @@ export function useSectionStatus(form, sections, hosts) {
     },
     // The pictures come from the host: missing ones are added in Hosts.
     host: { todo: [!hostId && "Pick a host", hostId && !form.imageUrl && "Host picture missing", hostId && !form.heroImageUrl && "Stream image missing"].filter(Boolean), ...(hostId ? part(hostLabel(host) || hostName, !defaultHost || hostId === defaultHost.id, ["hostId", "hostName", "imageUrl", "heroImageUrl", "heroCardImageUrl"]) : { summary: "No host" }) },
-    mode: { todo: [!mode && "Pick a format"].filter(Boolean), summary: mode?.label ?? "Not picked yet" },
     words: {
-      todo: [missingWords > 0 && `${missingWords} ${missingWords === 1 ? "word" : "words"} missing`, (rounds ?? []).length === 0 && "No rounds", showdown && !showdown.word && "Showdown word missing"].filter(Boolean),
-      summary: wordsHidden
+      // The game mode comes with the word set: none yet means no word set.
+      todo: [!mode && "Pick a word set", missingWords > 0 && `${missingWords} ${missingWords === 1 ? "word" : "words"} missing`, (rounds ?? []).length === 0 && "No rounds", showdown && !showdown.word && "Showdown word missing"].filter(Boolean),
+      summary: (mode ? `${mode.label} · ` : "") + (wordsHidden
         ? [words.length ? `${words.length} ${words.length === 1 ? "word" : "words"}` : "No words yet", showdown?.word && "showdown word"].filter(Boolean).join(" + ")
-        : [words.join(", ") || "No words yet", showdown?.word && `showdown: ${showdown.word}`].filter(Boolean).join(" · "),
+        : [words.join(", ") || "No words yet", showdown?.word && `showdown: ${showdown.word}`].filter(Boolean).join(" · ")),
     },
-    game: { todo: [], ...part("Points per round", sameJson(scoring, template.roundScoring), ["roundScoring"]) },
+    game: { todo: [], ...part(scoringPreset ? `${scoringPreset.name} preset` : "Own points", sameJson(scoring, template.roundScoring), ["roundScoring"]) },
     sponsor: { todo: [], ...part(sponsorName, sponsorIsDefault, ["sponsorship"]) },
     "rewards-card": {
       todo: [],

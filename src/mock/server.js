@@ -8,7 +8,7 @@ import { HOST_PICTURE_URL, MODE_LOGOS, STREAM_HERO_URL } from "../assets";
 // Version 2 keeps its own saved data: version 1 is published on the same site (same browser
 // storage) and must not be touched by it.
 const DB_KEY = "savvy-mock-db-2";
-const DB_VERSION = 53;
+const DB_VERSION = 55;
 
 // The demo data: one host (Scott), one sponsor (Wendy's) and one stream per state and edge case,
 // spread over the month around today (see DEMO_STREAMS). Streams are built like new ones: from a
@@ -183,6 +183,7 @@ function populate(d) {
         title: setName(words[0]),
         rounds: seed.roundsOf(words),
         showdown: hasShowdown ? { word: showdownWord } : null,
+        gameMode: p.mode ?? null,
         streamId: streamType === "Internal" ? null : st.id,
         createdAt: new Date(p.at - 10 * 86400000).toISOString(),
       });
@@ -198,6 +199,7 @@ function populate(d) {
       title: setName(words[0]),
       rounds: seed.roundsOf(words),
       showdown: k % 4 === 3 ? null : { word: SAMPLE_SHOWDOWNS[(k + 7) % SAMPLE_SHOWDOWNS.length] },
+      gameMode: k % 2 ? "SubText" : "TextChain",
       streamId: null,
       createdAt: new Date(now - (30 - k) * 86400000).toISOString(),
     });
@@ -228,6 +230,8 @@ function freshDb() {
     cashWins: seed.seedCashWins(users),
     howToPlay: seed.seedHowToPlay(),
     ...libraries,
+    powerUps: seed.seedPowerUps(),
+    scoringPresets: seed.seedScoringPresets(),
     bundles: seed.seedBundles(),
     scheduleSlots: seed.seedScheduleSlots(),
     wordSets: seed.seedWordSets(),
@@ -559,6 +563,31 @@ function load() {
         parsed.bundles ??= seed.seedBundles();
         populate(parsed);
         parsed.version = 53;
+      }
+      if (parsed.version === 53) {
+        // v54: power-ups and scoring presets are their own lists; game modes pick their power-ups;
+        // game sets say who can join.
+        parsed.powerUps ??= seed.seedPowerUps();
+        parsed.scoringPresets ??= seed.seedScoringPresets();
+        (parsed.gameModes ?? []).forEach((m) => (m.powerUpIds ??= parsed.powerUps.map((p) => p.id)));
+        (parsed.bundles ?? []).forEach((b) => (b.streamType ??= "Public"));
+        (parsed.wordSets ?? []).forEach((w, k) => (w.gameMode ??= (parsed.streams ?? []).find((st) => st.id === w.streamId)?.gameMode ?? (k % 2 ? "SubText" : "TextChain")));
+        parsed.version = 54;
+      }
+      if (parsed.version === 54) {
+        // v55: a stream plays its word set's game mode (sets assigned before didn't bring it), and
+        // shows its game mode logo once its words and mode are in.
+        (parsed.wordSets ?? []).forEach((w) => {
+          const st = (parsed.streams ?? []).find((x) => x.id === w.streamId);
+          if (st && w.gameMode && st.status !== "Completed" && st.status !== "Canceled") st.gameMode = w.gameMode;
+        });
+        (parsed.streams ?? [])
+          .filter((st) => st.status === "Scheduled")
+          .forEach((st) => {
+            const rounds = st.textSavvyRounds?.rounds ?? [];
+            st.hideGameModeLogo = !st.gameMode || !rounds.length || rounds.some((r) => !r.word) || (!!st.showdownConfiguration && !st.showdownConfiguration.word);
+          });
+        parsed.version = 55;
       }
       if (parsed.version === DB_VERSION) return parsed;
       // Older versions: add what's new and keep everything else.
@@ -990,6 +1019,8 @@ function applyWordSet(set, s) {
   // word. A set without one leaves the showdown waiting for its word.
   if (set.showdown) s.showdownConfiguration = { word: set.showdown.word, prize: { ...prize }, superSavvyOnly };
   else if (s.showdownConfiguration) s.showdownConfiguration = { ...s.showdownConfiguration, word: "" };
+  // The set is written for a game mode: the stream plays it.
+  if (set.gameMode) s.gameMode = set.gameMode;
 }
 function linkWordSet(setId, s) {
   if (!setId) return null;
@@ -1252,6 +1283,46 @@ on("put", "/admin/howtoplay", ({ body }) => {
   db.howToPlay = { powerUps };
   return json(db.howToPlay);
 });
+// ---- Power-ups (prototype endpoints): what a game mode's How to play can show. Multipart.
+const powerUpsOf = (ids) => ids.map((id) => db.powerUps.find((p) => p.id === id)).filter(Boolean).map(({ title, description, iconUrl }) => ({ title, description, iconUrl }));
+const syncPowerUps = () => (db.gameModes ?? []).forEach((m) => (m.howToPlay = { powerUps: powerUpsOf(m.powerUpIds ?? []) }));
+function powerUpFromBody(b, prev) {
+  return { id: prev?.id ?? uuid(), title: String(b.title ?? "").trim(), description: String(b.description ?? "").trim(), iconUrl: fileUrl(b.iconFile) || b.iconUrl || "" };
+}
+const powerUpErrors = (p) => {
+  const errors = {};
+  if (!p.title) errors.title = ["Enter a name."];
+  if (!p.description) errors.description = ["Describe what it does."];
+  return Object.keys(errors).length ? errors : null;
+};
+on("get", "/admin/power-ups", () => json(db.powerUps));
+on("get", "/admin/power-ups/:id", ({ params }) => {
+  const p = db.powerUps.find((x) => x.id === params.id);
+  return p ? json(p) : notFound();
+});
+on("post", "/admin/power-ups", ({ body }) => {
+  const p = powerUpFromBody(body, null);
+  const errors = powerUpErrors(p);
+  if (errors) return badRequest(errors);
+  db.powerUps.push(p);
+  return json(p, 201);
+});
+on("put", "/admin/power-ups/:id", ({ params, body }) => {
+  const i = db.powerUps.findIndex((x) => x.id === params.id);
+  if (i < 0) return notFound();
+  const p = powerUpFromBody(body, db.powerUps[i]);
+  const errors = powerUpErrors(p);
+  if (errors) return badRequest(errors);
+  db.powerUps[i] = p;
+  syncPowerUps();
+  return json(p);
+});
+on("delete", "/admin/power-ups/:id", ({ params }) => {
+  db.powerUps = db.powerUps.filter((x) => x.id !== params.id);
+  (db.gameModes ?? []).forEach((m) => (m.powerUpIds = (m.powerUpIds ?? []).filter((id) => id !== params.id)));
+  syncPowerUps();
+  return json({ id: params.id });
+});
 // ---- Game modes (prototype endpoints)
 on("get", "/admin/game-modes", () => json(db.gameModes));
 on("get", "/admin/game-modes/:id", ({ params }) => {
@@ -1262,38 +1333,16 @@ on("put", "/admin/game-modes/:id", ({ params, body }) => {
   const i = db.gameModes.findIndex((x) => x.id === params.id);
   if (i < 0) return notFound();
   const prev = db.gameModes[i];
-  const errors = {};
-  const count = Number(body.roundCount);
-  if (prev.id === "SubText" && count !== 5) errors.roundCount = ["SubText always has 5 rounds."];
-  if (!(count >= 1 && count <= 20)) errors.roundCount = ["Use 1 to 20 rounds."];
-  if (!(Number(body.roundDurationInSeconds) >= 5)) errors.roundDurationInSeconds = ["At least 5 seconds."];
-  const powerUps = compactArr(body.howToPlay?.powerUps ?? []).map((p) => {
-    const { iconFile, ...rest } = p;
-    return { title: rest.title ?? "", description: rest.description ?? "", iconUrl: fileUrl(iconFile) || rest.iconUrl || "" };
-  });
-  powerUps.forEach((p, j) => {
-    if (!p.title) errors[`howToPlay.powerUps[${j}].title`] = ["Title is required."];
-  });
-  if (Object.keys(errors).length) return badRequest(errors);
+  // A game mode is its title, its logo and the power-ups its How to play shows (picked from Power-ups).
+  const name = String(body.name ?? "").trim();
+  if (!name) return badRequest({ name: ["Enter a title."] });
+  const powerUpIds = compactArr(body.powerUpIds ?? []).filter((id) => db.powerUps.some((p) => p.id === id));
   db.gameModes[i] = {
     ...prev,
-    name: String(body.name ?? "").trim() || prev.name,
-    summary: body.summary ?? prev.summary,
-    roundCount: count,
-    roundDurationInSeconds: Number(body.roundDurationInSeconds),
-    roundScoring: body.roundScoring ?? prev.roundScoring,
-    hostStumperBonusXp: body.hostStumperBonusXp ?? null,
-    defaultRewards: compactArr(body.defaultRewards ?? []),
-    gameModeDisplayName: body.gameModeDisplayName || null,
-    gameModeBackgroundColor: body.gameModeBackgroundColor || null,
-    gameModeIconUrl: fileUrl(body.gameModeIconFile) || body.gameModeIconUrl || null,
+    name,
     gameLogoUrl: fileUrl(body.gameLogoFile) || body.gameLogoUrl || null,
-    howToPlay: { powerUps },
-    // The share card and notification presets new streams of this mode start from (none: the
-    // libraries' Default preset).
-    defaultSharePresetId: body.defaultSharePresetId || null,
-    defaultNotificationPresetId: body.defaultNotificationPresetId || null,
-    showdown: prev.showdown ? { prize: { rewardType: body.showdown?.prize?.rewardType ?? "Cash", amount: Number(body.showdown?.prize?.amount) || 1 }, superSavvyOnly: !!body.showdown?.superSavvyOnly } : null,
+    powerUpIds,
+    howToPlay: { powerUps: powerUpsOf(powerUpIds) },
   };
   refreshUpcoming((s) => s.gameMode === db.gameModes[i].id);
   return json(db.gameModes[i]);
@@ -1307,10 +1356,12 @@ const bundleFrom = (body, prev) => ({
   hostStumperBonusXp: body.hostStumperBonusXp ?? null,
   defaultRewards: compactArr(body.defaultRewards ?? []),
   showdown: { prize: { rewardType: body.showdown?.prize?.rewardType ?? "Cash", amount: Number(body.showdown?.prize?.amount) || 1 }, superSavvyOnly: !!body.showdown?.superSavvyOnly },
+  streamType: ["Public", "SuperSavvy", "Internal"].includes(body.streamType) ? body.streamType : (prev.streamType ?? "Public"),
+  defaultScoringPresetId: body.defaultScoringPresetId || null,
   defaultSharePresetId: body.defaultSharePresetId || null,
   defaultNotificationPresetId: body.defaultNotificationPresetId || null,
 });
-const bundleNameError = (name, id) => (!name ? "Enter a name." : name.length > 40 ? "Use 40 characters or fewer." : db.bundles.some((b) => b.id !== id && b.name.toLowerCase() === name.toLowerCase()) ? "A bundle with this name exists." : null);
+const bundleNameError = (name, id) => (!name ? "Enter a name." : name.length > 40 ? "Use 40 characters or fewer." : db.bundles.some((b) => b.id !== id && b.name.toLowerCase() === name.toLowerCase()) ? "A game set with this name exists." : null);
 on("get", "/admin/bundles", () => json(db.bundles));
 on("get", "/admin/bundles/:id", ({ params }) => {
   const b = db.bundles.find((x) => x.id === params.id);
@@ -1335,7 +1386,7 @@ on("put", "/admin/bundles/:id", ({ params, body }) => {
 });
 on("delete", "/admin/bundles/:id", ({ params }) => {
   if (!db.bundles.some((x) => x.id === params.id)) return notFound();
-  if (db.bundles.length === 1) return badRequest({ id: ["Keep at least one bundle."] });
+  if (db.bundles.length === 1) return badRequest({ id: ["Keep at least one game set."] });
   db.bundles = db.bundles.filter((x) => x.id !== params.id);
   return json({ id: params.id });
 });
@@ -1370,9 +1421,11 @@ function wordSetFromBody(b, prev) {
   });
   // The showdown is optional: null (or left out on a new set) means a set without one.
   const sd = "showdown" in b ? b.showdown : prev?.showdown;
-  // Words only: rewards and the showdown prize belong to the stream (from its bundle).
+  // Words only: rewards and the showdown prize belong to the stream (from its game set).
   const showdown = sd ? { word: word(sd.word) } : null;
-  return { title, rounds, showdown };
+  // The game mode the set is written for (TextChain or SubText); none for any.
+  const gameMode = ["TextChain", "SubText"].includes(b.gameMode) ? b.gameMode : "gameMode" in b ? null : (prev?.gameMode ?? null);
+  return { title, rounds, showdown, gameMode };
 }
 function wordSetErrors(w) {
   const errors = {};
@@ -1424,7 +1477,7 @@ on("post", "/admin/word-sets/:id/assign", ({ params, body }) => {
   const set = db.wordSets.find((x) => x.id === params.id);
   const s = db.streams.find((x) => x.id === body?.streamId);
   if (!set || !s) return notFound();
-  if (s.status !== "Scheduled") return json({ title: "Can't assign", detail: "Only upcoming streams can get new words.", status: 400 }, 400);
+  if (s.status !== "Scheduled" && s.status !== "InProgress") return json({ title: "Can't assign", detail: "Ended streams keep the words they played.", status: 400 }, 400);
   const err = linkWordSet(set.id, s);
   if (err) return json({ title: "Can't assign", detail: err, status: 400 }, 400);
   applyWordSet(set, s);
@@ -1575,7 +1628,7 @@ on("delete", "/admin/sponsors/:id", ({ params }) => {
 });
 
 // ---- Share card and notification presets (named, picked per stream). JSON bodies.
-for (const [path, key] of [["share-presets", "sharePresets"], ["notification-presets", "notificationPresets"], ["app-card-presets", "appCardPresets"], ["puzzle-card-presets", "puzzleCardPresets"]]) {
+for (const [path, key] of [["share-presets", "sharePresets"], ["scoring-presets", "scoringPresets"], ["notification-presets", "notificationPresets"], ["app-card-presets", "appCardPresets"], ["puzzle-card-presets", "puzzleCardPresets"]]) {
   on("get", `/admin/${path}`, () => json(db[key]));
   on("get", `/admin/${path}/:id`, ({ params }) => {
     const p = db[key].find((x) => x.id === params.id);

@@ -8,7 +8,7 @@ import { bundleLine, useBundles } from "./gameModes";
 
 /**
  * Bundles as cards (name, showdown and prize), the same card as a game mode's. With `onChange`
- * they're a picker (New stream, Fill month); with `onOpen` each card opens its bundle (Bundles).
+ * they're a picker (New stream, Create event); with `onOpen` each card opens its bundle (Bundles).
  */
 export function BundleCards({ value, onChange, onOpen }) {
   const theme = useTheme();

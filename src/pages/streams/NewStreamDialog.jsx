@@ -15,15 +15,11 @@ import { Icon } from "../../ds/Icon";
 import { dayjs, useTimezone } from "../../contexts";
 import { richLen } from "./enums";
 import { GAME_MODES, modeOf, useBundles, useStreamBuilder } from "./gameModes";
-import { BundleCards } from "./BundleCards";
-import { ModeCards } from "./ModeCards";
-import { HostPicker } from "./pickers";
+import { GameSetPicker, HostPicker } from "./pickers";
 import { DEFAULT_TITLE, fillHost, hostLabel, titleRule } from "./hosts";
 import { FieldHelper } from "../../ds/FieldHelper";
-import { ListGroup, ListItem, ListSwitch } from "../../ds/ListGroup";
-import { ScopeToggle } from "../../ds/ScopeToggle";
+import { ListGroup, ListItem } from "../../ds/ListGroup";
 import Typography from "@mui/material/Typography";
-import { StreamType } from "./enums";
 
 const defaultStart = (tz) => dayjs().tz(tz).add(1, "day").hour(19).minute(0).second(0).millisecond(0);
 
@@ -82,15 +78,14 @@ export function NewStreamDialog({ open, source, date, hosts, onClose, onCreated 
   const valid = !errors.title && !errors.start;
   const show = (k) => (submitted ? errors[k] : null);
   const mode = GAME_MODES[form.gameMode];
-  const superSavvy = form.streamType === StreamType.SuperSavvy;
-  const audience = superSavvy ? StreamType.Public : form.streamType;
 
   const submit = async () => {
     setSubmitted(true);
     if (!valid) return;
     const startDate = form.start.utc().toISOString();
-    const base = { title: form.title.trim(), host: host ?? {}, startDate, gameMode: form.gameMode, bundleId, streamType: form.streamType };
-    // A new stream: its bundle's defaults and the Default presets (see useStreamBuilder). Its game
+    // Who can join comes from the game set; a copy keeps its source's.
+    const base = { title: form.title.trim(), host: host ?? {}, startDate, gameMode: form.gameMode, bundleId, streamType: source ? form.streamType : undefined };
+    // A new stream: its game set's defaults and the Default presets (see useStreamBuilder). Its game
     // comes with its word set.
     let values = build(base);
     if (source) {
@@ -127,29 +122,15 @@ export function NewStreamDialog({ open, source, date, hosts, onClose, onCreated 
     <Dialog open={open} onClose={isPending ? undefined : onClose} fullScreen={fullScreen} maxWidth="sm" fullWidth>
       <DialogTitle>{source ? "Duplicate stream" : "New stream"}</DialogTitle>
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
-        {/* What the stream starts with: a bundle (points, showdown, rewards). A copy keeps its
+        {/* What the stream starts with: a game set (who can join, showdown, rewards). A copy keeps its
             source's settings. The game comes with the word set, added on the stream afterwards. */}
         {!source && (
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-            <Typography variant="overline" color="text.secondary" component="div">
-              Bundle
-            </Typography>
-            <BundleCards value={bundleId} onChange={(id) => set({ bundleId: id })} />
-          </Box>
-        )}
-        {/* Its format (logo, pill and How to play in the app). Can wait: it's also picked on the stream. */}
-        {!source && (
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-            <Typography variant="overline" color="text.secondary" component="div">
-              How to play & format
-            </Typography>
-            <ModeCards value={form.gameMode} onChange={(id) => set({ gameMode: id })} />
-          </Box>
+          <GameSetPicker value={bundleId} onChange={(id) => set({ bundleId: id })} />
         )}
 
         <HostPicker hosts={hosts} value={host} onChange={(h) => set({ host: h })} />
 
-        {/* The stream itself: its title, when and for whom. */}
+        {/* The stream itself: its title and when. Who can join comes from its game set. */}
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
           <Typography variant="overline" color="text.secondary" component="div">
             Stream
@@ -187,20 +168,6 @@ export function NewStreamDialog({ open, source, date, hosts, onClose, onCreated 
                 />
               </Box>
             </ListItem>
-            <ListItem
-              leading={<Icon name="visibility" size={20} />}
-              title="Visibility"
-              supporting={audience === StreamType.Internal ? "Only the team sees it" : "Everyone in the app"}
-              trailing={<ScopeToggle label="Visibility" all={false} value={audience} options={[{ value: StreamType.Public, label: "Public" }, { value: StreamType.Internal, label: "Internal" }]} onChange={(v) => set({ streamType: v })} />}
-            />
-            <ListSwitch
-              icon="workspace_premium"
-              title="Super Savvy only"
-              supporting="Everyone sees it; only Super Savvy members can join"
-              checked={superSavvy}
-              disabled={audience === StreamType.Internal}
-              onChange={(on) => set({ streamType: on ? StreamType.SuperSavvy : StreamType.Public })}
-            />
           </ListGroup>
         </Box>
       </DialogContent>

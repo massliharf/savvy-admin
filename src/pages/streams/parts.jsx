@@ -15,6 +15,8 @@ import { layer, radius } from "../../theme/tokens";
 import { hostLabel, useHosts, showTitle } from "./hosts";
 import { useTimezoneFormat } from "../../contexts";
 import { modeOf, setupIssues } from "./gameModes";
+import { useWordSets } from "./words";
+import { ModeLogo } from "./ModeLogo";
 
 export const STREAM_TYPES = {
   Public: { label: "Public", icon: "public", hint: "Everyone can see and join." },
@@ -31,50 +33,6 @@ export const isEnded = (s) => s.status === "Completed" || s.status === "Canceled
 export function StatusBadge({ status, draft: needsWords }) {
   const look = { InProgress: ["live", "Live"], Completed: ["neutral", "Ended"], Canceled: ["error", "Canceled"] }[status] ?? (needsWords ? ["neutral", "Needs setup"] : null);
   return look ? <Pill tone={look[0]}>{look[1]}</Pill> : null;
-}
-
-function MetaItem({ icon, children, tooltip, color = "text.secondary" }) {
-  const item = (
-    <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, minWidth: 0, color, typography: "labelMedium", whiteSpace: "nowrap" }}>
-      {icon && <Icon name={icon} size={16} />}
-      {/* Ellipsis, not a hard cut, when the card is narrow. */}
-      <Box component="span" sx={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
-        {children}
-      </Box>
-    </Box>
-  );
-  return tooltip ? <Tooltip title={tooltip}>{item}</Tooltip> : item;
-}
-
-/**
- * One line: game mode and rounds, then the audience and any extras (sponsor, raffle, spotlight,
- * a Super Savvy showdown on a Public stream) as icons with tooltips.
- */
-export function StreamMeta({ stream, color }) {
-  const mode = modeOf(stream);
-  const type = STREAM_TYPES[stream.streamType];
-  const rounds = stream.textSavvyRounds?.rounds?.length ?? 0;
-  const extras = [
-    type && { icon: type.icon, tip: type.label },
-    stream.showdownConfiguration?.superSavvyOnly && stream.streamType !== "SuperSavvy" && { icon: "diamond", tip: "Super Savvy Showdown" },
-    stream.sponsorship && { icon: "handshake", tip: `Sponsor: ${stream.sponsorship.title}` },
-    stream.raffleSystemWinnersConfiguration && { icon: "confirmation_number", tip: "Raffle" },
-    stream.isSpotlighted && { icon: "star", tip: "Spotlight on the home screen" },
-  ].filter(Boolean);
-  return (
-    <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0, color }}>
-      <MetaItem icon={mode.icon} color={color}>
-        {[mode.label, `${rounds} ${rounds === 1 ? "round" : "rounds"}`].filter(Boolean).join(" · ")}
-      </MetaItem>
-      {extras.map((x) => (
-        <Tooltip key={x.icon} title={x.tip}>
-          <Box component="span" aria-label={x.tip} sx={{ display: "inline-flex", flexShrink: 0, color }}>
-            <Icon name={x.icon} size={16} />
-          </Box>
-        </Tooltip>
-      ))}
-    </Box>
-  );
 }
 
 export function SetupWarning({ stream }) {
@@ -171,10 +129,73 @@ export function useStreamSurface(tinted = false) {
   };
 }
 
+/** Upcoming and live streams can take a word set; ended ones keep the words they played. */
+export const canTakeWords = (s) => s.status === "Scheduled" || s.status === "InProgress";
+
+/**
+ * The stream's word set on its card (schedule cards, rows, calendar): its name, or "Pick word set"
+ * while it has none. Clicking it picks one, like a word set's "Assign to a stream" the other way
+ * round. Ended streams show their set but can't change it.
+ */
+function WordSetChip({ stream, onAction, color }) {
+  const { tokens } = useTheme();
+  const { sets } = useWordSets();
+  const set = sets.find((w) => w.streamId === stream.id);
+  const missing = (stream.textSavvyRounds?.rounds ?? []).some((r) => !r.word) || (!!stream.showdownConfiguration && !stream.showdownConfiguration.word);
+  const label = set ? set.title || "Untitled set" : missing ? "Pick word set" : "Own words";
+  const canPick = !!onAction && canTakeWords(stream);
+  if (!canPick && !set) return null;
+  // The chip never opens the stream: an ended stream's chip does nothing at all.
+  const stop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  const pick = (e) => {
+    stop(e);
+    onAction("words", stream);
+  };
+  return (
+    <Tooltip title={canPick ? (set ? "Change word set" : "Pick a word set") : "Ended streams keep their word set"}>
+      <Box
+        component="span"
+        role={canPick ? "button" : undefined}
+        tabIndex={canPick ? 0 : undefined}
+        aria-label={canPick ? `${set ? `Word set ${label}, change it` : "Pick a word set"} for ${showTitle(stream)}` : undefined}
+        onClick={canPick ? pick : stop}
+        onMouseDown={(e) => e.stopPropagation()}
+        onKeyDown={canPick ? (e) => (e.key === "Enter" || e.key === " ") && pick(e) : undefined}
+        sx={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 0.5,
+          height: 24,
+          pl: 0.75,
+          pr: 1,
+          maxWidth: "100%",
+          minWidth: 0,
+          borderRadius: radius("full"),
+          bgcolor: alpha(color, 0.12),
+          color,
+          typography: "labelMedium",
+          whiteSpace: "nowrap",
+          cursor: canPick ? "pointer" : "default",
+          transition: `background-color ${tokens.motion.effects}`,
+          ...(canPick ? { "&:hover": { bgcolor: alpha(color, 0.2) }, "&:focus-visible": { outline: `2px solid ${color}`, outlineOffset: 1 } } : {}),
+        }}
+      >
+        <Icon name={set || !missing ? "spellcheck" : "add"} size={14} />
+        <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+          {label}
+        </Box>
+      </Box>
+    </Tooltip>
+  );
+}
+
 export function streamActions(stream, onAction) {
   return [
     { label: "Edit", icon: "edit", onClick: () => onAction("edit", stream) },
-    { label: "Add words", icon: "spellcheck", onClick: () => onAction("edit", stream), hidden: !logoHidden(stream) },
+    { label: logoHidden(stream) ? "Add words" : "Change word set", icon: "spellcheck", onClick: () => onAction("words", stream), hidden: !canTakeWords(stream) },
     { label: "Duplicate", icon: "content_copy", onClick: () => onAction("duplicate", stream) },
     { label: "Stream key", icon: "key", onClick: () => onAction("key", stream) },
     { label: "Delete", icon: "delete", onClick: () => onAction("delete", stream), tone: "error", divider: true },
@@ -187,7 +208,8 @@ export function streamActions(stream, onAction) {
 const LAYOUT = {
   // Cards and rows share the app's card corner (16) and title size with every other list.
   card: { radius: "lg", inset: 8, gap: 12, hero: 108, title: "titleMedium" },
-  row: { radius: "lg", inset: 8, gap: 12, hero: 36, title: "titleMedium" },
+  // Two lines (title, then time and status) on wide screens: a 3:4 image that height.
+  row: { radius: "lg", inset: 8, gap: 12, hero: 48, title: "titleMedium" },
   compact: { radius: "sm", inset: 4, gap: 4, title: "labelLarge" },
 };
 
@@ -250,6 +272,13 @@ export function StreamItem({ stream, variant = "card", onAction, highlight }) {
     </Typography>
   );
   const hostPill = <HostPill stream={stream} color={surface.fg} />;
+  // How it's played, the same in every view: the game mode's logo (from its word set) and the
+  // word set itself.
+  // Top to bottom in every view: time, the game mode's logo (from its word set), the title, the
+  // host, and the word set last, at the bottom left.
+  const LOGO = { compact: [72, 20], row: [104, 28], card: [104, 28] }[variant];
+  const logo = mode.id ? <ModeLogo mode={mode.id} width={LOGO[0]} height={LOGO[1]} bare /> : null;
+  const wordSet = <WordSetChip stream={stream} onAction={onAction} color={surface.fg} />;
 
   const root = {
     component: Link,
@@ -292,36 +321,43 @@ export function StreamItem({ stream, variant = "card", onAction, highlight }) {
     ].filter(Boolean);
     return (
       // The marks give way to the time in narrow cells (a container query on the item's width).
-      <ButtonBase {...root} onClick={(e) => e.stopPropagation()} sx={{ ...sx, display: "flex", flexDirection: "column", alignItems: "stretch", px: 1, py: 0.5, containerType: "inline-size" }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, minWidth: 0, minHeight: 16, color: surface.sub }}>
-          {/* The format's icon; none until the stream has one. */}
-          {mode.icon && <Icon name={mode.icon} size={14} />}
-          <Box sx={{ flex: 1, minWidth: 0, display: "flex", overflow: "hidden" }}>{time}</Box>
-          {warning}
-          {marks.length > 0 && (
-            <Box sx={{ display: "flex", gap: 0.5, flexShrink: 0, "@container (max-width: 104px)": { display: "none" } }}>
-              {marks.map((m) => (
-                <Tooltip key={m.icon} title={m.tip}>
-                  <Box component="span" aria-hidden sx={{ display: "inline-flex" }}>
-                    <Icon name={m.icon} size={14} />
-                  </Box>
-                </Tooltip>
-              ))}
-            </Box>
-          )}
-        </Box>
-        {title}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, minWidth: 0, color: surface.sub }}>
-          <HostFace host={host} size={16} color={surface.fg} />
-          <Typography variant="labelSmall" noWrap>
-            {host.name}
-          </Typography>
-        </Box>
-      </ButtonBase>
+      <Box sx={{ position: "relative" }}>
+        <ButtonBase {...root} onClick={(e) => e.stopPropagation()} sx={{ ...sx, display: "flex", flexDirection: "column", alignItems: "stretch", px: 1, py: 0.5, containerType: "inline-size" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, minWidth: 0, minHeight: 16, color: surface.sub }}>
+              <Box sx={{ flex: 1, minWidth: 0, display: "flex", overflow: "hidden" }}>{time}</Box>
+            {warning}
+            {marks.length > 0 && (
+              <Box sx={{ display: "flex", gap: 0.5, flexShrink: 0, "@container (max-width: 104px)": { display: "none" } }}>
+                {marks.map((m) => (
+                  <Tooltip key={m.icon} title={m.tip}>
+                    <Box component="span" aria-hidden sx={{ display: "inline-flex" }}>
+                      <Icon name={m.icon} size={14} />
+                    </Box>
+                  </Tooltip>
+                ))}
+              </Box>
+            )}
+          </Box>
+          {logo && <Box sx={{ display: "flex", mt: 0.5 }}>{logo}</Box>}
+          {title}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, minWidth: 0, color: surface.sub }}>
+            <HostFace host={host} size={16} color={surface.fg} />
+            <Typography variant="labelSmall" noWrap>
+              {host.name}
+            </Typography>
+          </Box>
+          <Box sx={{ display: "flex", minWidth: 0, mt: 0.5 }}>{wordSet}</Box>
+        </ButtonBase>
+      </Box>
     );
   }
 
   if (variant === "row") {
+    // A list row reads left to right, one column per fact, so rows line up as a table:
+    // image · title (time and status under it) · host · game mode · word set · ⋮.
+    // Narrower screens fold host, game mode and word set under the title.
+    const folded = { xs: "flex", lg: "none" };
+    const column = { xs: "none", lg: "flex" };
     return (
       <Box sx={{ position: "relative" }}>
         <ButtonBase
@@ -330,19 +366,23 @@ export function StreamItem({ stream, variant = "card", onAction, highlight }) {
             ...sx,
             display: "grid",
             alignItems: "center",
-            // The meta column joins on wide screens only, so the title keeps room next to the rail.
-            gridTemplateColumns: { xs: `${L.hero}px minmax(0, 1fr) 40px`, md: `${L.hero}px minmax(0, 1fr) 160px 40px`, lg: `${L.hero}px minmax(0, 1fr) 160px 260px 40px` },
+            columnGap: 2,
+            gridTemplateColumns: { xs: `${L.hero}px minmax(0, 1fr) 40px`, lg: `${L.hero}px minmax(0, 1fr) 180px 120px 200px 40px` },
           }}
         >
           {hero}
           <Box sx={{ minWidth: 0 }}>
-            {overline}
             {title}
+            {overline}
+            <Box sx={{ display: folded, alignItems: "center", flexWrap: "wrap", gap: 1, mt: 0.5, minWidth: 0 }}>
+              {hostPill}
+              {logo}
+              {wordSet}
+            </Box>
           </Box>
-          <Box sx={{ display: { xs: "none", md: "flex" }, minWidth: 0 }}>{hostPill}</Box>
-          <Box sx={{ display: { xs: "none", lg: "block" }, minWidth: 0, overflow: "hidden" }}>
-            <StreamMeta stream={stream} color={surface.sub} />
-          </Box>
+          <Box sx={{ display: column, minWidth: 0 }}>{hostPill}</Box>
+          <Box sx={{ display: column, minWidth: 0 }}>{logo}</Box>
+          <Box sx={{ display: column, minWidth: 0 }}>{wordSet}</Box>
           <span />
         </ButtonBase>
         {menu}
@@ -350,17 +390,17 @@ export function StreamItem({ stream, variant = "card", onAction, highlight }) {
     );
   }
 
+
   return (
     <Box sx={{ position: "relative", height: "100%" }}>
       <ButtonBase {...root} sx={{ ...sx, height: "100%", display: "flex" }}>
         {hero}
         <Box sx={{ minWidth: 0, flex: 1, alignSelf: "stretch", display: "flex", flexDirection: "column", alignItems: "flex-start", pr: 5 }}>
           {overline}
+          {logo && <Box sx={{ display: "flex", mt: 0.5 }}>{logo}</Box>}
           <Box sx={{ mt: 0.5, width: "100%" }}>{title}</Box>
           <Box sx={{ mt: 1, display: "flex", maxWidth: "100%" }}>{hostPill}</Box>
-          <Box sx={{ mt: "auto", pt: 1, width: "100%", overflow: "hidden" }}>
-            <StreamMeta stream={stream} color={surface.sub} />
-          </Box>
+          <Box sx={{ mt: "auto", pt: 1, display: "flex", maxWidth: "100%" }}>{wordSet}</Box>
         </Box>
       </ButtonBase>
       {menu}
