@@ -32,7 +32,7 @@ export function cellSx(c, tokens, error) {
     boxShadow: error ? `inset 0 0 0 1px ${c.fieldError}` : "none",
     transition: `background-color ${tokens.motion.effects}, box-shadow ${tokens.motion.effects}`,
     "&.Mui-focused, &[aria-expanded='true']": { bgcolor: c.surfaceCard, boxShadow: `inset 0 0 0 1px ${error ? c.fieldError : c.fieldActive}` },
-    // A value that doesn't apply (e.g. no yellow letters in SubText) is plain text, not a field.
+    // A value that doesn't apply (e.g. no green letters in SubText round 5+) is plain text, not a field.
     "&.Mui-disabled": { bgcolor: "transparent", boxShadow: "none" },
     "& input": { py: 0, height: "100%" },
     "& input::placeholder": { color: c.onSurfaceVariant, opacity: 1 },

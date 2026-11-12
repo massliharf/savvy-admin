@@ -319,19 +319,6 @@ export function RoundsEditor({ form, name, fields, append, remove, validateWord,
 }
 
 /**
- * Points for a game mode: SubText gives none for yellow letters; back on TextChain they return to
- * the game set's (`from`).
- */
-export function scoringForMode(scoring, id, from) {
-  if (!scoring) return scoring;
-  const next = structuredClone(scoring);
-  Object.keys(next).forEach((bracket) => {
-    if (next[bracket]) next[bracket].yellowLetterXp = id === GameMode.SubText ? 0 : (from?.[bracket]?.yellowLetterXp ?? next[bracket].yellowLetterXp);
-  });
-  return next;
-}
-
-/**
  * The stream's word set and the game mode it brings (logo and name). A stream plays its word
  * set's game mode; "Pick a word set" changes both.
  */
@@ -403,7 +390,7 @@ export function WordsSection({ form, validateWord, onPickWords, frame }) {
  * Which scoring preset (Library › Gameplay › Scoring) the stream plays: picking one fills in its points;
  * points changed by hand show as Custom.
  */
-function ScoringPresetField({ control, setValue, subText }) {
+function ScoringPresetField({ control, setValue }) {
   const scoring = useWatch({ control, name: "roundScoring" });
   const { data } = useList({ resource: "ScoringPreset", dataProviderName: DP.scoringPresets, pagination: { mode: "off" } });
   const presets = data?.data ?? [];
@@ -411,10 +398,7 @@ function ScoringPresetField({ control, setValue, subText }) {
   const pick = (id) => {
     const p = presets.find((x) => x.id === id);
     if (!p) return;
-    const next = structuredClone(p.roundScoring);
-    // SubText gives no points for yellow letters.
-    if (subText) Object.values(next).forEach((b) => b && (b.yellowLetterXp = 0));
-    setValue("roundScoring", next, { shouldDirty: true, shouldValidate: true });
+    setValue("roundScoring", structuredClone(p.roundScoring), { shouldDirty: true, shouldValidate: true });
   };
   return <SelectButton label="Scoring preset" value={current?.id ?? ""} placeholder="Custom" options={presets.map((p) => ({ value: p.id, label: p.name }))} onChange={pick} sx={{ maxWidth: 320 }} />;
 }
@@ -423,7 +407,7 @@ function ScoringPresetField({ control, setValue, subText }) {
 export function ScoringSection({ form, frame }) {
   return (
     <FormSection {...frame} id="game" title="Scoring" action={<PresetsLink kind="scoring" />}>
-      <ScoringPresetField control={form.control} setValue={form.setValue} subText={baseOf(form.gameMode) === GameMode.SubText} />
+      <ScoringPresetField control={form.control} setValue={form.setValue} />
       <ScoringFields control={form.control} setValue={form.setValue} subText={baseOf(form.gameMode) === GameMode.SubText} roundCount={form.roundFields?.length ?? 5} withStumper={false} />
     </FormSection>
   );
@@ -467,8 +451,8 @@ const SCORE_ROWS = [
   { key: "timeBonusXp", label: "Time bonus" },
 ];
 export const SCORE_BRACKETS = BRACKETS.map((b) => b.key);
-/** The same points per round (yellow letters left out: SubText streams give none). */
-export const sameScoring = (a, b) => SCORE_BRACKETS.every((k) => SCORE_ROWS.every(({ key: f }) => f === "yellowLetterXp" || Number(a?.[k]?.[f] ?? 0) === Number(b?.[k]?.[f] ?? 0)));
+/** The same points per round. */
+export const sameScoring = (a, b) => SCORE_BRACKETS.every((k) => SCORE_ROWS.every(({ key: f }) => Number(a?.[k]?.[f] ?? 0) === Number(b?.[k]?.[f] ?? 0)));
 const TIME_BONUS = Array.from({ length: 25 }, (_, i) => (i + 1) * 100);
 const xpRules = { validate: (v) => (v == null || Number.isNaN(v) ? "Required" : v < 0 ? "Min 0" : v > 10000 ? "Max 10,000" : true) };
 
@@ -523,7 +507,7 @@ export function ScoringFields({ control, setValue, subText, roundCount, prefix =
   const { m3: c, tokens } = useTheme();
   const count = Math.max(roundCount, 1);
   const brackets = BRACKETS.filter((b) => count >= b.minRounds);
-  const disabled = (bracket, row) => subText && (row === "yellowLetterXp" || (bracket === "round5OrMore" && row === "greenLetterXp"));
+  const disabled = (bracket, row) => subText && bracket === "round5OrMore" && row === "greenLetterXp";
   const stumper = withStumper && (subText || count >= 5);
   const cols = `minmax(96px, 1.2fr) repeat(${brackets.length}, minmax(64px, 1fr))`;
   // Rows are segments like ListGroup's (and EditTable's): 2px apart, outer corners 12px.

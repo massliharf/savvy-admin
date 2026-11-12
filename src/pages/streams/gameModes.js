@@ -119,8 +119,7 @@ export function streamFromPreset({ title, host, startDate, gameMode = null, stre
       // Each round's time follows its word (the fifth is always 45 s); Round Pounder 5, 10, 15 … Sparks.
       rounds: Array.from({ length: mode.rounds }, (_, i) => ({ roundIndex: i, word: "", durationInSeconds: durationFor("", i), roundBusterReward: busterFor(i) })),
     },
-    // SubText gives no points for yellow letters.
-    roundScoring: gameMode === GameMode.SubText ? Object.fromEntries(Object.entries(mode.scoring ?? {}).map(([k, v]) => [k, { ...v, yellowLetterXp: 0 }])) : mode.scoring,
+    roundScoring: mode.scoring,
     hostStumperBonusXp: mode.hostStumperBonusXp ?? undefined,
     defaultRewards: mode.defaultRewards,
     entranceFee: { type: EntranceFeeType.Free, amount: 0 },

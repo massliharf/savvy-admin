@@ -1,8 +1,9 @@
 // Static assets imported as URLs so the single-file build can inline them.
 import logoUrl from "./development-savvy-logo.png?url";
 import dictionaryUrl from "./wordle-dictionary.txt?url";
-import textChainLogoUrl from "./textchain-logo.svg?url";
-import subTextLogoUrl from "./subtext-logo.svg?url";
+// PNG renders of the SVGs (3×): the SVGs' blur filters are slow to repaint dozens of times.
+import textChainLogoUrl from "./textchain-logo.png?url";
+import subTextLogoUrl from "./subtext-logo.png?url";
 import hostPictureUrl from "./host-scott.png?url";
 import streamHeroUrl from "./stream-hero.png?url";
 import wendysLogoUrl from "./sponsor-wendys.svg?url";

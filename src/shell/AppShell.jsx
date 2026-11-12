@@ -249,10 +249,13 @@ function NavRail({ pathname, expanded, onToggle }) {
       // Closed: only the rail's own empty space opens it (React also bubbles clicks from the
       // account menu's portal).
       onClick={(e) => !expanded && e.currentTarget.contains(e.target) && !e.target.closest("a, button") && onToggle()}
+      // It sits over its slot in the shell (see AppShell), so only the rail repaints while it animates.
       sx={{
+        position: "absolute",
+        inset: "0 auto 0 0",
+        zIndex: 1,
         width: expanded ? EXPANDED_WIDTH : RAIL_WIDTH,
         transition: `width ${RAIL_EASE}`,
-        flexShrink: 0,
         height: "100%",
         display: "flex",
         flexDirection: "column",
@@ -345,6 +348,16 @@ export function AppShell({ children }) {
       return true;
     }
   });
+  // The rail's slot: the page beside it resizes once per toggle instead of every frame of the
+  // rail's animation (a full repaint of a wide page each frame is what made it stutter). Opening,
+  // the slot widens first and the rail grows into it; closing, the rail shrinks first and the
+  // slot follows when it's done.
+  const [slotWide, setSlotWide] = useState(expanded);
+  useEffect(() => {
+    if (expanded) return setSlotWide(true);
+    const t = setTimeout(() => setSlotWide(false), 240);
+    return () => clearTimeout(t);
+  }, [expanded]);
   const toggle = () =>
     setExpanded((e) => {
       try {
@@ -384,7 +397,9 @@ export function AppShell({ children }) {
   return (
     <RailContext.Provider value={{ expanded, toggle }}>
     <Box sx={{ display: "flex", gap: `${GAP}px`, p: `${GAP}px`, height: "100dvh", boxSizing: "border-box", bgcolor: c.background, overflow: "hidden" }}>
-      <NavRail pathname={pathname} expanded={expanded} onToggle={toggle} />
+      <Box sx={{ position: "relative", flexShrink: 0, width: expanded || slotWide ? EXPANDED_WIDTH : RAIL_WIDTH }}>
+        <NavRail pathname={pathname} expanded={expanded} onToggle={toggle} />
+      </Box>
       <Box
         component="main"
         id="main-scroll"

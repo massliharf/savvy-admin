@@ -26,7 +26,6 @@ import {
   DetailsSection,
   HostSection,
   ScoringSection,
-  scoringForMode,
   NotificationsSection,
   RaffleSection,
   RewardsSection,
@@ -170,10 +169,7 @@ export default function StreamDetail() {
     else if (current) form.setValue("showdownConfiguration", { ...current, word: "" }, { shouldDirty: true });
     form.setValue("wordSetId", set.id, { shouldDirty: true });
     // The set is written for a game mode: the stream plays it.
-    if (set.gameMode) {
-      form.setValue("gameMode", set.gameMode, { shouldDirty: true });
-      form.setValue("roundScoring", scoringForMode(form.getValues("roundScoring"), set.gameMode, bundle?.roundScoring), { shouldDirty: true });
-    }
+    if (set.gameMode) form.setValue("gameMode", set.gameMode, { shouldDirty: true });
     notify("Words filled in. Save to keep them.");
   };
   // react-hook-form's `errors` proxy updates after render; read the latest state directly.
