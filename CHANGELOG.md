@@ -15,3 +15,7 @@ Proposed changes to the Savvy admin dashboard design. Not released yet.
 - **Create event replaces Fill month and time slots.** One stream on a date and time, with its game set, host and sponsor; or Recurring, on the picked weekdays (M T W T F S S) until an end date; or Month, any days picked on a calendar (across months, past days greyed out). It opens as a centered dialog; a summary card spells out how many streams, on which days, at what time and between which dates, and Create stays disabled until there's something to add. Streams are added even when another one is at the same time.
 - **Game set messaging shows the library's presets.** Pick one per kind, or open a preset in a side sheet to edit it there.
 - **Unsaved changes ask before leaving.** On pages and when closing a side sheet.
+
+## To do
+
+- **Hero image generator:** not built yet.
