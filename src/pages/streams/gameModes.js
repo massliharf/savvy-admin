@@ -105,7 +105,8 @@ export function streamFromPreset({ title, host, startDate, gameMode = null, stre
     hostId: host.id,
     hostName: host.name,
     imageUrl: host.imageUrl ?? null,
-    heroImageUrl: host.streamImageUrl ?? null,
+    // The stream's screen (900 × 1200) comes from its game set; the host brings their picture and hero card.
+    heroImageUrl: preset?.streamImageUrl ?? null,
     heroCardImageUrl: host.heroCardImageUrl ?? null,
     startDate,
     streamType,
@@ -129,8 +130,8 @@ export function streamFromPreset({ title, host, startDate, gameMode = null, stre
 
 /**
  * The one way a new stream is put together (New stream and Create event alike): its bundle's
- * defaults (rounds, scoring, rewards, showdown, host's pictures, share card and
- * notification presets). Words come later, from a word set.
+ * defaults (rounds, scoring, rewards, showdown, stream image, share card and
+ * notification presets) and the host's pictures. Words come later, from a word set.
  */
 export function useStreamBuilder() {
   const { bundles, byId } = useBundles();

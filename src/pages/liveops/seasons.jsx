@@ -5,7 +5,6 @@ import { useCustom, useCustomMutation, useInvalidate, useList } from "@refinedev
 import { SelectButton } from "../../ds/SelectButton";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
-import ButtonBase from "@mui/material/ButtonBase";
 import Card from "@mui/material/Card";
 import FormHelperText from "@mui/material/FormHelperText";
 import LinearProgress from "@mui/material/LinearProgress";
@@ -22,11 +21,11 @@ import { useNotify } from "../../shell/notifications";
 import { DP } from "../../providers";
 import { DateTimeInput, TextInput } from "../streams/detail/fields";
 import { ConfirmDelete, useLibraryMutations, useSheet } from "../library/shared";
-import { Pill } from "../../ds/Pill";
 import { ConfirmDialog } from "../../ds/ConfirmDialog";
 import { radius } from "../../theme/tokens";
 import { ContainerCard } from "../../ds/ContainerCard";
 import { RowsSkeleton } from "../../ds/Skeletons";
+import { CardGrid, ShopCard } from "../shop/shared";
 
 const RESET_TZ = "America/New_York";
 
@@ -161,39 +160,21 @@ function ResetsCard({ now }) {
   );
 }
 
-function SeasonRow({ season, now, onOpen }) {
-  const { m3: c } = useTheme();
+/** An upcoming or ended season as the card every library page uses (no phase pill: it sits under its phase's title). */
+function SeasonCard({ season, onOpen }) {
   const { formatDate } = useTimezoneFormat();
-  const p = phase(season, now);
   return (
-    <ButtonBase
-      onClick={onOpen}
-      sx={{
-        width: "100%",
-        display: "flex",
-        alignItems: "center",
-        gap: 1.5,
-        px: 2,
-        py: 1.5,
-        textAlign: "left",
-        justifyContent: "flex-start",
-        "&:hover": { bgcolor: "action.hover" },
-        "&.Mui-focusVisible": { outline: `2px solid ${c.focus}`, outlineOffset: -2 },
-        "&:not(:last-of-type)": { borderBottom: `1px solid ${c.outlineVariant}` },
-      }}
-    >
-      <SeasonIcon season={season} size={40} />
-      <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography variant="titleMedium" noWrap>
-          {season.title}
-        </Typography>
-        <Typography variant="bodySmall" color="text.secondary">
+    <ShopCard
+      image={season.iconUrl}
+      icon="trophy"
+      title={season.title}
+      meta={
+        <Typography variant="bodySmall" color="text.secondary" component="div" noWrap>
           {formatDate(season.startsAt, "MMM D, YYYY")} – {formatDate(season.endsAt, "MMM D, YYYY")}
         </Typography>
-      </Box>
-      <Pill tone={p === "active" ? "success" : p === "upcoming" ? "primary" : "neutral"}>{p === "active" ? "Active" : p === "upcoming" ? "Upcoming" : "Ended"}</Pill>
-      <Icon name="chevron_right" style={{ color: c.onSurfaceVariant }} />
-    </ButtonBase>
+      }
+      onOpen={onOpen}
+    />
   );
 }
 
@@ -328,11 +309,11 @@ export default function SeasonsPage() {
           {empty}
         </Typography>
       ) : (
-        <ContainerCard>
+        <CardGrid>
           {items.map((s) => (
-            <SeasonRow key={s.id} season={s} now={now} onOpen={() => sheet.openEdit(s)} />
+            <SeasonCard key={s.id} season={s} onOpen={() => sheet.openEdit(s)} />
           ))}
-        </ContainerCard>
+        </CardGrid>
       )}
     </Box>
   );

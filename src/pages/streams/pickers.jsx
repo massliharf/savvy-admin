@@ -190,14 +190,17 @@ const AUDIENCES = [
  * Who sees and joins a stream. Super Savvy isn't an audience of its own: it's a Public stream
  * only Super Savvy members can join (stored as streamType "SuperSavvy").
  */
-export function AudienceField({ value, onChange, error, superSavvySwitch = true }) {
+// `label={null}` when the section around it already says what it is ("Who can join").
+export function AudienceField({ value, onChange, error, superSavvySwitch = true, label = "Visibility" }) {
   const superSavvy = value === StreamType.SuperSavvy;
   const audience = superSavvy ? StreamType.Public : value;
   return (
     <Box>
-      <Typography variant="labelLarge" color="text.secondary" component="div" sx={{ mb: 1 }}>
-        Visibility
-      </Typography>
+      {label && (
+        <Typography variant="labelLarge" color="text.secondary" component="div" sx={{ mb: 1 }}>
+          {label}
+        </Typography>
+      )}
       <ToggleButtonGroup
         exclusive
         value={audience ?? null}

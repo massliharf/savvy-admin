@@ -8,7 +8,7 @@ import { HOST_PICTURE_URL, MODE_LOGOS, STREAM_HERO_URL } from "../assets";
 // Version 2 keeps its own saved data: version 1 is published on the same site (same browser
 // storage) and must not be touched by it.
 const DB_KEY = "savvy-mock-db-2";
-const DB_VERSION = 55;
+const DB_VERSION = 56;
 
 // The demo data: one host (Scott), one sponsor (Wendy's) and one stream per state and edge case,
 // spread over the month around today (see DEMO_STREAMS). Streams are built like new ones: from a
@@ -99,8 +99,6 @@ function populate(d) {
     const tone = TONES[i % TONES.length];
     h.imageUrl ||= seed.expressiveAvatar(h.name, tone);
     h.heroCardImageUrl ||= seed.expressiveHero(tone);
-    // Each host's own stream image (Scott's photo is the sample one), so streams match their host.
-    h.streamImageUrl ||= h.id === seed.SCOTT.id ? STREAM_HERO_URL : seed.expressiveHero(tone);
     if (!d.users.some((u) => u.id === h.id)) d.users.push(seed.hostAccount(h));
     const u = d.users.find((x) => x.id === h.id);
     if (u) u.imageUrl = h.imageUrl;
@@ -117,6 +115,7 @@ function populate(d) {
   const nextWords = () => Array.from({ length: 5 }, () => SAMPLE_WORDS[w++ % SAMPLE_WORDS.length]);
   const day = (off) => new Date(Date.parse(`${todayKey}T12:00:00Z`) + off * 86400000).toISOString().slice(0, 10);
   d.bundles ??= seed.seedBundles();
+  d.bundles.forEach(withStreamImages);
   const rows = DEMO_STREAMS.map((p) => ({ ...p, at: p.time === "live" ? now - 10 * 60000 : ptTime(day(p.off), p.time) })).sort((a, b) => a.at - b.at);
 
   const sets = [];
@@ -150,7 +149,7 @@ function populate(d) {
       hostId: host?.id ?? null,
       hostName: host?.name ?? null,
       imageUrl: host?.imageUrl ?? null,
-      heroImageUrl: host ? host.streamImageUrl || STREAM_HERO_URL : null,
+      heroImageUrl: bundle.streamImageUrl || STREAM_HERO_URL,
       streamType,
       // The format (How to play & format) is picked on the stream; some have none yet.
       gameMode: p.mode ?? null,
@@ -588,6 +587,24 @@ function load() {
             st.hideGameModeLogo = !st.gameMode || !rounds.length || rounds.some((r) => !r.word) || (!!st.showdownConfiguration && !st.showdownConfiguration.word);
           });
         parsed.version = 55;
+      }
+      if (parsed.version === 55) {
+        // v56: the stream image background (900 × 1200) belongs to the game set, not the host. Each
+        // game set starts with the backgrounds the first host had; streams keep theirs.
+        const host = (parsed.hosts ?? [])[0];
+        const urls = (host?.streamImageUrls?.length ? host.streamImageUrls : host?.streamImageUrl ? [host.streamImageUrl] : []).filter(Boolean);
+        (parsed.bundles ?? []).forEach((b) => {
+          if (urls.length) {
+            b.streamImageUrls ??= [...urls];
+            b.streamImageUrl ??= host?.streamImageUrl ?? urls[0];
+          }
+          withStreamImages(b);
+        });
+        (parsed.hosts ?? []).forEach((h) => {
+          delete h.streamImageUrl;
+          delete h.streamImageUrls;
+        });
+        parsed.version = 56;
       }
       if (parsed.version === DB_VERSION) return parsed;
       // Older versions: add what's new and keep everything else.
@@ -1055,8 +1072,8 @@ on("post", "/TextSavvyStream", ({ body }) => {
   s.status = "Scheduled";
   s.totalPrizePool = 0;
   if (!s.imageUrl) s.imageUrl = LOGO_URL;
-  // The host's selected stream image, unless the stream has its own.
-  if (!s.heroImageUrl) s.heroImageUrl = db.hosts.find((h) => h.id === s.hostId)?.streamImageUrl || STREAM_HERO_URL;
+  // The game set's selected stream image background, unless the stream has its own.
+  if (!s.heroImageUrl) s.heroImageUrl = setBackground(s);
   for (const id of setIds) {
     const err = linkWordSet(id, s);
     if (err) return badRequest({ wordSetId: [err] });
@@ -1101,7 +1118,7 @@ on("post", "/TextSavvyStream/bulk", ({ body }) => {
     const s = streamFromBody(rest, null);
     const errors = validateStream(s);
     if (errors) return badRequest(errors);
-    created.push([{ ...s, id: uuid(), status: "Scheduled", totalPrizePool: 0, imageUrl: s.imageUrl || db.hosts.find((h) => h.id === s.hostId)?.imageUrl || LOGO_URL, heroImageUrl: s.heroImageUrl || db.hosts.find((h) => h.id === s.hostId)?.streamImageUrl || STREAM_HERO_URL }, b]);
+    created.push([{ ...s, id: uuid(), status: "Scheduled", totalPrizePool: 0, imageUrl: s.imageUrl || db.hosts.find((h) => h.id === s.hostId)?.imageUrl || LOGO_URL, heroImageUrl: s.heroImageUrl || setBackground(s) }, b]);
   }
   created.forEach(([s, b]) => {
     db.streams.push(s);
@@ -1131,9 +1148,9 @@ on("post", "/TextSavvyStream/host", ({ body }) => {
   db.streams.forEach((s) => {
     if (!ids.has(s.id) || s.status !== "Scheduled") return;
     const prevHost = db.hosts.find((h) => h.id === s.hostId);
-    // The stream image follows the host unless someone set a custom one.
+    // The host picture follows the host unless someone set a custom one; the stream image
+    // background is the game set's and stays.
     if (!s.imageUrl || s.imageUrl === LOGO_URL || s.imageUrl === prevHost?.imageUrl) s.imageUrl = host.imageUrl || LOGO_URL;
-    if (host.streamImageUrl && (!s.heroImageUrl || s.heroImageUrl === STREAM_HERO_URL || s.heroImageUrl === prevHost?.streamImageUrl)) s.heroImageUrl = host.streamImageUrl;
     s.hostId = host.id;
     applyLibrary(s);
     updated.push(s);
@@ -1349,8 +1366,18 @@ on("put", "/admin/game-modes/:id", ({ params, body }) => {
 });
 
 // ---- Bundles (prototype endpoints): what new streams start with. JSON bodies.
+// A game set's stream image backgrounds (900 × 1200): up to five, the selected one is what its new
+// streams start with. Older game sets get the sample one.
+function withStreamImages(b) {
+  b.streamImageUrls = (b.streamImageUrls ?? (b.streamImageUrl ? [b.streamImageUrl] : [STREAM_HERO_URL])).filter(Boolean).slice(0, 5);
+  if (!b.streamImageUrls.includes(b.streamImageUrl)) b.streamImageUrl = b.streamImageUrls[0] ?? null;
+  return b;
+}
+const setBackground = (s) => (db.bundles.find((b) => b.id === s.bundleId) ?? db.bundles[0])?.streamImageUrl || STREAM_HERO_URL;
 const bundleFrom = (body, prev) => ({
   ...prev,
+  streamImageUrls: Array.isArray(body.streamImageUrls) ? compactArr(body.streamImageUrls) : prev.streamImageUrls,
+  streamImageUrl: "streamImageUrl" in body ? body.streamImageUrl || null : prev.streamImageUrl,
   name: String(body.name ?? "").trim(),
   roundScoring: body.roundScoring ?? prev.roundScoring,
   hostStumperBonusXp: body.hostStumperBonusXp ?? null,
@@ -1381,7 +1408,15 @@ on("put", "/admin/bundles/:id", ({ params, body }) => {
   if (i < 0) return notFound();
   const error = bundleNameError(String(body.name ?? "").trim(), params.id);
   if (error) return badRequest({ name: [error] });
-  db.bundles[i] = bundleFrom(body, db.bundles[i]);
+  const prev = db.bundles[i];
+  db.bundles[i] = withStreamImages(bundleFrom(body, prev));
+  // Upcoming streams of this game set showing its previously selected background switch to the new
+  // one; a stream with its own keeps it.
+  const next = db.bundles[i].streamImageUrl;
+  if (next && next !== prev.streamImageUrl)
+    db.streams.forEach((s) => {
+      if (s.status === "Scheduled" && s.bundleId === prev.id && (!s.heroImageUrl || s.heroImageUrl === prev.streamImageUrl || s.heroImageUrl === STREAM_HERO_URL)) s.heroImageUrl = next;
+    });
   return json(db.bundles[i]);
 });
 on("delete", "/admin/bundles/:id", ({ params }) => {
@@ -1502,9 +1537,9 @@ on("post", "/admin/word-sets/:id/release", ({ params }) => {
 // ---- Host & sponsor libraries (prototype endpoints)
 const textLen = (v) => String(v ?? "").trim().length;
 // Each host picture kind keeps up to five images; the selected one is what new streams use.
+// (The stream image background is the game set's: see withStreamImages.)
 const HOST_GALLERIES = [
   ["pictureUrls", "imageUrl"],
-  ["streamImageUrls", "streamImageUrl"],
   ["heroCardImageUrls", "heroCardImageUrl"],
 ];
 function hostFromBody(b, prev) {
@@ -1525,7 +1560,6 @@ function hostFromBody(b, prev) {
 const withGalleries = (h) => ({
   ...h,
   ...Object.fromEntries(HOST_GALLERIES.map(([list, pick]) => [list, h[list] ?? (h[pick] ? [h[pick]] : [])])),
-  streamImageUrl: h.streamImageUrl ?? null,
 });
 function validateHost(h, isNew) {
   const errors = {};
@@ -1572,7 +1606,6 @@ on("put", "/admin/hosts/:id", ({ params, body }) => {
   db.streams.forEach((s) => {
     if (s.status !== "Scheduled" || s.hostId !== h.id) return;
     if (h.imageUrl && s.imageUrl === prev.imageUrl) s.imageUrl = h.imageUrl;
-    if (h.streamImageUrl && (s.heroImageUrl === prev.streamImageUrl || s.heroImageUrl === STREAM_HERO_URL)) s.heroImageUrl = h.streamImageUrl;
   });
   refreshUpcoming((s) => s.hostId === h.id);
   return json(withAccount(h));

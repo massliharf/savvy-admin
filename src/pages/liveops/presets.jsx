@@ -6,12 +6,12 @@ import { useForm, useWatch } from "react-hook-form";
 import { useList, useUpdate } from "@refinedev/core";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
+import Typography from "@mui/material/Typography";
 import { useTheme } from "@mui/material/styles";
 import { Icon } from "../../ds/Icon";
-import { FORM_WIDTH } from "../../ds/Page";
+import { PageToolbar } from "../../ds/Page";
 import { SideSheet } from "../../ds/SideSheet";
 import { ListAdd, ListGroup, ListItem } from "../../ds/ListGroup";
-import { FormSection } from "../../ds/FormSection";
 import { DP } from "../../providers";
 import { TextInput } from "../streams/detail/fields";
 import { NOTIFICATION_KEYS, NotificationRows, SCORE_BRACKETS, ScoringFields, ShareCardFields, sameScoring } from "../streams/detail/sections";
@@ -19,7 +19,8 @@ import { ConfirmDelete, useLibraryMutations, useSheet } from "../library/shared"
 import { Pill } from "../../ds/Pill";
 import { EmptyState } from "../../ds/EmptyState";
 import { ContainerCard } from "../../ds/ContainerCard";
-import { RowsSkeleton } from "../../ds/Skeletons";
+import { CardsSkeleton, RowsSkeleton } from "../../ds/Skeletons";
+import { CardGrid, ShopCard } from "../shop/shared";
 import { useNotify } from "../../shell/notifications";
 import { DEFAULT_ROUND_SCORING, stripRichText } from "../streams/enums";
 import { AppCardRows, cardsOf } from "./appCards";
@@ -87,7 +88,8 @@ export const KINDS = {
   notify: { resource: "NotificationPreset", dataProviderName: DP.notificationPresets, noun: "Notification preset", title: "Notifications", description: "New streams start from the Default.", icon: "notifications", empty: () => ({ name: "", ...Object.fromEntries(NOTIFICATION_KEYS.map((k) => [k, ""])) }), summary: (p) => p.lobbyOpenTitle },
 };
 
-export function PresetSheet({ kind, sheet, onSaved }) {
+/** `footerExtra` adds the preset's own action by Delete (Make default, Use in app). */
+export function PresetSheet({ kind, sheet, onSaved, footerExtra }) {
   const k = KINDS[kind];
   const isNew = sheet.open && !sheet.record?.id;
   const { save, destroy, saving } = useLibraryMutations(k);
@@ -118,9 +120,12 @@ export function PresetSheet({ kind, sheet, onSaved }) {
       subtitle={isNew ? undefined : k.noun}
       footerStart={
         !isNew && (
-          <Button variant="text" color="error" onClick={() => setConfirm(true)}>
-            Delete
-          </Button>
+          <>
+            <Button variant="text" color="error" onClick={() => setConfirm(true)}>
+              Delete
+            </Button>
+            {footerExtra}
+          </>
         )
       }
       actions={
@@ -152,11 +157,28 @@ export function PresetSheet({ kind, sheet, onSaved }) {
   );
 }
 
+/** A preset card's status line: its pill, then how many upcoming streams use it, on one line. */
+function PresetStatus({ pill, used }) {
+  if (!pill && !used) return null;
+  return (
+    <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0, width: "100%" }}>
+      {pill}
+      {used > 0 && (
+        <Typography variant="bodySmall" color="text.secondary" noWrap sx={{ minWidth: 0 }}>
+          {used} upcoming {used === 1 ? "stream" : "streams"}
+        </Typography>
+      )}
+    </Box>
+  );
+}
+
 /**
- * The presets of one kind as a titled section: list rows that open their sheet, ending with "Add
- * preset". `bare` leaves out the section card (inside a side sheet).
+ * The presets of one kind. On a page they're cards like every library page (CardGrid + ShopCard):
+ * `page` makes them the whole page (its title names them), otherwise a titled section of their own
+ * (Share cards has three kinds). `bare` (inside a side sheet) keeps them as list rows with their
+ * actions on each row; on cards those actions sit in the preset's sheet.
  */
-export function PresetList({ kind, share, bare = false }) {
+export function PresetList({ kind, share, bare = false, page = false }) {
   const k = KINDS[kind];
   const app = useAppPreset(share, !!k.puzzle);
   const usage = useStreamPresetUsage(kind, k);
@@ -167,52 +189,121 @@ export function PresetList({ kind, share, bare = false }) {
   const sheet = useSheet();
   const { data, isLoading } = useList({ resource: k.resource, dataProviderName: k.dataProviderName, pagination: { mode: "off" } });
   const rows = data?.data ?? [];
-  const list = isLoading ? (
-    <ContainerCard>
-      <RowsSkeleton count={3} lead={false} height={56} label={`Loading ${k.title.toLowerCase()}`} />
-    </ContainerCard>
-  ) : rows.length === 0 ? (
-    <ContainerCard>
-      <EmptyState compact icon={k.icon} title="No presets yet">
-        <Button color="secondary" startIcon={<Icon name="add" />} onClick={sheet.openNew}>
-          New preset
-        </Button>
-      </EmptyState>
-    </ContainerCard>
-  ) : (
-    <ListGroup label={k.title}>
-      {rows.map((p) => (
-        <ListItem
-          key={p.id}
-          onClick={() => sheet.openEdit(p)}
-          leading={<Icon name={k.icon} style={{ color: c.onSurfaceVariant }} />}
-          title={p.name}
-          supporting={forStreams ? [k.summary(p), (() => { const n = usage.usedBy(p); return n ? `Used by ${n} upcoming ${n === 1 ? "stream" : "streams"}` : null; })()].filter(Boolean).join(" · ") : k.summary(p)}
-          trailing={
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-              {share && (app.inUse(p) ? <Pill tone="primary">In use</Pill> : <Button variant="tonal" size="small" onClick={() => app.use(p)}>Use</Button>)}
-              {forStreams && (p.id === defaultId(rows) ? <Pill>Default</Pill> : <Button variant="tonal" size="small" onClick={() => usage.makeDefault(p)}>Make default</Button>)}
-              <Icon name="chevron_right" style={{ color: c.onSurfaceVariant }} />
-            </Box>
-          }
-        />
-      ))}
-      <ListAdd label="Add preset" onClick={sheet.openNew} />
-    </ListGroup>
+  const isDefault = (p) => forStreams && p.id === defaultId(rows);
+  const supporting = (p) => {
+    if (!forStreams) return k.summary(p);
+    const n = usage.usedBy(p);
+    return [k.summary(p), n ? `Used by ${n} upcoming ${n === 1 ? "stream" : "streams"}` : null].filter(Boolean).join(" · ");
+  };
+  const empty = (
+    <EmptyState compact icon={k.icon} title="No presets yet">
+      <Button color="secondary" startIcon={<Icon name="add" />} onClick={sheet.openNew}>
+        New preset
+      </Button>
+    </EmptyState>
   );
-  const editor = <PresetSheet kind={kind} sheet={sheet} onSaved={share ? (saved) => sheet.record?.id && app.inUse(sheet.record) && app.use(saved, true) : undefined} />;
-  if (bare)
+
+  if (bare) {
+    const list = isLoading ? (
+      <ContainerCard>
+        <RowsSkeleton count={3} lead={false} height={56} label={`Loading ${k.title.toLowerCase()}`} />
+      </ContainerCard>
+    ) : rows.length === 0 ? (
+      <ContainerCard>{empty}</ContainerCard>
+    ) : (
+      <ListGroup label={k.title}>
+        {rows.map((p) => (
+          <ListItem
+            key={p.id}
+            onClick={() => sheet.openEdit(p)}
+            leading={<Icon name={k.icon} style={{ color: c.onSurfaceVariant }} />}
+            title={p.name}
+            supporting={supporting(p)}
+            trailing={
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                {share && (app.inUse(p) ? <Pill tone="primary">In use</Pill> : <Button variant="tonal" size="small" onClick={() => app.use(p)}>Use</Button>)}
+                {forStreams && (isDefault(p) ? <Pill>Default</Pill> : <Button variant="tonal" size="small" onClick={() => usage.makeDefault(p)}>Make default</Button>)}
+                <Icon name="chevron_right" style={{ color: c.onSurfaceVariant }} />
+              </Box>
+            }
+          />
+        ))}
+        <ListAdd label="Add preset" onClick={sheet.openNew} />
+      </ListGroup>
+    );
     return (
       <>
         {list}
+        <PresetSheet kind={kind} sheet={sheet} onSaved={share ? (saved) => sheet.record?.id && app.inUse(sheet.record) && app.use(saved, true) : undefined} />
+      </>
+    );
+  }
+
+  // The open preset as the list has it now, for its sheet's action.
+  const open = rows.find((p) => p.id === sheet.record?.id);
+  const action =
+    open && forStreams && !isDefault(open) ? (
+      <Button variant="text" onClick={() => usage.makeDefault(open)}>
+        Make default
+      </Button>
+    ) : open && share && !app.inUse(open) ? (
+      <Button variant="text" onClick={() => app.use(open)}>
+        Use in app
+      </Button>
+    ) : null;
+  const cards = isLoading ? (
+    <CardsSkeleton count={2} media={88} label={`Loading ${k.title.toLowerCase()}`} />
+  ) : rows.length === 0 ? (
+    page ? empty : <ContainerCard>{empty}</ContainerCard>
+  ) : (
+    <CardGrid>
+      {rows.map((p) => (
+        // Like every library card: the title, one line of what it is, then one line of status
+        // (Default / In use and how many upcoming streams use it). Each line stays one line.
+        <ShopCard
+          key={p.id}
+          icon={k.icon}
+          title={p.name}
+          meta={
+            <Typography variant="bodySmall" color="text.secondary" component="div" noWrap>
+              {k.summary(p)}
+            </Typography>
+          }
+          pills={<PresetStatus pill={isDefault(p) ? <Pill>Default</Pill> : share && app.inUse(p) ? <Pill tone="primary">In use</Pill> : null} used={forStreams ? usage.usedBy(p) : 0} />}
+          onOpen={() => sheet.openEdit(p)}
+        />
+      ))}
+    </CardGrid>
+  );
+  const editor = <PresetSheet kind={kind} sheet={sheet} footerExtra={action} onSaved={share ? (saved) => sheet.record?.id && app.inUse(sheet.record) && app.use(saved, true) : undefined} />;
+  if (page)
+    return (
+      <>
+        <PageToolbar description={k.description} actionLabel="New preset" onAction={sheet.openNew} />
+        {cards}
         {editor}
       </>
     );
+  // A titled group of cards, like Polls & trivia's.
   return (
-    <FormSection id={kind} title={k.title} description={k.description}>
-      {list}
+    <Box component="section" id={kind} sx={{ display: "flex", flexDirection: "column", gap: 2, scrollMarginTop: 96 }}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+        <Icon name={k.icon} />
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography variant="titleMedium" component="h2">
+            {k.title}
+          </Typography>
+          <Typography variant="bodySmall" color="text.secondary" component="div">
+            {k.description}
+          </Typography>
+        </Box>
+        <Button variant="tonal" size="small" startIcon={<Icon name="add" size={16} />} onClick={sheet.openNew}>
+          New preset
+        </Button>
+      </Box>
+      {cards}
       {editor}
-    </FormSection>
+    </Box>
   );
 }
 
@@ -241,11 +332,11 @@ export function PresetsButton({ kind }) {
   );
 }
 
-/** Library › Gameplay › Scoring: the scoring presets streams pick from. */
+/** Library › Gameplay › Scoring: the scoring presets streams pick from. One list, so the page title names it. */
 export function ScoringPage() {
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 3, maxWidth: FORM_WIDTH }}>
-      <PresetList kind="scoring" />
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+      <PresetList kind="scoring" page />
     </Box>
   );
 }
@@ -253,9 +344,9 @@ export function ScoringPage() {
 /** Library › Notifications: the notification presets streams pick from. */
 export default function NotificationsPage() {
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 3, maxWidth: FORM_WIDTH }}>
-      {/* The same titled section as each kind on Share cards. */}
-      <PresetList kind="notify" />
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+      {/* One list, so the page title names it (Share cards has several, each titled). */}
+      <PresetList kind="notify" page />
     </Box>
   );
 }

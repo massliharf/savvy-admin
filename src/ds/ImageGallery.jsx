@@ -19,9 +19,10 @@ const toDataUrl = (file) =>
  * Up to `max` images of one kind, one of them selected (ringed, with a check). Click an image to
  * select it, × to remove it, the dashed tile to upload and crop another. The first upload is
  * selected; removing the selected one selects the first left.
- * `onChange(urls, selected)`.
+ * `onChange(urls, selected)`. `hideLabel` leaves the label out (a section title already names it;
+ * it still names the images for screen readers).
  */
-export function ImageGallery({ label, hint, width, height, urls = [], selected, onChange, max = 5 }) {
+export function ImageGallery({ label, hideLabel, hint, width, height, urls = [], selected, onChange, max = 5 }) {
   const { m3: c, tokens } = useTheme();
   const h = 88;
   const w = Math.min(Math.round(h * (width / height)), 156);
@@ -37,9 +38,11 @@ export function ImageGallery({ label, hint, width, height, urls = [], selected, 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
       <Box>
-        <Typography variant="titleSmall" component="div">
-          {label}
-        </Typography>
+        {!hideLabel && (
+          <Typography variant="titleSmall" component="div">
+            {label}
+          </Typography>
+        )}
         <Typography variant="bodySmall" color="text.secondary" component="div">
           {`${hint ?? `${width} × ${height} px`} · ${urls.length} / ${max}`}
         </Typography>

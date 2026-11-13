@@ -56,7 +56,8 @@ export function ShareCardsPage() {
   const share = useShareConfigForm();
   if (!share.loaded) return <Loading />;
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 3, maxWidth: FORM_WIDTH }}>
+    // Three kinds of presets, each a titled group of cards (like Polls & trivia).
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 4 }}>
       <PresetList kind="share" />
       <PresetList kind="app" share={share} />
       <PresetList kind="puzzle" share={share} />

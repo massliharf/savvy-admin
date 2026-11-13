@@ -1,6 +1,6 @@
-// A bundle's settings under Streams › Bundles: what a new stream of it starts with. Game (points
-// per round, the showdown and its prize, rewards) and Messaging. Hosts and sponsors are picked per
-// stream and time slot, not here. How the game shows in the app is edited in Streams › How to play.
+// A bundle's settings under Streams › Bundles: what a new stream of it starts with. Stream image,
+// game (points per round, the showdown and its prize, rewards) and Messaging. Hosts and sponsors
+// are picked per stream, not here. How the game shows in the app is edited in Streams › How to play.
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useForm } from "@refinedev/react-hook-form";
@@ -9,6 +9,7 @@ import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import { Icon } from "../../ds/Icon";
 import { EmptyState } from "../../ds/EmptyState";
+import { ImageGallery } from "../../ds/ImageGallery";
 import { FormSection } from "../../ds/FormSection";
 import { DetailHeader, DetailSkeleton, SectionGroup } from "../../ds/DetailLayout";
 import { IconTile } from "../../ds/IconTile";
@@ -72,6 +73,29 @@ function BundlePresets({ kind, control, setValue, name }) {
   );
 }
 
+/**
+ * The game set's stream image backgrounds (behind the stream's screen, 900 × 1200): up to five, the selected one is
+ * what its new streams start with; a stream can switch to another of these on its page.
+ */
+function StreamImages({ control, setValue }) {
+  const [urls, picked] = useWatch({ control, name: ["streamImageUrls", "streamImageUrl"] });
+  return (
+    <ImageGallery
+      label="Stream image background"
+      hideLabel
+      hint="900 × 1200"
+      width={900}
+      height={1200}
+      urls={urls ?? []}
+      selected={picked}
+      onChange={(next, sel) => {
+        setValue("streamImageUrls", next, { shouldDirty: true });
+        setValue("streamImageUrl", sel, { shouldDirty: true });
+      }}
+    />
+  );
+}
+
 /** A game mode's settings on one page: what its new streams start with. Changes save with the floating Save bar. */
 export function GameModeSettings({ id }) {
   const notify = useNotify();
@@ -109,6 +133,8 @@ export function GameModeSettings({ id }) {
     if (!mode) return;
     reset({
       ...mode,
+      streamImageUrls: mode.streamImageUrls ?? (mode.streamImageUrl ? [mode.streamImageUrl] : []),
+      streamImageUrl: mode.streamImageUrl ?? null,
       streamType: mode.streamType ?? StreamType.Public,
       defaultRewards: mode.defaultRewards?.length ? mode.defaultRewards : [{ rewardType: "BombPowerup", amount: 1 }],
     });
@@ -136,11 +162,15 @@ export function GameModeSettings({ id }) {
       {/* The same groups, in the same order, as a stream's page: it starts with these. */}
       <SectionGroup title="New streams start with">
           <FormSection id="name" title="Name">
-            <TextInput control={control} name="name" label="Name" max={40} rules={{ validate: (v) => (v?.trim() ? (v.trim().length <= 40 ? true : "Use 40 characters or fewer") : "Enter a name") }} />
+            {/* The section names it: no label repeating the title. */}
+            <TextInput control={control} name="name" slotProps={{ htmlInput: { "aria-label": "Name" } }} max={40} rules={{ validate: (v) => (v?.trim() ? (v.trim().length <= 40 ? true : "Use 40 characters or fewer") : "Enter a name") }} />
           </FormSection>
           {/* Public or Internal, and (for a public one) Super Savvy only: new streams of this game set get it. */}
+          <FormSection id="image" title="Stream image background" description="Behind the stream's screen. New streams of this game set start with the selected one; a stream can switch to another of these.">
+            <StreamImages control={control} setValue={setValue} />
+          </FormSection>
           <FormSection id="audience" title="Who can join">
-            <Controller name="streamType" control={control} render={({ field }) => <AudienceField value={field.value} onChange={field.onChange} />} />
+            <Controller name="streamType" control={control} render={({ field }) => <AudienceField value={field.value} onChange={field.onChange} label={null} />} />
           </FormSection>
           <FormSection id="scoring" title="Scoring" description="The preset new streams start from. Open one to see and edit its points.">
             <BundlePresets kind="scoring" control={control} setValue={setValue} name="defaultScoringPresetId" />

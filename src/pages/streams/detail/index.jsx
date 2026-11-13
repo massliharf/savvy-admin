@@ -41,15 +41,16 @@ import {
 // Sponsor, Rewards, Messaging. `fields` are
 // what each owns, to jump to the first error.
 const SECTIONS = [
-  { id: "basics", group: "Stream", label: "When & title", icon: "event", fields: ["title", "subtitle", "startDate", "streamType", "headless", "isSpotlighted"] },
+  // The stream image (from its game set) sits with the stream itself.
+  { id: "basics", group: "Stream", label: "When & title", icon: "event", fields: ["heroImageUrl", "title", "subtitle", "startDate", "streamType", "headless", "isSpotlighted"] },
   // Words holds the rounds and the showdown word together.
   // Words holds the word set and the game mode it brings.
   { id: "words", group: "Game", label: "Words", icon: "spellcheck", fields: ["gameMode", "textSavvyRounds", "showdownConfiguration"] },
   { id: "game", group: "Game", label: "Scoring", icon: "scoreboard", fields: ["roundScoring"] },
-  // The host brings their pictures (host picture, stream image, hero card).
-  { id: "host", group: "Host", label: "Host", icon: "person", fields: ["hostId", "hostName", "imageUrl", "heroImageUrl"] },
+  // The host brings their pictures (host picture, hero card).
+  { id: "host", group: "Host", label: "Host", icon: "person", fields: ["hostId", "hostName", "imageUrl"] },
   { id: "sponsor", group: "Sponsor", label: "Sponsor", icon: "handshake", fields: ["sponsorship"] },
-  { id: "rewards-card", group: "Rewards", label: "Rewards", icon: "redeem", fields: ["defaultRewards", "hostBusterReward", "hostStumperBonusXp"] },
+  { id: "rewards-card", group: "Rewards", label: "Game rewards", icon: "redeem", fields: ["defaultRewards", "hostBusterReward", "hostStumperBonusXp"] },
   { id: "raffle", group: "Rewards", label: "Raffle", icon: "confirmation_number", fields: ["raffleSystemWinnersConfiguration"] },
   { id: "share", group: "Messaging", label: "Share cards", icon: "style", fields: ["shareableCards"] },
   { id: "notifications-card", group: "Messaging", label: "Notifications", icon: "notifications", fields: ["lobbyOpenTitle", "lobbyOpenBody", "goingLiveTitle", "goingLiveBody", "round1StartsTitle", "round1StartsBody", "round1StartsAt"] },

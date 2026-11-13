@@ -32,13 +32,12 @@ import { CardGrid, ShopCard } from "../shop/shared";
 import { ConfirmDelete, LibraryToolbar, useLibraryMutations, useSheet } from "./shared";
 import { CardsSkeleton } from "../../ds/Skeletons";
 
-// Each picture kind keeps up to five images; the selected one (imageUrl, streamImageUrl,
-// heroCardImageUrl) is what new streams use.
-const EMPTY = { id: "", name: "", displayName: "", imageUrl: null, pictureUrls: [], streamImageUrl: null, streamImageUrls: [], heroCardImageUrl: null, heroCardImageUrls: [] };
+// Each picture kind keeps up to five images; the selected one (imageUrl, heroCardImageUrl) is what
+// new streams use. The stream image (900 × 1200) comes from the stream's game set, not the host.
+const EMPTY = { id: "", name: "", displayName: "", imageUrl: null, pictureUrls: [], heroCardImageUrl: null, heroCardImageUrls: [] };
 const GALLERIES = [
-  // The same three, by the same names, as a stream's Host section shows them.
+  // The same two, by the same names, as a stream's Host section shows them.
   { list: "pictureUrls", pick: "imageUrl", label: "Host picture", width: 256, height: 256, hint: "Avatar and stream thumbnail · 256 × 256" },
-  { list: "streamImageUrls", pick: "streamImageUrl", label: "Stream image", width: 900, height: 1200, hint: "The stream's screen · 900 × 1200" },
   { list: "heroCardImageUrls", pick: "heroCardImageUrl", label: "Hero card image", width: 256, height: 256, hint: "Home screen card · 256 × 256" },
 ];
 const galleryOf = (r, g) => r?.[g.list] ?? (r?.[g.pick] ? [r[g.pick]] : []);

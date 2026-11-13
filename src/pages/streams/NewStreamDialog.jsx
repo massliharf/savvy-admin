@@ -95,16 +95,20 @@ export function NewStreamDialog({ open, source, date, hosts, onClose, onCreated 
       const { id, status, prizePool, totalPrizePool, isDraft, hideGameModeLogo, ...copy } = source;
       const sameMode = (source.gameMode ?? null) === (mode?.id ?? null);
       const sameHost = source.hostId === host?.id;
+      const sameSet = (source.bundleId ?? null) === bundleId;
       values = {
         ...copy,
         title: base.title,
         startDate,
         streamType: form.streamType,
         gameMode: values.gameMode,
+        // The game set picked here (a copy starts with its source's).
+        bundleId: values.bundleId,
         hostId: values.hostId,
         hostName: values.hostName,
         imageUrl: sameHost ? copy.imageUrl : values.imageUrl,
-        heroImageUrl: sameHost ? copy.heroImageUrl : values.heroImageUrl,
+        // The stream image belongs to the game set: a copy in the same set keeps the source's.
+        heroImageUrl: sameSet ? copy.heroImageUrl : values.heroImageUrl,
         textSavvyRounds: sameMode ? { rounds: (copy.textSavvyRounds?.rounds ?? []).map((r) => ({ ...r, word: "" })) } : values.textSavvyRounds,
         showdownConfiguration: sameMode && copy.showdownConfiguration ? { ...copy.showdownConfiguration, word: "" } : values.showdownConfiguration,
         roundScoring: sameMode ? copy.roundScoring : values.roundScoring,

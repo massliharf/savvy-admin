@@ -38,9 +38,6 @@ export default function AppearancePage() {
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3, maxWidth: FORM_WIDTH }}>
       <SettingsCard title="Theme">
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-          <Typography variant="labelLarge" color="text.secondary">
-            Mode
-          </Typography>
           <ToggleButtonGroup exclusive value={settings.mode} onChange={(_, mode) => mode && settings.update({ mode })} aria-label="Colour mode" sx={{ alignSelf: "flex-start" }}>
             <ToggleButton value="light">
               <Icon name="light_mode" size={16} />
@@ -64,7 +61,7 @@ export default function AppearancePage() {
           options={TIMEZONES}
           disableClearable
           onChange={(_, tz) => tz && setTimezone(tz)}
-          renderInput={(params) => <TextField {...params} label="Time zone" />}
+          renderInput={(params) => <TextField {...params} inputProps={{ ...params.inputProps, "aria-label": "Time zone" }} />}
           sx={{ maxWidth: 400 }}
         />
       </SettingsCard>

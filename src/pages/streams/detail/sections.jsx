@@ -2,6 +2,7 @@
 import { useEffect, useRef } from "react";
 import { Controller, useFormState, useWatch } from "react-hook-form";
 import { useList } from "@refinedev/core";
+import { Link } from "react-router";
 import Avatar from "@mui/material/Avatar";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -79,21 +80,24 @@ function SwitchListRow({ control, name, icon, title, supporting }) {
   return <Controller name={name} control={control} render={({ field }) => <ListSwitch icon={icon} title={title} supporting={supporting} checked={!!field.value} onChange={field.onChange} />} />;
 }
 
-/** The stream itself: images first, then title and subtitle, when, who sees it, and its toggles. */
-// The host's three pictures, each its own thing (set in Hosts, picked per stream from the host's
-// galleries): the host picture (avatar and stream thumbnail), the stream image (the stream's
-// screen) and the hero card image (the home screen card).
+// The host's two pictures, each its own thing (set in Hosts, picked per stream from the host's
+// galleries): the host picture (avatar and stream thumbnail) and the hero card image (the home
+// screen card).
 const HOST_PICTURES = [
   { label: "Host picture", hint: "Avatar and stream thumbnail", list: "pictureUrls", pick: "imageUrl", field: "imageUrl", file: "hostImageFile", ratio: 1 },
-  { label: "Stream image", hint: "The stream's screen", list: "streamImageUrls", pick: "streamImageUrl", field: "heroImageUrl", file: "heroImageFile", ratio: 0.75 },
   { label: "Hero card image", hint: "Home screen card", list: "heroCardImageUrls", pick: "heroCardImageUrl", field: "heroCardImageUrl", file: null, ratio: 1 },
 ];
+// The stream image background (behind the stream's screen, 900 × 1200) comes from the stream's game set.
+const STREAM_IMAGE = { label: "Stream image background", hint: "Behind the stream's screen", list: "streamImageUrls", pick: "streamImageUrl", field: "heroImageUrl", file: "heroImageFile", ratio: 0.75 };
 
-/** Where a host's picture of one kind is used on this stream, and the host's others to switch to. */
-function HostPictureRow({ def, host, value, onPick }) {
+/**
+ * Where a picture of one kind is used on this stream, and the others of its `source` (the host or
+ * the game set) to switch to. `empty` says what's missing when there's none.
+ */
+function PictureRow({ def, source, value, onPick, empty }) {
   const { m3: c, tokens } = useTheme();
-  const urls = host?.[def.list] ?? (host?.[def.pick] ? [host[def.pick]] : []);
-  const current = value || host?.[def.pick] || null;
+  const urls = source?.[def.list] ?? (source?.[def.pick] ? [source[def.pick]] : []);
+  const current = value || source?.[def.pick] || null;
   const tile = (url, size, on, onClick, i) => (
     <ButtonBase
       key={url ? url.slice(-40) + i : "none"}
@@ -114,10 +118,10 @@ function HostPictureRow({ def, host, value, onPick }) {
           {def.label}
         </Typography>
         <Typography variant="bodySmall" color="text.secondary" component="div">
-          {current ? def.hint : `${hostLabel(host) || "This host"} has none yet`}
+          {current ? def.hint : empty}
         </Typography>
       </Box>
-      {/* The host's others of this kind, to use one for this stream instead. */}
+      {/* The others of this kind, to use one for this stream instead. */}
       {urls.length > 1 && <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", justifyContent: "flex-end" }}>{urls.map((u, i) => tile(u, 36, u === current, () => onPick(u), i))}</Box>}
     </Box>
   );
@@ -141,10 +145,11 @@ function HostPictures({ form, host, onEditHost }) {
         )}
       </Box>
       {HOST_PICTURES.map((d, i) => (
-        <HostPictureRow
+        <PictureRow
           key={d.field}
           def={d}
-          host={host}
+          source={host}
+          empty={`${hostLabel(host) || "This host"} has none yet`}
           value={values[i]}
           onPick={(url) => {
             if (d.file) setValue(d.file, null);
@@ -156,10 +161,44 @@ function HostPictures({ form, host, onEditHost }) {
   );
 }
 
+/** The stream image background as this stream uses it, and its game set's others to switch to. */
+function StreamImage({ form }) {
+  const { control, setValue } = form;
+  const [bundleId, value] = useWatch({ control, name: ["bundleId", STREAM_IMAGE.field] });
+  const { byId } = useBundles();
+  const set = byId[bundleId];
+  return (
+    <Box>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+        <Typography variant="overline" color="text.secondary" component="h3" sx={{ flex: 1 }}>
+          {set ? `From ${set.name}` : "Game set"}
+        </Typography>
+        {set && (
+          <Button variant="text" size="small" startIcon={<Icon name="edit" size={16} />} component={Link} to={`/game-sets/${set.id}#image`}>
+            Edit in Game sets
+          </Button>
+        )}
+      </Box>
+      <PictureRow
+        def={STREAM_IMAGE}
+        source={set}
+        empty={set ? `${set.name} has none yet` : "None yet"}
+        value={value}
+        onPick={(url) => {
+          setValue(STREAM_IMAGE.file, null);
+          setValue(STREAM_IMAGE.field, url, { shouldDirty: true });
+        }}
+      />
+    </Box>
+  );
+}
+
+/** The stream itself: its image background first, then title and subtitle, when, who sees it, and its toggles. */
 export function DetailsSection({ form, frame }) {
   const { control } = form;
   return (
     <FormSection {...frame} id="basics" title="When & title">
+      <StreamImage form={form} />
       <TextInput control={control} name="title" label="Title" max={100} rules={{ validate: titleRule }} helperText="{host} becomes the host's name wherever the title shows." />
       <TextInput control={control} name="subtitle" label="Subtitle" />
       <DateTimeInput control={control} name="startDate" rules={{ required: "Pick a date and time" }} />
@@ -213,12 +252,10 @@ export function HostSection({ form, hosts, frame }) {
             onChange={(h) => {
               setValue("hostId", h?.id ?? "", { shouldDirty: true, shouldValidate: true });
               setValue("hostName", h?.name ?? "", { shouldDirty: true });
-              // A new host brings their selected pictures (picture, stream image, hero card).
+              // A new host brings their selected pictures (picture, hero card); the stream image is the game set's.
               setValue("imageUrl", h?.imageUrl ?? null, { shouldDirty: true });
-              setValue("heroImageUrl", h?.streamImageUrl ?? null, { shouldDirty: true });
               setValue("heroCardImageUrl", h?.heroCardImageUrl ?? null, { shouldDirty: true });
               setValue("hostImageFile", null);
-              setValue("heroImageFile", null);
             }}
           />
         )}
@@ -400,7 +437,7 @@ function ScoringPresetField({ control, setValue }) {
     if (!p) return;
     setValue("roundScoring", structuredClone(p.roundScoring), { shouldDirty: true, shouldValidate: true });
   };
-  return <SelectButton label="Scoring preset" value={current?.id ?? ""} placeholder="Custom" options={presets.map((p) => ({ value: p.id, label: p.name }))} onChange={pick} sx={{ maxWidth: 320 }} />;
+  return <SelectButton label="Preset" value={current?.id ?? ""} placeholder="Custom" options={presets.map((p) => ({ value: p.id, label: p.name }))} onChange={pick} sx={{ maxWidth: 320 }} />;
 }
 
 /** This stream's points per round: a scoring preset, then this stream's copy. */
@@ -795,7 +832,7 @@ export function RewardsEditor({ form, prefix = "", keys, stumper }) {
 
 export function RewardsSection({ form, frame }) {
   return (
-    <FormSection {...frame} id="rewards-card" title="Rewards">
+    <FormSection {...frame} id="rewards-card" title="Game rewards">
       <RewardsEditor form={form} keys={["defaultRewards", "hostBusterReward"]} stumper />
     </FormSection>
   );
@@ -1105,11 +1142,12 @@ export function useSectionStatus(form, sections, hosts) {
 
   const parts = {
     basics: {
-      todo: [!title?.trim() && "Add a title", !startDate && "Pick a date"].filter(Boolean),
+      todo: [!title?.trim() && "Add a title", !startDate && "Pick a date", !form.heroImageUrl && "Stream image background missing"].filter(Boolean),
       summary: [fillHost(title?.trim(), hostLabel(host) || hostName) || "Untitled", startDate && formatDate(startDate, "ddd, MMM D · h:mm A"), streamType === StreamType.Internal ? "Internal" : streamType === StreamType.SuperSavvy ? "Super Savvy only" : "Public", showdown && (showdown.superSavvyOnly ? "Super Savvy Showdown" : "Savvy Showdown")].filter(Boolean).join(" · "),
     },
-    // The pictures come from the host: missing ones are added in Hosts.
-    host: { todo: [!hostId && "Pick a host", hostId && !form.imageUrl && "Host picture missing", hostId && !form.heroImageUrl && "Stream image missing"].filter(Boolean), ...(hostId ? part(hostLabel(host) || hostName, !defaultHost || hostId === defaultHost.id, ["hostId", "hostName", "imageUrl", "heroImageUrl", "heroCardImageUrl"]) : { summary: "No host" }) },
+    // The host's pictures come from the host: missing ones are added in Hosts. The stream image is
+    // the game set's (When & title).
+    host: { todo: [!hostId && "Pick a host", hostId && !form.imageUrl && "Host picture missing"].filter(Boolean), ...(hostId ? part(hostLabel(host) || hostName, !defaultHost || hostId === defaultHost.id, ["hostId", "hostName", "imageUrl", "heroCardImageUrl"]) : { summary: "No host" }) },
     words: {
       // The game mode comes with the word set: none yet means no word set.
       todo: [!mode && "Pick a word set", missingWords > 0 && `${missingWords} ${missingWords === 1 ? "word" : "words"} missing`, (rounds ?? []).length === 0 && "No rounds", showdown && !showdown.word && "Showdown word missing"].filter(Boolean),
