@@ -22,6 +22,7 @@ import { ModeLogo } from "../ModeLogo";
 import { PresetsButton } from "../../liveops/presets";
 import { AudienceField, HostPicker, PickCard, PickPlaceholder } from "../pickers";
 import { HostSheet } from "../../library/hosts";
+import { StreamBakePreview } from "../bakeTrial"; // bake trial
 import { fillHost, hostLabel, titleRule } from "../hosts";
 import { useWordSets, useWordsLock } from "../words";
 import { useSheet } from "../../library/shared";
@@ -164,7 +165,7 @@ function HostPictures({ form, host, onEditHost }) {
 /** The stream image background as this stream uses it, and its game set's others to switch to. */
 function StreamImage({ form }) {
   const { control, setValue } = form;
-  const [bundleId, value] = useWatch({ control, name: ["bundleId", STREAM_IMAGE.field] });
+  const [bundleId, value, hostPicture, hostId] = useWatch({ control, name: ["bundleId", STREAM_IMAGE.field, "imageUrl", "hostId"] });
   const { byId } = useBundles();
   const set = byId[bundleId];
   return (
@@ -189,6 +190,7 @@ function StreamImage({ form }) {
           setValue(STREAM_IMAGE.field, url, { shouldDirty: true });
         }}
       />
+      <StreamBakePreview background={value || set?.streamImageUrl} host={hostPicture} hostId={hostId} setName={set?.name} /> {/* bake trial */}
     </Box>
   );
 }
