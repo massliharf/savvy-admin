@@ -630,8 +630,10 @@ export function ShowdownFields({ control, name, validateWord, word = true, label
       minWidth={360}
       reserveRemove
       // The same tracks as the other tables (rounds, raffle, rewards), so the prize lines up with
-      // their values; without a word (game mode defaults) that column stays empty.
-      columns={[{ header: "", width: "16px" }, { header: word ? "Word" : typeSelect ? "Showdown" : "", width: "minmax(96px, 1fr)" }, { header: "", width: "64px" }, { header: "Prize", width: "200px" }]}
+      // their values; without a word (game mode defaults) that column stays empty. The showdown
+      // select (a game set) takes the spacer too, so its name fits in a side sheet: the prize
+      // stays put, as it's placed from the right.
+      columns={[{ header: "", width: "16px" }, { header: word ? "Word" : typeSelect ? "Showdown" : "", width: "minmax(96px, 1fr)" }, ...(!word && typeSelect ? [] : [{ header: "", width: "64px" }]), { header: "Prize", width: "200px" }]}
       rows={[
         {
           key: "sd",
@@ -649,7 +651,7 @@ export function ShowdownFields({ control, name, validateWord, word = true, label
                 {label}
               </Typography>
             ),
-            null,
+            ...(!word && typeSelect ? [] : [null]),
             <RewardCell key="p" control={control} name={`${name}.prize`} allowed={SHOWDOWN_REWARDS} label="Showdown prize" />,
           ],
         },

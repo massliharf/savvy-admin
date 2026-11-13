@@ -10,7 +10,7 @@ import Button from "@mui/material/Button";
 import { Icon } from "../../ds/Icon";
 import { EmptyState } from "../../ds/EmptyState";
 import { ImageGallery } from "../../ds/ImageGallery";
-import { FormSection } from "../../ds/FormSection";
+import { FieldGroup, FormSection } from "../../ds/FormSection";
 import { DetailHeader, DetailSkeleton, SectionGroup } from "../../ds/DetailLayout";
 import { IconTile } from "../../ds/IconTile";
 import { TextInput } from "../streams/detail/fields";
@@ -96,6 +96,80 @@ function StreamImages({ control, setValue }) {
   );
 }
 
+/** A game set as its form edits it: older ones get their gallery, audience and a reward. */
+export const gameSetForm = (mode) => ({
+  ...mode,
+  streamImageUrls: mode.streamImageUrls ?? (mode.streamImageUrl ? [mode.streamImageUrl] : []),
+  streamImageUrl: mode.streamImageUrl ?? null,
+  streamType: mode.streamType ?? StreamType.Public,
+  defaultRewards: mode.defaultRewards?.length ? mode.defaultRewards : [{ rewardType: "BombPowerup", amount: 1 }],
+});
+
+const nameRule = { validate: (v) => (v?.trim() ? (v.trim().length <= 40 ? true : "Use 40 characters or fewer") : "Enter a name") };
+
+/** One part of a game set: a card on its page, a titled group (set off by a divider) in its side sheet. */
+function Part({ inSheet, id, title, description, children }) {
+  if (inSheet)
+    return (
+      <FieldGroup title={title} description={description}>
+        {children}
+      </FieldGroup>
+    );
+  return (
+    <FormSection id={id} title={title} description={description}>
+      {children}
+    </FormSection>
+  );
+}
+
+/**
+ * Everything a game set holds, the same parts in the same order wherever it's edited: its page
+ * (cards) or the side sheet a stream's page opens (`inSheet`: flat groups, no cards). `form` is
+ * { control, setValue, getValues, trigger }.
+ */
+export function GameSetFields({ form, inSheet = false }) {
+  const { control, setValue } = form;
+  const streamType = useWatch({ control, name: "streamType" });
+  return (
+    <>
+      {/* The same groups, in the same order, as a stream's page: it starts with these. */}
+      <SectionGroup title="New streams start with">
+        {inSheet ? (
+          <TextInput control={control} name="name" label="Name" max={40} rules={nameRule} />
+        ) : (
+          <FormSection id="name" title="Name">
+            {/* The section names it: no label repeating the title. */}
+            <TextInput control={control} name="name" slotProps={{ htmlInput: { "aria-label": "Name" } }} max={40} rules={nameRule} />
+          </FormSection>
+        )}
+        <Part inSheet={inSheet} id="image" title="Stream image background" description="Behind the stream's screen. New streams of this game set start with the selected one; a stream can switch to another of these.">
+          <StreamImages control={control} setValue={setValue} />
+        </Part>
+        {/* Public or Internal, and (for a public one) Super Savvy only: new streams of this game set get it. */}
+        <Part inSheet={inSheet} id="audience" title="Who can join">
+          <Controller name="streamType" control={control} render={({ field }) => <AudienceField value={field.value} onChange={field.onChange} label={null} />} />
+        </Part>
+        <Part inSheet={inSheet} id="scoring" title="Scoring" description="The preset new streams start from. Open one to see and edit its points.">
+          <BundlePresets kind="scoring" control={control} setValue={setValue} name="defaultScoringPresetId" />
+        </Part>
+        <Part inSheet={inSheet} id="game" title="Game" description="The showdown and the rewards.">
+          <ShowdownEditor control={control} setValue={setValue} name="showdown" word={false} superSavvy={streamType === StreamType.SuperSavvy} note="Each stream gets its showdown word from its word set." />
+          <RewardsEditor form={form} keys={["defaultRewards"]} stumper />
+        </Part>
+      </SectionGroup>
+      {/* The library's presets, as in Library: pick one per kind; a row opens it to edit. */}
+      <SectionGroup title="Messaging">
+        <Part inSheet={inSheet} id="share" title="Share cards" description="The preset new streams start from. Open one to see and edit its cards.">
+          <BundlePresets kind="share" control={control} setValue={setValue} name="defaultSharePresetId" />
+        </Part>
+        <Part inSheet={inSheet} id="notifications" title="Notifications" description="The preset new streams start from. Open one to see and edit its texts.">
+          <BundlePresets kind="notify" control={control} setValue={setValue} name="defaultNotificationPresetId" />
+        </Part>
+      </SectionGroup>
+    </>
+  );
+}
+
 /** A game mode's settings on one page: what its new streams start with. Changes save with the floating Save bar. */
 export function GameModeSettings({ id }) {
   const notify = useNotify();
@@ -127,17 +201,10 @@ export function GameModeSettings({ id }) {
   // The same parts as a stream's page (scoring, rewards) take the form as one object.
   const modeForm = { control, setValue, getValues, trigger };
   const mode = query?.data?.data;
-  const streamType = useWatch({ control, name: "streamType" });
 
   useEffect(() => {
     if (!mode) return;
-    reset({
-      ...mode,
-      streamImageUrls: mode.streamImageUrls ?? (mode.streamImageUrl ? [mode.streamImageUrl] : []),
-      streamImageUrl: mode.streamImageUrl ?? null,
-      streamType: mode.streamType ?? StreamType.Public,
-      defaultRewards: mode.defaultRewards?.length ? mode.defaultRewards : [{ rewardType: "BombPowerup", amount: 1 }],
-    });
+    reset(gameSetForm(mode));
     setLoaded(true);
   }, [mode, reset]);
 
@@ -159,36 +226,7 @@ export function GameModeSettings({ id }) {
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2, maxWidth: 880 }}>
-      {/* The same groups, in the same order, as a stream's page: it starts with these. */}
-      <SectionGroup title="New streams start with">
-          <FormSection id="name" title="Name">
-            {/* The section names it: no label repeating the title. */}
-            <TextInput control={control} name="name" slotProps={{ htmlInput: { "aria-label": "Name" } }} max={40} rules={{ validate: (v) => (v?.trim() ? (v.trim().length <= 40 ? true : "Use 40 characters or fewer") : "Enter a name") }} />
-          </FormSection>
-          {/* Public or Internal, and (for a public one) Super Savvy only: new streams of this game set get it. */}
-          <FormSection id="image" title="Stream image background" description="Behind the stream's screen. New streams of this game set start with the selected one; a stream can switch to another of these.">
-            <StreamImages control={control} setValue={setValue} />
-          </FormSection>
-          <FormSection id="audience" title="Who can join">
-            <Controller name="streamType" control={control} render={({ field }) => <AudienceField value={field.value} onChange={field.onChange} label={null} />} />
-          </FormSection>
-          <FormSection id="scoring" title="Scoring" description="The preset new streams start from. Open one to see and edit its points.">
-            <BundlePresets kind="scoring" control={control} setValue={setValue} name="defaultScoringPresetId" />
-          </FormSection>
-          <FormSection id="game" title="Game" description="The showdown and the rewards.">
-            <ShowdownEditor control={control} setValue={setValue} name="showdown" word={false} superSavvy={streamType === StreamType.SuperSavvy} note="Each stream gets its showdown word from its word set." />
-            <RewardsEditor form={modeForm} keys={["defaultRewards"]} stumper />
-          </FormSection>
-      </SectionGroup>
-      {/* The library's presets, as in Library: pick one per kind; a row opens it to edit. */}
-      <SectionGroup title="Messaging">
-          <FormSection id="share" title="Share cards" description="The preset new streams start from. Open one to see and edit its cards.">
-            <BundlePresets kind="share" control={control} setValue={setValue} name="defaultSharePresetId" />
-          </FormSection>
-          <FormSection id="notifications" title="Notifications" description="The preset new streams start from. Open one to see and edit its texts.">
-            <BundlePresets kind="notify" control={control} setValue={setValue} name="defaultNotificationPresetId" />
-          </FormSection>
-      </SectionGroup>
+      <GameSetFields form={modeForm} />
       <Box>
         <Button variant="text" color="error" startIcon={<Icon name="delete" />} disabled={deleting} onClick={() => setConfirmDelete(true)}>
           Delete game set
