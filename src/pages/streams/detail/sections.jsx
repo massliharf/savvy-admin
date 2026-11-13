@@ -2,7 +2,6 @@
 import { useEffect, useRef } from "react";
 import { Controller, useFormState, useWatch } from "react-hook-form";
 import { useList } from "@refinedev/core";
-import { Link } from "react-router";
 import Avatar from "@mui/material/Avatar";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -22,6 +21,7 @@ import { ModeLogo } from "../ModeLogo";
 import { PresetsButton } from "../../liveops/presets";
 import { AudienceField, HostPicker, PickCard, PickPlaceholder } from "../pickers";
 import { HostSheet } from "../../library/hosts";
+import { GameSetSheet } from "../../gameModes/sheet";
 import { StreamBakePreview } from "../bakeTrial"; // bake trial
 import { fillHost, hostLabel, titleRule } from "../hosts";
 import { useWordSets, useWordsLock } from "../words";
@@ -164,10 +164,11 @@ function HostPictures({ form, host, onEditHost }) {
 
 /** The stream image background as this stream uses it, and its game set's others to switch to. */
 function StreamImage({ form }) {
-  const { control, setValue } = form;
+  const { control, setValue, getValues } = form;
   const [bundleId, value, hostPicture, hostId] = useWatch({ control, name: ["bundleId", STREAM_IMAGE.field, "imageUrl", "hostId"] });
   const { byId } = useBundles();
   const set = byId[bundleId];
+  const sheet = useSheet();
   return (
     <Box>
       <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
@@ -175,7 +176,7 @@ function StreamImage({ form }) {
           {set ? `From ${set.name}` : "Game set"}
         </Typography>
         {set && (
-          <Button variant="text" size="small" startIcon={<Icon name="edit" size={16} />} component={Link} to={`/game-sets/${set.id}#image`}>
+          <Button variant="text" size="small" startIcon={<Icon name="edit" size={16} />} onClick={() => sheet.openEdit(set)}>
             Edit in Game sets
           </Button>
         )}
@@ -191,6 +192,17 @@ function StreamImage({ form }) {
         }}
       />
       <StreamBakePreview background={value || set?.streamImageUrl} host={hostPicture} hostId={hostId} setName={set?.name} /> {/* bake trial */}
+      {/* Edits the game set in Game sets (every stream of it shows the change). */}
+      <GameSetSheet
+        sheet={sheet}
+        onSaved={(before, after) => {
+          // Upcoming streams still on the game set's old background move to its new one (as the
+          // server does): this stream's form follows, without counting as an edit of its own.
+          const current = getValues(STREAM_IMAGE.field);
+          const next = after?.streamImageUrl;
+          if (next && next !== before.streamImageUrl && getValues("status") === "Scheduled" && (!current || current === before.streamImageUrl)) setValue(STREAM_IMAGE.field, next);
+        }}
+      />
     </Box>
   );
 }
