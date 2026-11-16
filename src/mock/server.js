@@ -3,12 +3,13 @@
 // localStorage ("savvy-mock-db"); call window.__resetMockDb() to restore the seed.
 import * as seed from "./seed";
 import { LOGO_URL } from "../assets";
+import { DEFAULT_AVATAR_BACKGROUND, seedBackgroundPresets } from "../utils/backgrounds";
 import { HOST_PICTURE_URL, MODE_LOGOS, STREAM_HERO_URL } from "../assets";
 
 // Version 2 keeps its own saved data: version 1 is published on the same site (same browser
 // storage) and must not be touched by it.
 const DB_KEY = "savvy-mock-db-2";
-const DB_VERSION = 56;
+const DB_VERSION = 59;
 
 // The demo data: one host (Scott), one sponsor (Wendy's) and one stream per state and edge case,
 // spread over the month around today (see DEMO_STREAMS). Streams are built like new ones: from a
@@ -115,7 +116,8 @@ function populate(d) {
   const nextWords = () => Array.from({ length: 5 }, () => SAMPLE_WORDS[w++ % SAMPLE_WORDS.length]);
   const day = (off) => new Date(Date.parse(`${todayKey}T12:00:00Z`) + off * 86400000).toISOString().slice(0, 10);
   d.bundles ??= seed.seedBundles();
-  d.bundles.forEach(withStreamImages);
+  d.rewardSets ??= seed.seedRewardSets();
+  d.bundles.forEach(withBackgrounds);
   const rows = DEMO_STREAMS.map((p) => ({ ...p, at: p.time === "live" ? now - 10 * 60000 : ptTime(day(p.off), p.time) })).sort((a, b) => a.at - b.at);
 
   const sets = [];
@@ -137,7 +139,8 @@ function populate(d) {
     const words = nextWords();
     const showdownWord = SAMPLE_SHOWDOWNS[i % SAMPLE_SHOWDOWNS.length];
     const complete = p.words === 5 && p.showdown !== "empty";
-    const rounds = words.map((word, r) => ({ roundIndex: r, word: r < p.words ? word : "", durationInSeconds: seed.secondsFor(r < p.words ? word : "", r), prizes: null, roundBusterReward: { rewardType: "Sparks", amount: 5 * (r + 1) } }));
+    const pays = rewardsOf(bundle, d);
+    const rounds = words.map((word, r) => ({ roundIndex: r, word: r < p.words ? word : "", durationInSeconds: seed.secondsFor(r < p.words ? word : "", r), prizes: null, roundBusterReward: roundRewardOf(pays, r) }));
     const st = {
       id: uuid(),
       title: p.title ?? "You vs {host}",
@@ -149,16 +152,21 @@ function populate(d) {
       hostId: host?.id ?? null,
       hostName: host?.name ?? null,
       imageUrl: host?.imageUrl ?? null,
-      heroImageUrl: bundle.streamImageUrl || STREAM_HERO_URL,
+      // The live game host avatar: its background from the game set, its image from the host.
+      heroImageUrl: bundle.avatarBackgroundUrl || STREAM_HERO_URL,
+      // The hero card: its background from the game set, its image (heroCardImageUrl) from the host.
+      heroCardImageUrl: host?.heroCardImageUrl ?? null,
+      heroCardBackgroundUrl: bundle.heroCardBackgroundUrl ?? null,
+      powerUpIds: [...(bundle.powerUpIds ?? [])],
       streamType,
       // The format (How to play & format) is picked on the stream; some have none yet.
       gameMode: p.mode ?? null,
       bundleId: bundle.id,
       textSavvyRounds: { rounds },
-      showdownConfiguration: hasShowdown ? { word: p.showdown === "word" ? showdownWord : "", prize: { ...bundle.showdown.prize }, superSavvyOnly: streamType === "SuperSavvy" || !!bundle.showdown.superSavvyOnly } : null,
+      showdownConfiguration: hasShowdown ? { word: p.showdown === "word" ? showdownWord : "", prize: { ...pays.showdownPrize }, superSavvyOnly: streamType === "SuperSavvy" || !!bundle.showdown?.superSavvyOnly } : null,
       roundScoring: structuredClone(bundle.roundScoring),
-      hostStumperBonusXp: bundle.hostStumperBonusXp ?? null,
-      defaultRewards: structuredClone(bundle.defaultRewards),
+      hostStumperBonusXp: pays.hostStumperBonusXp ?? null,
+      defaultRewards: structuredClone(pays.defaultRewards ?? []),
       hostBusterReward: p.buster ? { rewardType: "Sparks", amount: 25 } : null,
       raffleSystemWinnersConfiguration: p.raffle ? [{ rewardType: "Cash", amount: 10 }, { rewardType: "Cash", amount: 5 }] : null,
       sponsorship: p.sponsor ? { title: wendys.title, description: wendys.description, cta: wendys.cta, imageUrl: wendys.imageUrl ?? null } : null,
@@ -231,6 +239,8 @@ function freshDb() {
     ...libraries,
     powerUps: seed.seedPowerUps(),
     scoringPresets: seed.seedScoringPresets(),
+    rewardSets: seed.seedRewardSets(),
+    backgroundPresets: seedBackgroundPresets(),
     bundles: seed.seedBundles(),
     scheduleSlots: seed.seedScheduleSlots(),
     wordSets: seed.seedWordSets(),
@@ -598,13 +608,91 @@ function load() {
             b.streamImageUrls ??= [...urls];
             b.streamImageUrl ??= host?.streamImageUrl ?? urls[0];
           }
-          withStreamImages(b);
         });
         (parsed.hosts ?? []).forEach((h) => {
           delete h.streamImageUrl;
           delete h.streamImageUrls;
         });
         parsed.version = 56;
+      }
+      if (parsed.version === 56) {
+        // v57 (2026-11-15):
+        // - Rewards are their own list (Reward sets); each game set picks one. A game set's own
+        //   rewards become a reward set (the same rewards share one).
+        // - Power-ups are picked per game set (and per stream), no longer per game mode.
+        // - Game sets hold two backgrounds: the live game host avatar background (was the stream
+        //   image background) and the hero card background (new).
+        // - A host has one avatar image and one hero card image (no galleries).
+        parsed.rewardSets ??= [];
+        const modePowerUps = [...new Set((parsed.gameModes ?? []).flatMap((m) => m.powerUpIds ?? []))];
+        const allPowerUps = (parsed.powerUps ?? []).map((p) => p.id);
+        (parsed.bundles ?? []).forEach((b) => {
+          const pays = {
+            roundRewards: seed.roundRewardsFor(5),
+            showdownPrize: b.showdown?.prize ?? { rewardType: "Cash", amount: 100 },
+            defaultRewards: b.defaultRewards ?? [{ rewardType: "BombPowerup", amount: 1 }],
+            hostBusterReward: null,
+            hostStumperBonusXp: b.hostStumperBonusXp ?? 500,
+            raffleSystemWinnersConfiguration: null,
+          };
+          const same = parsed.rewardSets.find((r) => samePays(r, pays));
+          if (same) b.rewardSetId = same.id;
+          else {
+            const cash = pays.showdownPrize.rewardType === "Cash";
+            const base = cash ? "Cash game" : "Sparks game";
+            const taken = parsed.rewardSets.filter((r) => r.name === base || r.name.startsWith(`${base} `)).length;
+            const id = !parsed.rewardSets.length ? seed.DEFAULT_REWARD_SET_ID : cash ? `rewards-cash-${uuid().slice(0, 8)}` : parsed.rewardSets.some((r) => r.id === seed.SPARKS_REWARD_SET_ID) ? `rewards-sparks-${uuid().slice(0, 8)}` : seed.SPARKS_REWARD_SET_ID;
+            parsed.rewardSets.push({ id, name: taken ? `${base} ${taken + 1}` : base, isDefault: !parsed.rewardSets.length, ...pays });
+            b.rewardSetId = id;
+          }
+          b.showdown = { superSavvyOnly: !!b.showdown?.superSavvyOnly };
+          delete b.defaultRewards;
+          delete b.hostStumperBonusXp;
+          b.powerUpIds ??= modePowerUps.length ? modePowerUps : allPowerUps;
+          b.avatarBackgroundUrls ??= b.streamImageUrls;
+          b.avatarBackgroundUrl ??= b.streamImageUrl;
+          delete b.streamImageUrls;
+          delete b.streamImageUrl;
+          withBackgrounds(b);
+        });
+        if (!parsed.rewardSets.length) parsed.rewardSets = seed.seedRewardSets();
+        (parsed.gameModes ?? []).forEach((m) => {
+          delete m.powerUpIds;
+          delete m.howToPlay;
+        });
+        (parsed.hosts ?? []).forEach((h) => {
+          delete h.pictureUrls;
+          delete h.heroCardImageUrls;
+        });
+        (parsed.streams ?? []).forEach((st) => {
+          const b = (parsed.bundles ?? []).find((x) => x.id === st.bundleId) ?? parsed.bundles?.[0];
+          st.powerUpIds ??= [...(b?.powerUpIds ?? allPowerUps)];
+          st.heroCardBackgroundUrl ??= b?.heroCardBackgroundUrl ?? null;
+        });
+        parsed.version = 57;
+      }
+      if (parsed.version === 57) {
+        // v58: v57 made one reward set per game set even when they paid the same; those become one.
+        const kept = [];
+        (parsed.rewardSets ?? []).forEach((r) => {
+          const same = kept.find((k) => samePays(k, r));
+          if (!same) return kept.push(r);
+          (parsed.bundles ?? []).forEach((b) => b.rewardSetId === r.id && (b.rewardSetId = same.id));
+        });
+        parsed.rewardSets = kept;
+        parsed.version = 58;
+      }
+      if (parsed.version === 58) {
+        // v59: the live game host avatar background is square, and can be a colour or gradient
+        // (presets, more added as Custom). Each game set gets the Savvy blue gradient as an option;
+        // what's selected stays.
+        parsed.backgroundPresets ??= seedBackgroundPresets();
+        const blue = DEFAULT_AVATAR_BACKGROUND();
+        (parsed.bundles ?? []).forEach((b) => {
+          b.avatarBackgroundUrls = [blue, ...(b.avatarBackgroundUrls ?? []).filter((u) => u !== blue)].slice(0, 8);
+          b.avatarBackgroundUrl ??= blue;
+        });
+        parsed.version = 59;
       }
       if (parsed.version === DB_VERSION) return parsed;
       // Older versions: add what's new and keep everything else.
@@ -856,9 +944,8 @@ function applyLibrary(s, from = db) {
   if (host) {
     s.hostName = host.name;
     s.hostDisplayName = host.displayName ?? null;
-    // The stream's pick of the host's hero card images, else the host's selected one.
-    const cards = host.heroCardImageUrls ?? (host.heroCardImageUrl ? [host.heroCardImageUrl] : []);
-    s.heroCardHostImageUrl = s.heroCardImageUrl && cards.includes(s.heroCardImageUrl) ? s.heroCardImageUrl : (host.heroCardImageUrl ?? null);
+    // The stream's hero card image (the host's, or one uploaded for this stream), else the host's.
+    s.heroCardHostImageUrl = s.heroCardImageUrl || (host.heroCardImageUrl ?? null);
   }
   // The stream's format (How to play & format); without one it shows no logo or pill.
   const mode = from.gameModes.find((m) => m.id === s.gameMode);
@@ -876,7 +963,7 @@ const STREAM_FILE_FIELDS = {
   heroImageFile: "heroImageUrl",
 };
 const NULLABLE_STREAM_FIELDS = [
-  "subtitle", "heroImageUrl", "sponsorship", "raffleSystemWinnersConfiguration",
+  "subtitle", "heroImageUrl", "heroCardImageUrl", "heroCardBackgroundUrl", "sponsorship", "raffleSystemWinnersConfiguration",
   "hostBusterReward", "showdownConfiguration", "roundScoring", "round1StartsAt", "shareableCards",
 ];
 
@@ -916,6 +1003,8 @@ function streamFromBody(b, existing) {
   } else s.textSavvyRounds = { rounds: [] };
   s.headless = !!s.headless;
   s.isSpotlighted = !!s.isSpotlighted;
+  if (Array.isArray(s.powerUpIds)) s.powerUpIds = compactArr(s.powerUpIds).filter((id) => db.powerUps.some((p) => p.id === id));
+  s.howToPlay = { powerUps: powerUpsOf(s.powerUpIds ?? []) };
   s.entranceFee = s.entranceFee || { type: "Free", amount: 0 };
   return s;
 }
@@ -1018,12 +1107,14 @@ const holdsSets = (s) => s.streamType !== "Internal" && s.status !== "Canceled";
 function applyWordSet(set, s) {
   const bundle = db.bundles.find((b) => b.id === s.bundleId);
   const prev = s.textSavvyRounds?.rounds ?? [];
-  // A set is words (and their times) only: rewards and the showdown prize stay the stream's.
+  // A set is words (and their times) only: rewards and the showdown prize stay the stream's (a
+  // round the stream didn't have yet gets its game set's reward set's Round Pounder).
+  const pays = rewardsOf(bundle);
   s.textSavvyRounds = {
     ...s.textSavvyRounds,
     rounds: set.rounds.map((r, i) => ({
       prizes: null,
-      roundBusterReward: { rewardType: "Sparks", amount: 5 * (i + 1) },
+      roundBusterReward: roundRewardOf(pays, i),
       ...prev[i],
       roundIndex: i,
       word: r.word,
@@ -1031,7 +1122,7 @@ function applyWordSet(set, s) {
     })),
   };
   const superSavvyOnly = s.streamType === "SuperSavvy" || !!(s.showdownConfiguration ?? bundle?.showdown)?.superSavvyOnly;
-  const prize = s.showdownConfiguration?.prize ?? bundle?.showdown?.prize ?? { rewardType: "Cash", amount: 100 };
+  const prize = s.showdownConfiguration?.prize ?? pays.showdownPrize ?? { rewardType: "Cash", amount: 100 };
   // The stream (from its bundle) decides whether there's a showdown; the set only brings its
   // word. A set without one leaves the showdown waiting for its word.
   if (set.showdown) s.showdownConfiguration = { word: set.showdown.word, prize: { ...prize }, superSavvyOnly };
@@ -1072,8 +1163,9 @@ on("post", "/TextSavvyStream", ({ body }) => {
   s.status = "Scheduled";
   s.totalPrizePool = 0;
   if (!s.imageUrl) s.imageUrl = LOGO_URL;
-  // The game set's selected stream image background, unless the stream has its own.
+  // The game set's selected backgrounds, unless the stream has its own.
   if (!s.heroImageUrl) s.heroImageUrl = setBackground(s);
+  if (!s.heroCardBackgroundUrl) s.heroCardBackgroundUrl = setHeroCardBackground(s);
   for (const id of setIds) {
     const err = linkWordSet(id, s);
     if (err) return badRequest({ wordSetId: [err] });
@@ -1118,7 +1210,7 @@ on("post", "/TextSavvyStream/bulk", ({ body }) => {
     const s = streamFromBody(rest, null);
     const errors = validateStream(s);
     if (errors) return badRequest(errors);
-    created.push([{ ...s, id: uuid(), status: "Scheduled", totalPrizePool: 0, imageUrl: s.imageUrl || db.hosts.find((h) => h.id === s.hostId)?.imageUrl || LOGO_URL, heroImageUrl: s.heroImageUrl || setBackground(s) }, b]);
+    created.push([{ ...s, id: uuid(), status: "Scheduled", totalPrizePool: 0, imageUrl: s.imageUrl || db.hosts.find((h) => h.id === s.hostId)?.imageUrl || LOGO_URL, heroImageUrl: s.heroImageUrl || setBackground(s), heroCardBackgroundUrl: s.heroCardBackgroundUrl || setHeroCardBackground(s) }, b]);
   }
   created.forEach(([s, b]) => {
     db.streams.push(s);
@@ -1302,7 +1394,8 @@ on("put", "/admin/howtoplay", ({ body }) => {
 });
 // ---- Power-ups (prototype endpoints): what a game mode's How to play can show. Multipart.
 const powerUpsOf = (ids) => ids.map((id) => db.powerUps.find((p) => p.id === id)).filter(Boolean).map(({ title, description, iconUrl }) => ({ title, description, iconUrl }));
-const syncPowerUps = () => (db.gameModes ?? []).forEach((m) => (m.howToPlay = { powerUps: powerUpsOf(m.powerUpIds ?? []) }));
+// A stream's How to play shows its power-ups (picked on its game set, changeable per stream).
+const syncPowerUps = () => db.streams.forEach((s) => (s.howToPlay = { powerUps: powerUpsOf(s.powerUpIds ?? []) }));
 function powerUpFromBody(b, prev) {
   return { id: prev?.id ?? uuid(), title: String(b.title ?? "").trim(), description: String(b.description ?? "").trim(), iconUrl: fileUrl(b.iconFile) || b.iconUrl || "" };
 }
@@ -1336,7 +1429,7 @@ on("put", "/admin/power-ups/:id", ({ params, body }) => {
 });
 on("delete", "/admin/power-ups/:id", ({ params }) => {
   db.powerUps = db.powerUps.filter((x) => x.id !== params.id);
-  (db.gameModes ?? []).forEach((m) => (m.powerUpIds = (m.powerUpIds ?? []).filter((id) => id !== params.id)));
+  [...(db.bundles ?? []), ...db.streams].forEach((x) => (x.powerUpIds = (x.powerUpIds ?? []).filter((id) => id !== params.id)));
   syncPowerUps();
   return json({ id: params.id });
 });
@@ -1350,39 +1443,61 @@ on("put", "/admin/game-modes/:id", ({ params, body }) => {
   const i = db.gameModes.findIndex((x) => x.id === params.id);
   if (i < 0) return notFound();
   const prev = db.gameModes[i];
-  // A game mode is its title, its logo and the power-ups its How to play shows (picked from Power-ups).
+  // A game mode is its title and its logo (power-ups are picked per game set and stream).
   const name = String(body.name ?? "").trim();
   if (!name) return badRequest({ name: ["Enter a title."] });
-  const powerUpIds = compactArr(body.powerUpIds ?? []).filter((id) => db.powerUps.some((p) => p.id === id));
   db.gameModes[i] = {
     ...prev,
     name,
     gameLogoUrl: fileUrl(body.gameLogoFile) || body.gameLogoUrl || null,
-    powerUpIds,
-    howToPlay: { powerUps: powerUpsOf(powerUpIds) },
   };
   refreshUpcoming((s) => s.gameMode === db.gameModes[i].id);
   return json(db.gameModes[i]);
 });
 
 // ---- Bundles (prototype endpoints): what new streams start with. JSON bodies.
-// A game set's stream image backgrounds (900 × 1200): up to five, the selected one is what its new
-// streams start with. Older game sets get the sample one.
-function withStreamImages(b) {
-  b.streamImageUrls = (b.streamImageUrls ?? (b.streamImageUrl ? [b.streamImageUrl] : [STREAM_HERO_URL])).filter(Boolean).slice(0, 5);
-  if (!b.streamImageUrls.includes(b.streamImageUrl)) b.streamImageUrl = b.streamImageUrls[0] ?? null;
+// A game set's two backgrounds, up to five of each, the selected one is what its new streams start
+// with: the live game host avatar background (900 × 1200; the stream's heroImageUrl) and the hero
+// card background (the stream's heroCardBackgroundUrl). Older game sets get the samples.
+// (Function declarations: load() runs before the rest of this module.)
+function backgroundKinds() {
+  return [
+    ["avatarBackgroundUrls", "avatarBackgroundUrl", DEFAULT_AVATAR_BACKGROUND, 8],
+    ["heroCardBackgroundUrls", "heroCardBackgroundUrl", () => seed.HERO_CARD_BACKGROUND],
+  ];
+}
+function withBackgrounds(b) {
+  backgroundKinds().forEach(([list, pick, sample, max]) => {
+    b[list] = (b[list] ?? (b[pick] ? [b[pick]] : [sample()])).filter(Boolean).slice(0, max ?? 5);
+    if (!b[list].includes(b[pick])) b[pick] = b[list][0] ?? null;
+  });
   return b;
 }
-const setBackground = (s) => (db.bundles.find((b) => b.id === s.bundleId) ?? db.bundles[0])?.streamImageUrl || STREAM_HERO_URL;
+/** Do two reward sets pay the same (whatever their names)? */
+function samePays(a, b) {
+  const pick = (r) => JSON.stringify(["roundRewards", "showdownPrize", "defaultRewards", "hostBusterReward", "hostStumperBonusXp", "raffleSystemWinnersConfiguration"].map((k) => r[k] ?? null));
+  return pick(a) === pick(b);
+}
+/** The reward set a game set pays with: its own pick, else the Default one. */
+function rewardsOf(bundle, from = db) {
+  const sets = from.rewardSets ?? [];
+  return sets.find((r) => r.id === bundle?.rewardSetId) ?? sets.find((r) => r.isDefault) ?? sets[0] ?? seed.seedRewardSets()[0];
+}
+/** A round's Round Pounder from a reward set; rounds past its list follow on (5, 10, 15 … Sparks). */
+function roundRewardOf(pays, i) {
+  const r = pays?.roundRewards?.[i];
+  return r === undefined ? { rewardType: "Sparks", amount: 5 * (i + 1) } : r ? { ...r } : null;
+}
+const setBackground = (s) => (db.bundles.find((b) => b.id === s.bundleId) ?? db.bundles[0])?.avatarBackgroundUrl || STREAM_HERO_URL;
+const setHeroCardBackground = (s) => (db.bundles.find((b) => b.id === s.bundleId) ?? db.bundles[0])?.heroCardBackgroundUrl ?? null;
 const bundleFrom = (body, prev) => ({
   ...prev,
-  streamImageUrls: Array.isArray(body.streamImageUrls) ? compactArr(body.streamImageUrls) : prev.streamImageUrls,
-  streamImageUrl: "streamImageUrl" in body ? body.streamImageUrl || null : prev.streamImageUrl,
+  ...Object.fromEntries(backgroundKinds().flatMap(([list, pick]) => [[list, Array.isArray(body[list]) ? compactArr(body[list]) : prev[list]], [pick, pick in body ? body[pick] || null : prev[pick]]])),
   name: String(body.name ?? "").trim(),
   roundScoring: body.roundScoring ?? prev.roundScoring,
-  hostStumperBonusXp: body.hostStumperBonusXp ?? null,
-  defaultRewards: compactArr(body.defaultRewards ?? []),
-  showdown: { prize: { rewardType: body.showdown?.prize?.rewardType ?? "Cash", amount: Number(body.showdown?.prize?.amount) || 1 }, superSavvyOnly: !!body.showdown?.superSavvyOnly },
+  showdown: { superSavvyOnly: !!body.showdown?.superSavvyOnly },
+  rewardSetId: db.rewardSets.some((r) => r.id === body.rewardSetId) ? body.rewardSetId : null,
+  powerUpIds: Array.isArray(body.powerUpIds) ? compactArr(body.powerUpIds).filter((id) => db.powerUps.some((p) => p.id === id)) : (prev.powerUpIds ?? []),
   streamType: ["Public", "SuperSavvy", "Internal"].includes(body.streamType) ? body.streamType : (prev.streamType ?? "Public"),
   defaultScoringPresetId: body.defaultScoringPresetId || null,
   defaultSharePresetId: body.defaultSharePresetId || null,
@@ -1409,14 +1524,18 @@ on("put", "/admin/bundles/:id", ({ params, body }) => {
   const error = bundleNameError(String(body.name ?? "").trim(), params.id);
   if (error) return badRequest({ name: [error] });
   const prev = db.bundles[i];
-  db.bundles[i] = withStreamImages(bundleFrom(body, prev));
+  db.bundles[i] = withBackgrounds(bundleFrom(body, prev));
   // Upcoming streams of this game set showing its previously selected background switch to the new
-  // one; a stream with its own keeps it.
-  const next = db.bundles[i].streamImageUrl;
-  if (next && next !== prev.streamImageUrl)
-    db.streams.forEach((s) => {
-      if (s.status === "Scheduled" && s.bundleId === prev.id && (!s.heroImageUrl || s.heroImageUrl === prev.streamImageUrl || s.heroImageUrl === STREAM_HERO_URL)) s.heroImageUrl = next;
-    });
+  // one; a stream with its own (another of the set's, or uploaded) keeps it.
+  const follow = (pick, field) => {
+    const next = db.bundles[i][pick];
+    if (next && next !== prev[pick])
+      db.streams.forEach((s) => {
+        if (s.status === "Scheduled" && s.bundleId === prev.id && (!s[field] || s[field] === prev[pick])) s[field] = next;
+      });
+  };
+  follow("avatarBackgroundUrl", "heroImageUrl");
+  follow("heroCardBackgroundUrl", "heroCardBackgroundUrl");
   return json(db.bundles[i]);
 });
 on("delete", "/admin/bundles/:id", ({ params }) => {
@@ -1536,31 +1655,18 @@ on("post", "/admin/word-sets/:id/release", ({ params }) => {
 
 // ---- Host & sponsor libraries (prototype endpoints)
 const textLen = (v) => String(v ?? "").trim().length;
-// Each host picture kind keeps up to five images; the selected one is what new streams use.
-// (The stream image background is the game set's: see withStreamImages.)
-const HOST_GALLERIES = [
-  ["pictureUrls", "imageUrl"],
-  ["heroCardImageUrls", "heroCardImageUrl"],
-];
+// A host has one of each picture: the live game host avatar image (imageUrl) and the hero card
+// image (heroCardImageUrl). The backgrounds they're placed on are the game set's.
+const HOST_PICTURES = ["imageUrl", "heroCardImageUrl"];
 function hostFromBody(b, prev) {
   const h = {
     id: prev?.id ?? String(b.id ?? "").trim(),
     name: String(b.name ?? "").trim(),
     displayName: b.displayName ? String(b.displayName).trim() : null,
   };
-  HOST_GALLERIES.forEach(([list, pick]) => {
-    const urls = (Array.isArray(b[list]) ? compactArr(b[list]) : prev?.[list] ?? []).filter(Boolean).slice(0, 5);
-    const chosen = pick in b ? b[pick] || null : prev?.[pick] ?? null;
-    h[list] = urls;
-    h[pick] = urls.includes(chosen) ? chosen : (urls[0] ?? null);
-  });
+  HOST_PICTURES.forEach((k) => (h[k] = k in b ? b[k] || null : prev?.[k] ?? null));
   return h;
 }
-/** A host with its galleries (older profiles only have the selected picture). */
-const withGalleries = (h) => ({
-  ...h,
-  ...Object.fromEntries(HOST_GALLERIES.map(([list, pick]) => [list, h[list] ?? (h[pick] ? [h[pick]] : [])])),
-});
 function validateHost(h, isNew) {
   const errors = {};
   if (isNew && !h.id) errors.id = ["Choose the host's Savvy account."];
@@ -1581,7 +1687,7 @@ function hostProfile(id) {
   }
   return h;
 }
-const withAccount = (h) => ({ ...withGalleries(h), username: db.users.find((u) => u.id === h.id)?.username ?? null });
+const withAccount = (h) => ({ ...h, username: db.users.find((u) => u.id === h.id)?.username ?? null });
 on("get", "/admin/hosts", () => json(db.users.filter((u) => isHost(u.id)).map((u) => withAccount(hostProfile(u.id)))));
 on("get", "/admin/hosts/:id", ({ params }) => (isHost(params.id) ? json(withAccount(hostProfile(params.id))) : notFound()));
 // Adding a host gives the account the Host role.
@@ -1596,7 +1702,7 @@ on("post", "/admin/hosts", ({ body }) => {
 on("put", "/admin/hosts/:id", ({ params, body }) => {
   const i = db.hosts.findIndex((x) => x.id === params.id);
   if (i < 0) return notFound();
-  const prev = withGalleries(db.hosts[i]);
+  const prev = db.hosts[i];
   const h = hostFromBody(body, prev);
   const errors = validateHost(h, false);
   if (errors) return badRequest(errors);
@@ -1605,7 +1711,8 @@ on("put", "/admin/hosts/:id", ({ params, body }) => {
   // a stream with its own uploaded picture keeps it.
   db.streams.forEach((s) => {
     if (s.status !== "Scheduled" || s.hostId !== h.id) return;
-    if (h.imageUrl && s.imageUrl === prev.imageUrl) s.imageUrl = h.imageUrl;
+    if (h.imageUrl && (!s.imageUrl || s.imageUrl === prev.imageUrl)) s.imageUrl = h.imageUrl;
+    if (h.heroCardImageUrl && (!s.heroCardImageUrl || s.heroCardImageUrl === prev.heroCardImageUrl)) s.heroCardImageUrl = h.heroCardImageUrl;
   });
   refreshUpcoming((s) => s.hostId === h.id);
   return json(withAccount(h));
@@ -1661,7 +1768,7 @@ on("delete", "/admin/sponsors/:id", ({ params }) => {
 });
 
 // ---- Share card and notification presets (named, picked per stream). JSON bodies.
-for (const [path, key] of [["share-presets", "sharePresets"], ["scoring-presets", "scoringPresets"], ["notification-presets", "notificationPresets"], ["app-card-presets", "appCardPresets"], ["puzzle-card-presets", "puzzleCardPresets"]]) {
+for (const [path, key] of [["share-presets", "sharePresets"], ["scoring-presets", "scoringPresets"], ["reward-sets", "rewardSets"], ["background-presets", "backgroundPresets"], ["notification-presets", "notificationPresets"], ["app-card-presets", "appCardPresets"], ["puzzle-card-presets", "puzzleCardPresets"]]) {
   on("get", `/admin/${path}`, () => json(db[key]));
   on("get", `/admin/${path}/:id`, ({ params }) => {
     const p = db[key].find((x) => x.id === params.id);

@@ -14,7 +14,8 @@ import { SideSheet } from "../../ds/SideSheet";
 import { ListAdd, ListGroup, ListItem } from "../../ds/ListGroup";
 import { DP } from "../../providers";
 import { TextInput } from "../streams/detail/fields";
-import { NOTIFICATION_KEYS, NotificationRows, SCORE_BRACKETS, ScoringFields, ShareCardFields, sameScoring } from "../streams/detail/sections";
+import { NOTIFICATION_KEYS, NotificationRows, RewardSetFields, SCORE_BRACKETS, ScoringFields, ShareCardFields, rewardSetSummary, sameRewards, sameScoring } from "../streams/detail/sections";
+import { roundRewardsFor } from "../streams/gameModes";
 import { ConfirmDelete, useLibraryMutations, useSheet } from "../library/shared";
 import { Pill } from "../../ds/Pill";
 import { EmptyState } from "../../ds/EmptyState";
@@ -58,6 +59,8 @@ const STREAM_SHARE_KEYS = ["liveHome", "upcomingHome", "beatHost", "didNotBeatHo
 const streamUses = (kind, p, s) =>
   kind === "scoring"
     ? sameScoring(p.roundScoring, s.roundScoring)
+    : kind === "rewards"
+    ? sameRewards(p, s)
     : kind === "share"
     ? STREAM_SHARE_KEYS.every((key) => ["header", "title", "subtitle"].every((f) => norm(p.cards?.[key]?.[f]) === norm(s.shareableCards?.[key]?.[f])))
     : NOTIFICATION_KEYS.every((key) => norm(p[key]) === norm(s[key]));
@@ -66,7 +69,7 @@ const streamUses = (kind, p, s) =>
 function useStreamPresetUsage(kind, k) {
   const notify = useNotify();
   const { mutateAsync } = useUpdate();
-  const { data } = useList({ resource: "TextSavvyStream", filters: [{ field: "status", operator: "eq", value: "Scheduled" }], pagination: { current: 1, pageSize: 500 }, queryOptions: { enabled: kind === "share" || kind === "notify" || kind === "scoring" } });
+  const { data } = useList({ resource: "TextSavvyStream", filters: [{ field: "status", operator: "eq", value: "Scheduled" }], pagination: { current: 1, pageSize: 500 }, queryOptions: { enabled: kind === "share" || kind === "notify" || kind === "scoring" || kind === "rewards" } });
   const streams = data?.data ?? [];
   const usedBy = (p) => streams.filter((s) => streamUses(kind, p, s)).length;
   const makeDefault = async (p) => {
@@ -85,6 +88,22 @@ export const KINDS = {
   app: { resource: "AppCardPreset", dataProviderName: DP.appCardPresets, noun: "App share card preset", title: "App share cards", description: "Shared from the profile and after a live show.", icon: "ios_share", puzzle: false, empty: () => ({ name: "", cards: emptyAppCards(false) }), summary: (p) => p.cards?.profileShare?.title },
   puzzle: { resource: "PuzzleCardPreset", dataProviderName: DP.puzzleCardPresets, noun: "Daily puzzle share card preset", title: "Daily puzzle share cards", description: "Shared after today's puzzle.", icon: "extension", puzzle: true, empty: () => ({ name: "", cards: emptyAppCards(true) }), summary: (p) => stripRichText(p.cards?.dailyPuzzleSuccess?.title ?? "") },
   scoring: { resource: "ScoringPreset", dataProviderName: DP.scoringPresets, noun: "Scoring preset", title: "Scoring", description: "Points per round. Each game set picks one (else the Default); a stream can pick another.", icon: "scoreboard", empty: () => ({ name: "", roundScoring: structuredClone(DEFAULT_ROUND_SCORING) }), summary: (p) => `Solve bonus ${SCORE_BRACKETS.map((k) => (p.roundScoring?.[k]?.solveBonusXp ?? 0).toLocaleString()).join(" / ")}` },
+  rewards: {
+    resource: "RewardSet",
+    dataProviderName: DP.rewardSets,
+    noun: "Reward set",
+    title: "Reward sets",
+    description: "Everything a stream pays. Each game set picks one (else the Default); a stream can pick another.",
+    icon: "redeem",
+    // Not presets by name: its own words on buttons and titles.
+    newLabel: "New reward set",
+    addLabel: "Add reward set",
+    emptyTitle: "No reward sets yet",
+    sheetTitle: "Reward sets",
+    empty: () => ({ name: "", roundRewards: roundRewardsFor(5), showdownPrize: { rewardType: "Cash", amount: 100 }, defaultRewards: [{ rewardType: "BombPowerup", amount: 1 }], hostBusterReward: null, hostStumperBonusXp: 500, raffleSystemWinnersConfiguration: null }),
+    // Read when called: sections.jsx imports this module too.
+    summary: (p) => rewardSetSummary(p),
+  },
   notify: { resource: "NotificationPreset", dataProviderName: DP.notificationPresets, noun: "Notification preset", title: "Notifications", description: "New streams start from the Default.", icon: "notifications", empty: () => ({ name: "", ...Object.fromEntries(NOTIFICATION_KEYS.map((k) => [k, ""])) }), summary: (p) => p.lobbyOpenTitle },
 };
 
@@ -139,8 +158,8 @@ export function PresetSheet({ kind, sheet, onSaved, footerExtra }) {
         </>
       }
     >
-      <TextInput control={control} name="name" label="Preset name" rules={{ validate: (v) => (v?.trim() ? true : "Enter a name") }} />
-      {kind === "scoring" ? <ScoringFields control={control} setValue={setValue} subText={false} roundCount={5} /> : kind === "share" ? <ShareCardFields form={form} prefix="cards" /> : kind === "notify" ? <NotificationRows form={form} /> : <AppCardRows form={form} puzzle={k.puzzle} prefix="cards." label={k.title} />}
+      <TextInput control={control} name="name" label={kind === "rewards" ? "Name" : "Preset name"} rules={{ validate: (v) => (v?.trim() ? true : "Enter a name") }} />
+      {kind === "rewards" ? <RewardSetFields form={form} /> : kind === "scoring" ? <ScoringFields control={control} setValue={setValue} subText={false} roundCount={5} /> : kind === "share" ? <ShareCardFields form={form} prefix="cards" /> : kind === "notify" ? <NotificationRows form={form} /> : <AppCardRows form={form} puzzle={k.puzzle} prefix="cards." label={k.title} />}
       <ConfirmDelete
         open={confirm}
         title={`Delete ${sheet.record?.name}?`}
@@ -182,7 +201,7 @@ export function PresetList({ kind, share, bare = false, page = false }) {
   const k = KINDS[kind];
   const app = useAppPreset(share, !!k.puzzle);
   const usage = useStreamPresetUsage(kind, k);
-  const forStreams = kind === "share" || kind === "notify" || kind === "scoring";
+  const forStreams = kind === "share" || kind === "notify" || kind === "scoring" || kind === "rewards";
   // Stream presets: the default is the one new streams start from (the first one if none is set).
   const defaultId = (rows) => (rows.find((p) => p.isDefault) ?? rows[0])?.id;
   const { m3: c } = useTheme();
@@ -196,9 +215,9 @@ export function PresetList({ kind, share, bare = false, page = false }) {
     return [k.summary(p), n ? `Used by ${n} upcoming ${n === 1 ? "stream" : "streams"}` : null].filter(Boolean).join(" · ");
   };
   const empty = (
-    <EmptyState compact icon={k.icon} title="No presets yet">
+    <EmptyState compact icon={k.icon} title={k.emptyTitle ?? "No presets yet"}>
       <Button color="secondary" startIcon={<Icon name="add" />} onClick={sheet.openNew}>
-        New preset
+        {k.newLabel ?? "New preset"}
       </Button>
     </EmptyState>
   );
@@ -228,7 +247,7 @@ export function PresetList({ kind, share, bare = false, page = false }) {
             }
           />
         ))}
-        <ListAdd label="Add preset" onClick={sheet.openNew} />
+        <ListAdd label={k.addLabel ?? "Add preset"} onClick={sheet.openNew} />
       </ListGroup>
     );
     return (
@@ -279,7 +298,7 @@ export function PresetList({ kind, share, bare = false, page = false }) {
   if (page)
     return (
       <>
-        <PageToolbar description={k.description} actionLabel="New preset" onAction={sheet.openNew} />
+        <PageToolbar description={k.description} actionLabel={k.newLabel ?? "New preset"} onAction={sheet.openNew} />
         {cards}
         {editor}
       </>
@@ -298,7 +317,7 @@ export function PresetList({ kind, share, bare = false, page = false }) {
           </Typography>
         </Box>
         <Button variant="tonal" size="small" startIcon={<Icon name="add" size={16} />} onClick={sheet.openNew}>
-          New preset
+          {k.newLabel ?? "New preset"}
         </Button>
       </Box>
       {cards}
@@ -317,12 +336,12 @@ export function PresetsButton({ kind }) {
   return (
     <>
       <Button variant="tonal" size="small" onClick={() => setOpen(true)}>
-        Presets
+        {k.sheetTitle ?? "Presets"}
       </Button>
       <SideSheet
         open={open}
         onClose={() => setOpen(false)}
-        title={`${k.title} presets`}
+        title={k.sheetTitle ?? `${k.title} presets`}
         subtitle={k.description}
         actions={<Button onClick={() => setOpen(false)}>Done</Button>}
       >
@@ -337,6 +356,15 @@ export function ScoringPage() {
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
       <PresetList kind="scoring" page />
+    </Box>
+  );
+}
+
+/** Library › Gameplay › Reward sets: what streams pay. One list, so the page title names it. */
+export function RewardSetsPage() {
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+      <PresetList kind="rewards" page />
     </Box>
   );
 }

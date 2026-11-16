@@ -139,19 +139,19 @@ export function PickPlaceholder({ icon }) {
 
 /** The game set as a PickCard, like Host and Sponsor: its showdown tile, name and prize. */
 export function GameSetPicker({ value, onChange, label = "Game set" }) {
-  const { bundles } = useBundles();
-  const tile = (b, size) => <IconTile icon={b.showdown?.superSavvyOnly ? "diamond" : "trophy"} tone={b.showdown?.prize?.rewardType === "Cash" ? "green" : "violet"} size={size} />;
+  const { bundles, rewardsOf } = useBundles();
+  const tile = (b, size) => <IconTile icon={b.showdown?.superSavvyOnly ? "diamond" : "trophy"} tone={rewardsOf(b)?.showdownPrize?.rewardType === "Cash" ? "green" : "violet"} size={size} />;
   const set = bundles.find((b) => b.id === value) ?? bundles[0];
   return (
     <PickCard
       label={label}
       ariaLabel={label}
       value={set?.id ?? ""}
-      options={bundles.map((b) => ({ value: b.id, media: tile(b, 32), primary: b.name, secondary: bundleLine(b) }))}
+      options={bundles.map((b) => ({ value: b.id, media: tile(b, 32), primary: b.name, secondary: bundleLine(b, rewardsOf(b)) }))}
       onChange={onChange}
       media={set ? tile(set, 48) : <PickPlaceholder icon="inventory_2" />}
       title={set?.name ?? "No game sets yet"}
-      supporting={set ? bundleLine(set) : "Add one in Library › Gameplay › Game sets."}
+      supporting={set ? bundleLine(set, rewardsOf(set)) : "Add one in Library › Gameplay › Game sets."}
     />
   );
 }

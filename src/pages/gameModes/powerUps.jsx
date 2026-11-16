@@ -1,15 +1,19 @@
-// Library › Gameplay › Power-ups — the power-ups a game mode's How to play can show: icon, name and what it
-// does. Each game mode picks its own (Library › Gameplay › Game modes). Same cards and sheet as Sponsors.
+// Library › Gameplay › Power-ups — the power-ups a stream's How to play can show: icon, name and what it
+// does. Each game set picks its own (Library › Gameplay › Game sets), and a stream can change its
+// own. Same cards and sheet as Sponsors.
 import { useEffect, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { useList } from "@refinedev/core";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
+import Checkbox from "@mui/material/Checkbox";
 import Typography from "@mui/material/Typography";
 import { Icon } from "../../ds/Icon";
 import { EmptyState } from "../../ds/EmptyState";
 import { ImageField } from "../../ds/ImageField";
 import { SideSheet } from "../../ds/SideSheet";
+import { IconTile } from "../../ds/IconTile";
+import { ListGroup, ListItem } from "../../ds/ListGroup";
 import { CardsSkeleton } from "../../ds/Skeletons";
 import { DP } from "../../providers";
 import { TextInput } from "../streams/detail/fields";
@@ -22,6 +26,37 @@ const EMPTY = { title: "", description: "", iconUrl: null, iconFile: null };
 export function usePowerUps() {
   const { data, isLoading } = useList({ resource: "PowerUp", dataProviderName: DP.powerUps, pagination: { mode: "off" } });
   return { powerUps: data?.data ?? [], isLoading };
+}
+
+/**
+ * The power-ups as rows with a checkbox, bound to `powerUpIds` (a game set's or a stream's): the
+ * checked ones show in How to play.
+ */
+export function PowerUpPicker({ control, setValue }) {
+  const { powerUps } = usePowerUps();
+  const picked = useWatch({ control, name: "powerUpIds" }) ?? [];
+  const toggle = (id, on) =>
+    setValue(
+      "powerUpIds",
+      // Kept in the order of Library › Gameplay › Power-ups.
+      powerUps.map((p) => p.id).filter((x) => (x === id ? on : picked.includes(x))),
+      { shouldDirty: true },
+    );
+  if (powerUps.length === 0) return <EmptyState compact icon="bolt" title="No power-ups yet" description="Add them in Library › Gameplay › Power-ups." />;
+  return (
+    <ListGroup label="Power-ups">
+      {powerUps.map((p) => (
+        <ListItem
+          key={p.id}
+          onClick={() => toggle(p.id, !picked.includes(p.id))}
+          leadingControl={<Checkbox checked={picked.includes(p.id)} onChange={(e) => toggle(p.id, e.target.checked)} onClick={(e) => e.stopPropagation()} slotProps={{ input: { "aria-label": `Show ${p.title}` } }} />}
+          leading={<IconTile src={p.iconUrl} icon="bolt" />}
+          title={p.title}
+          supporting={p.description}
+        />
+      ))}
+    </ListGroup>
+  );
 }
 
 function PowerUpSheet({ sheet }) {

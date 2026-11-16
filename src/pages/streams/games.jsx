@@ -1,5 +1,5 @@
-// Library › Gameplay › Game sets — what a new stream starts with: its stream image background, who
-// can join, the showdown and its prize, rewards and messaging. The same cards as every library page
+// Library › Gameplay › Game sets — what a new stream starts with: its backgrounds, who can join,
+// scoring, the showdown, its reward set, power-ups and messaging. The same cards as every library page
 // (CardGrid + ShopCard); a card opens that game set's settings.
 import { useState } from "react";
 import { useNavigate } from "react-router";
@@ -19,10 +19,10 @@ export default function GameSetsPage() {
   const notify = useNotify();
   const navigate = useNavigate();
   const [newMode, setNewMode] = useState(false);
-  const { bundles, isLoading } = useBundles();
+  const { bundles, rewardsOf, isLoading } = useBundles();
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-      <PageToolbar description="What a new stream starts with: who can join, the showdown and its prize, rewards and messaging." actionLabel="New game set" onAction={() => setNewMode(true)} />
+      <PageToolbar description="What a new stream starts with: backgrounds, who can join, scoring, the showdown, rewards, power-ups and messaging." actionLabel="New game set" onAction={() => setNewMode(true)} />
       {isLoading ? (
         <CardsSkeleton count={3} media={66} label="Loading game sets" />
       ) : (
@@ -30,15 +30,15 @@ export default function GameSetsPage() {
           {bundles.map((b) => (
             <ShopCard
               key={b.id}
-              // Its selected stream image background (900 × 1200).
-              image={b.streamImageUrl}
+              // Its selected live game host avatar background (900 × 1200).
+              image={b.avatarBackgroundUrl}
               aspect="3 / 4"
               icon={b.showdown?.superSavvyOnly ? "diamond" : "trophy"}
               title={b.name}
               meta={
                 <>
                   <Typography variant="bodySmall" color="text.secondary" component="div" noWrap>
-                    {bundleLine(b)}
+                    {bundleLine(b, rewardsOf(b))}
                   </Typography>
                   <Typography variant="bodySmall" color="text.secondary" component="div" noWrap>
                     {AUDIENCE[b.streamType] ?? "Public"}

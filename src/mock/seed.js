@@ -335,22 +335,23 @@ export const withShowdown = (m) => ({
   showdown: { prize: { rewardType: "Cash", amount: 100 }, superSavvyOnly: false },
 });
 
-// Bundles: what a new stream starts with, whatever game its word set plays. Points per round,
-// the showdown (which kind, and its prize), the rewards and the messaging presets. Rounds always
-// pay Sparks (the Round Pounder reward); a "cash game" pays cash in the showdown, a "sparks game"
-// pays Sparks there too.
+// Game sets (stored as bundles): what a new stream starts with, whatever game its word set plays.
+// Points per round (a scoring preset), the showdown kind, a reward set, the power-ups its How to
+// play shows, the two backgrounds and the messaging presets.
 const BUNDLE_SCORING = {
   rounds1To2: { greenLetterXp: 500, yellowLetterXp: 250, solveBonusXp: 500, timeBonusXp: 100 },
   rounds3To4: { greenLetterXp: 1000, yellowLetterXp: 500, solveBonusXp: 1000, timeBonusXp: 100 },
   round5OrMore: { greenLetterXp: 0, yellowLetterXp: 0, solveBonusXp: 2000, timeBonusXp: 200 },
 };
-const bundle = (id, name, prize, superSavvyOnly) => ({
+const bundle = (id, name, rewardSetId, superSavvyOnly) => ({
   id,
   name,
   roundScoring: structuredClone(BUNDLE_SCORING),
-  hostStumperBonusXp: 500,
-  defaultRewards: [{ rewardType: "BombPowerup", amount: 1 }],
-  showdown: { prize, superSavvyOnly },
+  showdown: { superSavvyOnly },
+  // Library › Gameplay › Reward sets: what its streams pay (null: the Default reward set).
+  rewardSetId,
+  // Library › Gameplay › Power-ups: the ones its streams' How to play shows.
+  powerUpIds: seedPowerUps().map((p) => p.id),
   // Who can join new streams of this game set: Public (or Super Savvy only) or Internal.
   streamType: "Public",
   defaultScoringPresetId: null,
@@ -361,15 +362,35 @@ export const DEFAULT_BUNDLE_ID = "bundle-cash-savvy";
 // Scoring presets (Library › Gameplay › Scoring): points per round. New streams start from the Default; a
 // stream can pick another one.
 export const seedScoringPresets = () => [{ id: "scoring-standard", name: "Standard", roundScoring: structuredClone(BUNDLE_SCORING), isDefault: true }];
+// Reward sets (Library › Gameplay › Reward sets): everything a stream pays. Rounds pay Sparks (the
+// Round Pounder reward); a cash game pays cash in the showdown, a sparks game Sparks.
+export const roundRewardsFor = (n = 5) => Array.from({ length: n }, (_, i) => ({ rewardType: "Sparks", amount: 5 * (i + 1) }));
+const rewardSet = (id, name, showdownPrize, isDefault = false) => ({
+  id,
+  name,
+  isDefault,
+  roundRewards: roundRewardsFor(5),
+  showdownPrize,
+  defaultRewards: [{ rewardType: "BombPowerup", amount: 1 }],
+  hostBusterReward: null,
+  hostStumperBonusXp: 500,
+  raffleSystemWinnersConfiguration: null,
+});
+export const DEFAULT_REWARD_SET_ID = "rewards-cash";
+export const SPARKS_REWARD_SET_ID = "rewards-sparks";
+export const seedRewardSets = () => [
+  rewardSet(DEFAULT_REWARD_SET_ID, "Cash game", { rewardType: "Cash", amount: 100 }, true),
+  rewardSet(SPARKS_REWARD_SET_ID, "Sparks game", { rewardType: "Sparks", amount: 500 }),
+];
 export const seedBundles = () => [
-  bundle("bundle-cash-super-savvy", "Cash game · Super Savvy Showdown", { rewardType: "Cash", amount: 100 }, true),
-  bundle("bundle-sparks-savvy", "Sparks game · Savvy Showdown", { rewardType: "Sparks", amount: 500 }, false),
-  bundle(DEFAULT_BUNDLE_ID, "Cash game · Savvy Showdown", { rewardType: "Cash", amount: 100 }, false),
+  bundle("bundle-cash-super-savvy", "Cash game · Super Savvy Showdown", DEFAULT_REWARD_SET_ID, true),
+  bundle("bundle-sparks-savvy", "Sparks game · Savvy Showdown", SPARKS_REWARD_SET_ID, false),
+  bundle(DEFAULT_BUNDLE_ID, "Cash game · Savvy Showdown", DEFAULT_REWARD_SET_ID, false),
 ];
 
 // Two game modes, Savvy TextChain and Savvy SubText: five rounds, then a Savvy Showdown.
 export const SHOWDOWN_DEFAULTS = { prize: { rewardType: "Cash", amount: 100 }, superSavvyOnly: false };
-export const seedGameModes = () => seedBaseModes().map((m) => ({ ...m, name: `Savvy ${m.name}`, summary: MODE_SUMMARY[m.id], roundCount: 5, showdown: SHOWDOWN_DEFAULTS, powerUpIds: seedPowerUps().map((p) => p.id) }));
+export const seedGameModes = () => seedBaseModes().map((m) => ({ ...m, name: `Savvy ${m.name}`, summary: MODE_SUMMARY[m.id], roundCount: 5, showdown: SHOWDOWN_DEFAULTS }));
 const seedBaseModes = () => [
   {
     id: "TextChain",
@@ -449,6 +470,14 @@ export function expressiveAvatar(name, tone = "blue", size = 512) {
 }
 
 /** 3:4 stream / hero art (900 × 1200): a big flower, a pill and a cookie on a tonal field. */
+/** A clean background (no one in it) for a host to be placed on: a gradient with soft blurred shapes. */
+export function cleanBackground(from = "#1556f0", via = "#1d9bf4", to = "#04112a", w = 900, h = 1200) {
+  const dots = [[0.14, 0.35, 0.08, "#78b4ff", 0.55], [0.88, 0.23, 0.05, "#285ae6", 0.8], [0.84, 0.63, 0.1, "#1446be", 0.55], [0.13, 0.82, 0.09, "#0a2878", 0.6]];
+  return svgUrl(w, h, `<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${from}"/><stop offset=".45" stop-color="${via}"/><stop offset="1" stop-color="${to}"/></linearGradient><filter id="b"><feGaussianBlur stdDeviation="${w * 0.016}"/></filter></defs><rect width="${w}" height="${h}" fill="url(#g)"/><g filter="url(#b)">${dots.map(([x, y, r, c, o]) => `<circle cx="${w * x}" cy="${h * y}" r="${w * r}" fill="${c}" opacity="${o}"/>`).join("")}</g>`);
+}
+// The sample hero card background every game set starts with.
+export const HERO_CARD_BACKGROUND = cleanBackground("#5b3bd9", "#7c5cff", "#120a3a");
+
 export function expressiveHero(tone = "blue", w = 900, h = 1200) {
   const [bg, main, accent, on] = EXPRESSIVE[tone];
   return svgUrl(w, h, `<rect width="${w}" height="${h}" fill="${bg}"/><path d="${polar(w * 0.62, h * 0.32, w * 0.36, 4, 0.2, 0.3)}" fill="${main}"/><rect x="${w * 0.08}" y="${h * 0.6}" width="${w * 0.62}" height="${h * 0.14}" rx="${h * 0.07}" fill="${accent}"/><path d="${polar(w * 0.76, h * 0.82, w * 0.17, 9, 0.08)}" fill="${on}"/><circle cx="${w * 0.2}" cy="${h * 0.2}" r="${w * 0.07}" fill="${accent}"/>`);

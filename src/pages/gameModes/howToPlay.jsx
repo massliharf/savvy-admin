@@ -1,69 +1,33 @@
-// Library › Gameplay › Game modes — each game as players see it in the app: its title, its logo and the
-// power-ups its How to play shows (picked from Library › Gameplay › Power-ups). One card per game; a card
-// opens that game in a side sheet.
+// Library › Gameplay › Game modes — each game as players see it in the app: its title and its logo.
+// (Power-ups are picked per game set and stream.) One card per game; a card opens it in a side sheet.
 import { useEffect } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
-import Checkbox from "@mui/material/Checkbox";
 import Typography from "@mui/material/Typography";
 import { ImageField } from "../../ds/ImageField";
-import { IconTile } from "../../ds/IconTile";
-import { ListGroup, ListItem } from "../../ds/ListGroup";
 import { SideSheet } from "../../ds/SideSheet";
 import { CardsSkeleton } from "../../ds/Skeletons";
-import { EmptyState } from "../../ds/EmptyState";
 import { MODE_LOGOS } from "../../assets";
 import { DP } from "../../providers";
 import { useLibraryMutations, useSheet } from "../library/shared";
 import { CardGrid, ShopCard } from "../shop/shared";
 import { TextInput } from "../streams/detail/fields";
 import { useGameModePresets } from "../streams/gameModes";
-import { usePowerUps } from "./powerUps";
-
-const powerUpCount = (n) => `${n} ${n === 1 ? "power-up" : "power-ups"}`;
-
-/** The power-ups as rows with a checkbox: the checked ones show in this game's How to play. */
-function PowerUpPicker({ control, setValue }) {
-  const { powerUps } = usePowerUps();
-  const picked = useWatch({ control, name: "powerUpIds" }) ?? [];
-  const toggle = (id, on) =>
-    setValue(
-      "powerUpIds",
-      // Kept in the order of Library › Gameplay › Power-ups.
-      powerUps.map((p) => p.id).filter((x) => (x === id ? on : picked.includes(x))),
-      { shouldDirty: true },
-    );
-  if (powerUps.length === 0) return <EmptyState compact icon="bolt" title="No power-ups yet" description="Add them in Library › Gameplay › Power-ups." />;
-  return (
-    <ListGroup label="Power-ups">
-      {powerUps.map((p) => (
-        <ListItem
-          key={p.id}
-          onClick={() => toggle(p.id, !picked.includes(p.id))}
-          leadingControl={<Checkbox checked={picked.includes(p.id)} onChange={(e) => toggle(p.id, e.target.checked)} onClick={(e) => e.stopPropagation()} slotProps={{ input: { "aria-label": `Show ${p.title}` } }} />}
-          leading={<IconTile src={p.iconUrl} icon="bolt" />}
-          title={p.title}
-          supporting={p.description}
-        />
-      ))}
-    </ListGroup>
-  );
-}
 
 function GameModeSheet({ sheet }) {
   const { save, saving } = useLibraryMutations({ resource: "GameMode", dataProviderName: DP.gameModes, noun: "Game mode" });
-  const { control, reset, handleSubmit, setValue, setError, formState } = useForm({ defaultValues: { name: "", gameLogoUrl: null, gameLogoFile: null, powerUpIds: [] } });
+  const { control, reset, handleSubmit, setValue, setError, formState } = useForm({ defaultValues: { name: "", gameLogoUrl: null, gameLogoFile: null } });
   const gameLogoUrl = useWatch({ control, name: "gameLogoUrl" });
 
   useEffect(() => {
     if (!sheet.open) return;
     const r = sheet.record;
-    reset({ name: r.name ?? "", gameLogoUrl: r.gameLogoUrl ?? MODE_LOGOS[r.id] ?? null, gameLogoFile: null, powerUpIds: r.powerUpIds ?? [] });
+    reset({ name: r.name ?? "", gameLogoUrl: r.gameLogoUrl ?? MODE_LOGOS[r.id] ?? null, gameLogoFile: null });
   }, [sheet.open, sheet.record, reset]);
 
   const submit = handleSubmit(async (v) => {
-    if (await save(sheet.record.id, { name: v.name, gameLogoUrl: v.gameLogoUrl, gameLogoFile: v.gameLogoFile, powerUpIds: v.powerUpIds }, setError)) sheet.close();
+    if (await save(sheet.record.id, { name: v.name, gameLogoUrl: v.gameLogoUrl, gameLogoFile: v.gameLogoFile }, setError)) sheet.close();
   });
 
   return (
@@ -97,12 +61,6 @@ function GameModeSheet({ sheet }) {
         }}
       />
       <TextInput control={control} name="name" label="Title" max={40} rules={{ validate: (v) => (v?.trim() ? (v.length <= 40 ? true : "Use 40 characters or fewer") : "Enter a title") }} />
-      <Box>
-        <Typography variant="titleSmall" component="div" sx={{ mb: 1.5 }}>
-          Power-ups
-        </Typography>
-        <PowerUpPicker control={control} setValue={setValue} />
-      </Box>
     </SideSheet>
   );
 }
@@ -129,7 +87,7 @@ export default function GameModesPage() {
                 title={m.name}
                 meta={
                   <Typography variant="bodySmall" color="text.secondary" component="div" noWrap>
-                    {powerUpCount(m.powerUpIds?.length ?? 0)}
+                    {m.summary}
                   </Typography>
                 }
                 onOpen={() => sheet.openEdit(m)}

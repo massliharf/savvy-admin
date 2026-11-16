@@ -15,8 +15,8 @@ import { DetailBody, DetailHeader, DetailSkeleton, SectionGroup, SectionNav, use
 import { useTimezoneFormat } from "../../../contexts";
 import { useNotify } from "../../../shell/notifications";
 import { useStreamForm, useWordValidator } from "../form";
-import { DEFAULT_ROUND_SCORING, GameMode, busterFor, durationFor } from "../enums";
-import { useBundles } from "../gameModes";
+import { DEFAULT_ROUND_SCORING, durationFor } from "../enums";
+import { roundRewardOf, useBundles } from "../gameModes";
 import { useUnsavedGuard } from "../../../shell/unsaved";
 import { STREAM_TYPES, SetupWarning, StatusBadge, StreamImage, logoHidden } from "../parts";
 import { StreamKeyDialog } from "../StreamKeyDialog";
@@ -25,9 +25,10 @@ import { WordSetPickerDialog } from "../words";
 import {
   DetailsSection,
   HostSection,
+  ImagesSection,
+  PowerUpsSection,
   ScoringSection,
   NotificationsSection,
-  RaffleSection,
   RewardsSection,
   WordsSection,
   ShareCardsSection,
@@ -41,17 +42,17 @@ import {
 // Sponsor, Rewards, Messaging. `fields` are
 // what each owns, to jump to the first error.
 const SECTIONS = [
-  // The stream image (from its game set) sits with the stream itself.
-  { id: "basics", group: "Stream", label: "When & title", icon: "event", fields: ["heroImageUrl", "title", "subtitle", "startDate", "streamType", "headless", "isSpotlighted"] },
-  // Words holds the rounds and the showdown word together.
-  // Words holds the word set and the game mode it brings.
-  { id: "words", group: "Game", label: "Words", icon: "spellcheck", fields: ["gameMode", "textSavvyRounds", "showdownConfiguration"] },
+  { id: "basics", group: "Stream", label: "When & title", icon: "event", fields: ["title", "subtitle", "startDate", "streamType", "headless", "isSpotlighted"] },
+  // The live game host avatar and the hero card: backgrounds from the game set, images from the host.
+  { id: "images", group: "Stream", label: "Images", icon: "image", fields: ["heroImageUrl", "imageUrl", "heroCardImageUrl", "heroCardBackgroundUrl"] },
+  // Words holds the word set (and the game mode it brings), the rounds and the showdown word.
+  { id: "words", group: "Game", label: "Words", icon: "spellcheck", fields: ["gameMode", "textSavvyRounds", "showdownConfiguration.word"] },
   { id: "game", group: "Game", label: "Scoring", icon: "scoreboard", fields: ["roundScoring"] },
-  // The host brings their pictures (host picture, hero card).
-  { id: "host", group: "Host", label: "Host", icon: "person", fields: ["hostId", "hostName", "imageUrl"] },
+  { id: "power-ups", group: "Game", label: "Power-ups", icon: "auto_fix_high", fields: ["powerUpIds"] },
+  { id: "host", group: "Host", label: "Host", icon: "person", fields: ["hostId", "hostName"] },
   { id: "sponsor", group: "Sponsor", label: "Sponsor", icon: "handshake", fields: ["sponsorship"] },
-  { id: "rewards-card", group: "Rewards", label: "Game rewards", icon: "redeem", fields: ["defaultRewards", "hostBusterReward", "hostStumperBonusXp"] },
-  { id: "raffle", group: "Rewards", label: "Raffle", icon: "confirmation_number", fields: ["raffleSystemWinnersConfiguration"] },
+  // Everything the stream pays (a reward set, then its own copy): rounds, showdown prize, game rewards, raffle.
+  { id: "rewards-card", group: "Rewards", label: "Rewards", icon: "redeem", fields: ["showdownConfiguration.prize", "defaultRewards", "hostBusterReward", "hostStumperBonusXp", "raffleSystemWinnersConfiguration"] },
   { id: "share", group: "Messaging", label: "Share cards", icon: "style", fields: ["shareableCards"] },
   { id: "notifications-card", group: "Messaging", label: "Notifications", icon: "notifications", fields: ["lobbyOpenTitle", "lobbyOpenBody", "goingLiveTitle", "goingLiveBody", "round1StartsTitle", "round1StartsBody", "round1StartsAt"] },
 ];
@@ -62,7 +63,7 @@ export default function StreamDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const notify = useNotify();
-  const { bundles, byId } = useBundles();
+  const { bundles, byId, rewardsOf } = useBundles();
   const { formatDate } = useTimezoneFormat();
   const hosts = useHosts();
   const { validateWord } = useWordValidator();
@@ -155,18 +156,18 @@ export default function StreamDetail() {
     submit();
   };
   // A picked set fills in the words (rounds and showdown); rewards and the prize stay the
-  // stream's. Saving links the set to the stream (public streams use a set once).
+  // stream's (under Rewards). Saving links the set to the stream (public streams use a set once).
   const applySet = (set) => {
     setPicking(false);
     const prev = form.getValues("textSavvyRounds.rounds") ?? [];
-    // Same as adding a set anywhere else: its words, times and Round Pounder rewards; its showdown
-    // (word and prize) or none when the set has none.
-    // A set is words and their times; rewards and the showdown prize stay the stream's (from its bundle).
-    form.replaceRounds(set.rounds.map((r, i) => ({ ...prev[i], roundIndex: i, word: r.word, durationInSeconds: r.durationInSeconds ?? durationFor(r.word, i), roundBusterReward: prev[i]?.roundBusterReward ?? busterFor(i) })));
-    const current = form.getValues("showdownConfiguration");
     const bundle = byId[form.getValues("bundleId")] ?? bundles[0];
+    const rewards = rewardsOf(bundle);
+    // A set is words and their times; a round the stream didn't have yet gets its game set's
+    // reward set's Round Pounder.
+    form.replaceRounds(set.rounds.map((r, i) => ({ ...prev[i], roundIndex: i, word: r.word, durationInSeconds: r.durationInSeconds ?? durationFor(r.word, i), roundBusterReward: prev[i] ? prev[i].roundBusterReward ?? null : roundRewardOf(rewards, i) })));
+    const current = form.getValues("showdownConfiguration");
     // The stream decides whether there's a showdown; a set without a showdown word leaves it waiting for one.
-    if (set.showdown) form.setValue("showdownConfiguration", { superSavvyOnly: !!bundle?.showdown?.superSavvyOnly, ...current, word: set.showdown.word, prize: current?.prize ?? bundle?.showdown?.prize ?? { rewardType: "Cash", amount: 100 } }, { shouldDirty: true });
+    if (set.showdown) form.setValue("showdownConfiguration", { superSavvyOnly: !!bundle?.showdown?.superSavvyOnly, ...current, word: set.showdown.word, prize: current?.prize ?? rewards?.showdownPrize ?? { rewardType: "Cash", amount: 100 } }, { shouldDirty: true });
     else if (current) form.setValue("showdownConfiguration", { ...current, word: "" }, { shouldDirty: true });
     form.setValue("wordSetId", set.id, { shouldDirty: true });
     // The set is written for a game mode: the stream plays it.
@@ -192,12 +193,13 @@ export default function StreamDetail() {
   const audience = STREAM_TYPES[getValues("streamType")];
   const body = {
     basics: <DetailsSection key="basics" form={form} frame={frame("basics")} />,
+    images: <ImagesSection key="images" form={form} hosts={hosts} frame={frame("images")} />,
+    "power-ups": <PowerUpsSection key="power-ups" form={form} frame={frame("power-ups")} />,
     words: <WordsSection key="words" form={form} validateWord={validateWord} onPickWords={() => setPicking(true)} frame={frame("words")} />,
     game: <ScoringSection key="game" form={form} frame={frame("game")} />,
     host: <HostSection key="host" form={form} hosts={hosts} frame={frame("host")} />,
     sponsor: <SponsorSection key="sponsor" form={form} frame={frame("sponsor")} />,
     "rewards-card": <RewardsSection key="rewards-card" form={form} frame={frame("rewards-card")} />,
-    raffle: <RaffleSection key="raffle" form={form} frame={frame("raffle")} />,
     share: <ShareCardsSection key="share" form={form} hosts={hosts} frame={frame("share")} />,
     "notifications-card": <NotificationsSection key="notifications-card" form={form} frame={frame("notifications-card")} />,
   };

@@ -20,7 +20,7 @@ import { useTheme } from "@mui/material/styles";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { Icon } from "../../ds/Icon";
 import { EmptyState } from "../../ds/EmptyState";
-import { ImageGallery } from "../../ds/ImageGallery";
+import { ImageField } from "../../ds/ImageField";
 import { SideSheet } from "../../ds/SideSheet";
 import { useDebounced } from "../../ds/SearchField";
 import { dayjs, useTimezone, useTimezoneFormat } from "../../contexts";
@@ -32,15 +32,20 @@ import { CardGrid, ShopCard } from "../shop/shared";
 import { ConfirmDelete, LibraryToolbar, useLibraryMutations, useSheet } from "./shared";
 import { CardsSkeleton } from "../../ds/Skeletons";
 
-// Each picture kind keeps up to five images; the selected one (imageUrl, heroCardImageUrl) is what
-// new streams use. The stream image (900 × 1200) comes from the stream's game set, not the host.
-const EMPTY = { id: "", name: "", displayName: "", imageUrl: null, pictureUrls: [], heroCardImageUrl: null, heroCardImageUrls: [] };
-const GALLERIES = [
-  // The same two, by the same names, as a stream's Host section shows them.
-  { list: "pictureUrls", pick: "imageUrl", label: "Host picture", width: 256, height: 256, hint: "Avatar and stream thumbnail · 256 × 256" },
-  { list: "heroCardImageUrls", pick: "heroCardImageUrl", label: "Hero card image", width: 256, height: 256, hint: "Home screen card · 256 × 256" },
+// A host has one of each image; new streams use them, placed on the game set's backgrounds (a
+// stream can switch to its own). The same two, by the same names, as a stream's Images section.
+const EMPTY = { id: "", name: "", displayName: "", imageUrl: null, heroCardImageUrl: null };
+const PICTURES = [
+  { field: "imageUrl", label: "Live game host avatar image", width: 256, height: 256, hint: "On the live game host avatar background · 256 × 256" },
+  { field: "heroCardImageUrl", label: "Hero card image", width: 256, height: 256, hint: "On the home screen hero card background · 256 × 256" },
 ];
-const galleryOf = (r, g) => r?.[g.list] ?? (r?.[g.pick] ? [r[g.pick]] : []);
+const toDataUrl = (file) =>
+  new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
 
 /** A host as a large card, like the Shop's: their picture, the name the app shows, then their name. */
 function HostCard({ host, onOpen }) {
@@ -196,15 +201,15 @@ export function HostSheet({ sheet, stats, existing, onHandOver }) {
   const [confirm, setConfirm] = useState(false);
   const { control, reset, handleSubmit, setValue, setError, getValues, formState } = useForm({ defaultValues: EMPTY });
   const [account, setAccount] = useState(null);
-  const gallery = useWatch({ control, name: GALLERIES.flatMap((g) => [g.list, g.pick]) });
+  const pictures = useWatch({ control, name: PICTURES.map((p) => p.field) });
 
   useEffect(() => {
-    if (sheet.open) reset({ ...EMPTY, ...sheet.record, displayName: sheet.record?.displayName ?? "", ...Object.fromEntries(GALLERIES.map((g) => [g.list, galleryOf(sheet.record, g)])) });
+    if (sheet.open) reset({ ...EMPTY, ...sheet.record, displayName: sheet.record?.displayName ?? "" });
     setAccount(null);
   }, [sheet.open, sheet.record, reset]);
 
   const submit = handleSubmit(async (v) => {
-    const values = { name: v.name, displayName: v.displayName || null, ...Object.fromEntries(GALLERIES.flatMap((g) => [[g.list, v[g.list]], [g.pick, v[g.pick] || null]])), ...(isNew ? { id: v.id } : {}) };
+    const values = { name: v.name, displayName: v.displayName || null, ...Object.fromEntries(PICTURES.map((p) => [p.field, v[p.field] || null])), ...(isNew ? { id: v.id } : {}) };
     if (await save(isNew ? null : sheet.record.id, values, setError)) sheet.close();
   });
   const upcoming = sheet.record?.id ? stats(sheet.record.id).upcoming : 0;
@@ -273,19 +278,16 @@ export function HostSheet({ sheet, stats, existing, onHandOver }) {
       <TextInput control={control} name="displayName" label="Display name (optional)" helperText="Shown in the app instead of the name." />
       {/* The pictures, after who the host is. */}
       <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
-        {GALLERIES.map((g, i) => (
-          <ImageGallery
-            key={g.list}
-            label={g.label}
-            hint={g.hint}
-            width={g.width}
-            height={g.height}
-            urls={gallery[i * 2] ?? []}
-            selected={gallery[i * 2 + 1]}
-            onChange={(urls, picked) => {
-              setValue(g.list, urls, { shouldDirty: true });
-              setValue(g.pick, picked, { shouldDirty: true });
-            }}
+        {PICTURES.map((p, i) => (
+          <ImageField
+            key={p.field}
+            label={p.label}
+            hint={p.hint}
+            width={p.width}
+            height={p.height}
+            value={pictures[i]}
+            onChange={async (file) => setValue(p.field, await toDataUrl(file), { shouldDirty: true })}
+            onRemove={() => setValue(p.field, null, { shouldDirty: true })}
           />
         ))}
       </Box>

@@ -10,7 +10,7 @@ import { Icon } from "../../ds/Icon";
 import { SideSheet } from "../../ds/SideSheet";
 import { DP } from "../../providers";
 import { useNotify } from "../../shell/notifications";
-import { bundleLine } from "../streams/gameModes";
+import { bundleLine, useBundles } from "../streams/gameModes";
 import { useLibraryMutations } from "../library/shared";
 import { GameSetFields, gameSetForm } from "./detail";
 
@@ -18,6 +18,7 @@ import { GameSetFields, gameSetForm } from "./detail";
 export function GameSetSheet({ sheet, onSaved }) {
   const set = sheet.record;
   const notify = useNotify();
+  const { rewardsOf } = useBundles();
   const { save, saving } = useLibraryMutations({ resource: "Bundle", dataProviderName: DP.bundles, noun: "Game set" });
   const { control, reset, handleSubmit, setValue, getValues, trigger, setError, formState } = useForm();
   // The fields show once the form holds this game set (as on its page), never an empty form.
@@ -45,7 +46,7 @@ export function GameSetSheet({ sheet, onSaved }) {
       onClose={sheet.close}
       dirty={formState.isDirty}
       title={set?.name}
-      subtitle={["Game set", bundleLine(set)].filter(Boolean).join(" · ")}
+      subtitle={["Game set", bundleLine(set, rewardsOf(set))].filter(Boolean).join(" · ")}
       headerActions={
         set?.id && (
           <Tooltip title="Open game set">

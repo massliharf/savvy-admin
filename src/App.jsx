@@ -43,7 +43,7 @@ import SwagPage from "./pages/shop/swag";
 import OrdersPage from "./pages/shop/orders";
 import SeasonsPage from "./pages/liveops/seasons";
 import PollsPage from "./pages/liveops/polls";
-import NotificationsPage, { ScoringPage } from "./pages/liveops/presets";
+import NotificationsPage, { RewardSetsPage, ScoringPage } from "./pages/liveops/presets";
 import ReferralsPage, { ShareCardsPage } from "./pages/liveops/sharing";
 import DailyPuzzlePage from "./pages/liveops/dailyPuzzle";
 
@@ -75,6 +75,8 @@ const resources = [
   { name: "Bundle", list: "/game-sets", edit: "/game-sets/:id", meta: { label: "Game sets", dataProviderName: DP.bundles } },
   { name: "WordSet", list: "/word-sets", meta: { dataProviderName: DP.wordSets } },
   { name: "ScoringPreset", list: "/scoring", meta: { dataProviderName: DP.scoringPresets } },
+  { name: "RewardSet", list: "/reward-sets", meta: { dataProviderName: DP.rewardSets } },
+  { name: "BackgroundPreset", meta: { dataProviderName: DP.backgroundPresets } },
   { name: "GameMode", list: "/game-modes", meta: { dataProviderName: DP.gameModes } },
   { name: "PowerUp", list: "/power-ups", meta: { dataProviderName: DP.powerUps } },
   { name: "Host", list: "/hosts", meta: { dataProviderName: DP.hosts } },
@@ -154,6 +156,7 @@ export default function App() {
                       <Route path="/game-sets" element={<GameSetsPage />} />
                       <Route path="/word-sets" element={<WordSetsPage />} />
                       <Route path="/scoring" element={<ScoringPage />} />
+                      <Route path="/reward-sets" element={<RewardSetsPage />} />
                       <Route path="/game-modes" element={<GameModesPage />} />
                       <Route path="/power-ups" element={<PowerUpsPage />} />
                       <Route path="/games" element={<Navigate to="/game-sets" replace />} />

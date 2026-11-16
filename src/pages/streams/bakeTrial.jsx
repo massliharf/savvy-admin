@@ -1,5 +1,6 @@
-// TRIAL (2026-11-13): bakes the stream image (900 × 1200) from the game set's stream image
-// background and the host's picture, by itself, so nobody has to make one per host and set.
+// TRIAL (2026-11-13): bakes a stream's two host pictures (900 × 1200) by itself, so nobody has to
+// make one per host and set: the live game host avatar (the game set's live game host avatar
+// background + the host's avatar image) and the hero card (hero card background + hero card image).
 //
 //   1. Cut out: the host's picture loses its own background (a person segmenter, MediaPipe,
 //      running in the browser; in production this runs once on the server when a host picture is
@@ -8,16 +9,13 @@
 //      fade at the bottom for the app's text. In production the server bakes on save, once per
 //      background + host pair, and the stream gets that image's URL (heroImageUrl).
 //
-// It's baked on the stream (Stream detail › When & title) and only previewed: nothing is saved.
+// It's baked on the stream (Stream detail › Images) and only previewed: nothing is saved.
 // To remove the trial, delete this file and the lines marked "bake trial" in streams/detail/sections.jsx.
 import { useEffect, useState } from "react";
-import { useList } from "@refinedev/core";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import { useTheme } from "@mui/material/styles";
-import { DP } from "../../providers";
 import { STREAM_HERO_URL } from "../../assets";
-import { hostLabel } from "./hosts";
 
 const W = 900;
 const H = 1200;
@@ -95,7 +93,7 @@ function drawCover(ctx, img, w, h) {
 }
 
 /** A clean Savvy-blue background (no one in it), for when the game set's has a host baked in. */
-function paintSample(ctx) {
+function paintSample(ctx, W, H) {
   const g = ctx.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0, "#1556f0");
   g.addColorStop(0.45, "#1d9bf4");
@@ -122,9 +120,9 @@ function paintSample(ctx) {
 export const hasHostInIt = (url) => !url || url === STREAM_HERO_URL;
 
 const bakes = new Map();
-/** The stream image: `background` (cover) + the cut-out `host` on the bottom edge. Cached per pair. */
-export function bakeStreamImage({ background, host }) {
-  const key = `${background}|${host}`;
+/** A picture of `w` × `h`: `background` (cover) + the cut-out `host` on the bottom edge. Cached per pair and size. */
+export function bakeStreamImage({ background, host, w: W = 900, h: H = 1200 }) {
+  const key = `${background}|${host}|${W}x${H}`;
   if (!bakes.has(key))
     bakes.set(
       key,
@@ -133,12 +131,13 @@ export function bakeStreamImage({ background, host }) {
         canvas.width = W;
         canvas.height = H;
         const ctx = canvas.getContext("2d");
-        if (hasHostInIt(background)) paintSample(ctx);
+        if (hasHostInIt(background)) paintSample(ctx, W, H);
         else drawCover(ctx, await loadImage(background), W, H);
         if (host) {
           const cut = await cutout(host);
-          // Head and shoulders, as wide as the image, its bottom (where the photo cuts the shoulders) on the bottom edge.
-          const w = W * 1.04;
+          // Head and shoulders, about as wide as the picture (a little less on a square one), its
+          // bottom (where the photo cuts the shoulders) on the bottom edge.
+          const w = W * (W >= H ? 0.86 : 1.04);
           const h = (w * cut.height) / cut.width;
           ctx.save();
           ctx.shadowColor = "rgba(0, 10, 40, 0.45)";
@@ -161,61 +160,44 @@ export function bakeStreamImage({ background, host }) {
   return bakes.get(key);
 }
 
-function useBake(background, host) {
+function useBake(background, host, w, h) {
   const [state, setState] = useState({ url: null, error: null, busy: true });
   useEffect(() => {
     let live = true;
     setState((s) => ({ ...s, busy: true, error: null }));
-    bakeStreamImage({ background, host })
+    bakeStreamImage({ background, host, w, h })
       .then((url) => live && setState({ url, error: null, busy: false }))
       .catch((e) => live && setState({ url: null, error: e.message || "Couldn't make the image", busy: false }));
     return () => {
       live = false;
     };
-  }, [background, host]);
+  }, [background, host, w, h]);
   return state;
 }
 
 // ---------------------------------------------------------------- preview
-function BakedImage({ background, host, width }) {
+/**
+ * Stream page (Images): the picture this stream gets, made from a background and the host's image
+ * (`w` × `h`), shown `width` wide. Preview only.
+ */
+export function BakedImage({ background, host, w = 900, h = 1200, width = 150 }) {
   const { m3: c, tokens } = useTheme();
-  const { url, error, busy } = useBake(background, host);
+  const { url, error, busy } = useBake(background, host, w, h);
+  const sample = hasHostInIt(background);
   return (
-    <Box sx={{ width, aspectRatio: "3 / 4", flexShrink: 0, borderRadius: `${tokens.shape.md}px`, overflow: "hidden", bgcolor: c.surfaceContainerHighest, display: "grid", placeItems: "center", position: "relative" }}>
-      {url && <Box component="img" src={url} alt="" sx={{ width: "100%", height: "100%", objectFit: "cover", display: "block", opacity: busy ? 0.5 : 1 }} />}
-      {(busy || error) && (
+    <Box sx={{ width, aspectRatio: `${w} / ${h}`, flexShrink: 0, borderRadius: `${tokens.shape.md}px`, overflow: "hidden", bgcolor: c.surfaceContainerHighest, display: "grid", placeItems: "center", position: "relative" }}>
+      {host && url && <Box component="img" src={url} alt="" sx={{ width: "100%", height: "100%", objectFit: "cover", display: "block", opacity: busy ? 0.5 : 1 }} />}
+      {(!host || busy || error) && (
         <Typography variant="bodySmall" color="text.secondary" sx={{ position: "absolute", px: 1, textAlign: "center" }}>
-          {error ?? "Cutting out the host…"}
+          {!host ? "No host image" : error ?? "Cutting out the host…"}
         </Typography>
       )}
-    </Box>
-  );
-}
-
-/** Stream page (When & title): the image this stream gets, made from its background and host. */
-export function StreamBakePreview({ background, host, hostId, setName }) {
-  const { data } = useList({ resource: "Host", dataProviderName: DP.hosts, pagination: { mode: "off" } });
-  // The name the app shows (display name, else name).
-  const hostName = hostLabel((data?.data ?? []).find((h) => h.id === hostId));
-  if (!host) return null;
-  return (
-    <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start", py: 1.25, borderTop: 1, borderColor: "divider" }}>
-      <BakedImage background={background} host={host} width={150} />
-      <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Box>
-          <Typography variant="titleSmall" component="div">
-            Stream image
-          </Typography>
-          <Typography variant="bodySmall" color="text.secondary" component="div">
-            Made from {setName ? `${setName}'s background` : "the background"} and {hostName || "the host"}'s picture. Updates by itself when either changes.
-          </Typography>
-          {hasHostInIt(background) && (
-            <Typography variant="bodySmall" color="text.secondary" component="div" sx={{ mt: 0.5 }}>
-              This background already has a host in it, so a clean sample is used here.
-            </Typography>
-          )}
-        </Box>
-      </Box>
+      {/* The sample stream image already has a host in it: a clean sample stands in for it. */}
+      {host && sample && !busy && (
+        <Typography variant="labelSmall" sx={{ position: "absolute", left: 6, bottom: 6, px: 0.75, borderRadius: 1, bgcolor: "rgba(0,0,0,0.55)", color: "#fff" }}>
+          Sample background
+        </Typography>
+      )}
     </Box>
   );
 }

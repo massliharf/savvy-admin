@@ -1,5 +1,5 @@
 // Sections of the stream detail page. Each receives the stream form (useStreamForm) as `form`.
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Controller, useFormState, useWatch } from "react-hook-form";
 import { useList } from "@refinedev/core";
 import Avatar from "@mui/material/Avatar";
@@ -9,7 +9,12 @@ import Switch from "@mui/material/Switch";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import InputBase from "@mui/material/InputBase";
-import ButtonBase from "@mui/material/ButtonBase";
+import Menu from "@mui/material/Menu";
+import MenuItem from "@mui/material/MenuItem";
+import ListSubheader from "@mui/material/ListSubheader";
+import ListItemIcon from "@mui/material/ListItemIcon";
+import ListItemText from "@mui/material/ListItemText";
+import Divider from "@mui/material/Divider";
 import { useTheme } from "@mui/material/styles";
 import { Icon } from "../../../ds/Icon";
 import { FieldGroup, FormSection } from "../../../ds/FormSection";
@@ -22,11 +27,14 @@ import { PresetsButton } from "../../liveops/presets";
 import { AudienceField, HostPicker, PickCard, PickPlaceholder } from "../pickers";
 import { HostSheet } from "../../library/hosts";
 import { GameSetSheet } from "../../gameModes/sheet";
-import { StreamBakePreview } from "../bakeTrial"; // bake trial
+import { BakedImage } from "../bakeTrial"; // bake trial
+import { BackgroundPickerDialog, useBackgroundPresets } from "../../library/backgrounds";
+import { backgroundUrl } from "../../../utils/backgrounds";
 import { fillHost, hostLabel, titleRule } from "../hosts";
 import { useWordSets, useWordsLock } from "../words";
 import { useSheet } from "../../library/shared";
-import { GAME_MODES, baseOf, modeId, newShowdown, useBundles, useStreamBuilder } from "../gameModes";
+import { GAME_MODES, baseOf, modeId, newShowdown, prizeText, roundRewardOf, streamRewards, useBundles, useRewardSets, useStreamBuilder } from "../gameModes";
+import { PowerUpPicker } from "../../gameModes/powerUps";
 import { DP } from "../../../providers";
 import { useTimezoneFormat } from "../../../contexts";
 import { DateTimeInput, NumberInput, RewardCell, TextInput, rewardText } from "./fields";
@@ -81,138 +89,207 @@ function SwitchListRow({ control, name, icon, title, supporting }) {
   return <Controller name={name} control={control} render={({ field }) => <ListSwitch icon={icon} title={title} supporting={supporting} checked={!!field.value} onChange={field.onChange} />} />;
 }
 
-// The host's two pictures, each its own thing (set in Hosts, picked per stream from the host's
-// galleries): the host picture (avatar and stream thumbnail) and the hero card image (the home
-// screen card).
-const HOST_PICTURES = [
-  { label: "Host picture", hint: "Avatar and stream thumbnail", list: "pictureUrls", pick: "imageUrl", field: "imageUrl", file: "hostImageFile", ratio: 1 },
-  { label: "Hero card image", hint: "Home screen card", list: "heroCardImageUrls", pick: "heroCardImageUrl", field: "heroCardImageUrl", file: null, ratio: 1 },
+// ---------------------------------------------------------------- images
+// A stream shows its host twice, each time as an image placed on a background: the live game host
+// avatar (in the live game) and the hero card (on the home screen). The backgrounds come from the
+// stream's game set, the images from its host; each can be switched per stream (another of the
+// game set's backgrounds, or one uploaded for this stream only) without changing the game set or
+// the host.
+const toDataUrl = (file) =>
+  new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+
+// `field` is the stream's (API names kept: heroImageUrl is the avatar background); `list`/`pick`
+// are the source's (the game set keeps up to five backgrounds, a host one image).
+const IMAGE_PAIRS = [
+  {
+    key: "avatar",
+    title: "Live game host avatar",
+    // Square; also a colour or gradient (presets, or Custom).
+    background: { label: "Live game host avatar background", short: "Background", source: "set", list: "avatarBackgroundUrls", pick: "avatarBackgroundUrl", field: "heroImageUrl", file: "heroImageFile", width: 1024, height: 1024, swatches: true },
+    image: { label: "Live game host avatar image", short: "Image", source: "host", pick: "imageUrl", field: "imageUrl", file: "hostImageFile", width: 256, height: 256 },
+  },
+  {
+    key: "heroCard",
+    title: "Hero card",
+    background: { label: "Hero card background", short: "Background", source: "set", list: "heroCardBackgroundUrls", pick: "heroCardBackgroundUrl", field: "heroCardBackgroundUrl", file: null, width: 900, height: 1200 },
+    image: { label: "Hero card image", short: "Image", source: "host", pick: "heroCardImageUrl", field: "heroCardImageUrl", file: null, width: 256, height: 256 },
+  },
 ];
-// The stream image background (behind the stream's screen, 900 × 1200) comes from the stream's game set.
-const STREAM_IMAGE = { label: "Stream image background", hint: "Behind the stream's screen", list: "streamImageUrls", pick: "streamImageUrl", field: "heroImageUrl", file: "heroImageFile", ratio: 0.75 };
+export const IMAGE_FIELDS = IMAGE_PAIRS.flatMap((p) => [p.background.field, p.image.field]);
 
 /**
- * Where a picture of one kind is used on this stream, and the others of its `source` (the host or
- * the game set) to switch to. `empty` says what's missing when there's none.
+ * One image of a stream: what it uses now and where that comes from, and "Change" to pick another
+ * of its source's, upload one for this stream only, or edit the source (game set or host).
  */
-function PictureRow({ def, source, value, onPick, empty }) {
+function PictureRow({ def, value, source, sourceName, emptyText, editLabel, onEdit, onPick }) {
   const { m3: c, tokens } = useTheme();
-  const urls = source?.[def.list] ?? (source?.[def.pick] ? [source[def.pick]] : []);
+  const [anchor, setAnchor] = useState(null);
+  const [swatches, setSwatches] = useState(false);
+  const pickFile = useRef(null);
+  const urls = (def.list ? source?.[def.list] : null) ?? (source?.[def.pick] ? [source[def.pick]] : []);
   const current = value || source?.[def.pick] || null;
-  const tile = (url, size, on, onClick, i) => (
-    <ButtonBase
-      key={url ? url.slice(-40) + i : "none"}
-      onClick={onClick}
-      disabled={!onClick}
-      aria-label={onClick ? `${def.label} ${i + 1}${on ? ", in use" : ""}` : def.label}
-      aria-pressed={onClick ? on : undefined}
-      sx={{ width: Math.round(size * def.ratio), height: size, flexShrink: 0, borderRadius: `${tokens.shape.sm}px`, overflow: "hidden", bgcolor: c.surfaceContainerHighest, boxShadow: on ? `0 0 0 2px ${c.primary}` : "none", "&.Mui-focusVisible": { outline: `2px solid ${c.focus}`, outlineOffset: 2 } }}
-    >
+  const own = !!value && !urls.includes(value);
+  // A colour or gradient by its preset's name (a game set's background too).
+  const { presets } = useBackgroundPresets();
+  const preset = def.swatches && current ? presets.find((p) => backgroundUrl(p) === current) : null;
+  const origin = !current ? emptyText : own ? `${preset ? preset.name : "Uploaded"} · this stream only` : [preset?.name, `From ${sourceName}`].filter(Boolean).join(" · ");
+  const ratio = def.width / def.height;
+  const thumb = (url, size) => (
+    <Box sx={{ width: Math.round(size * ratio), height: size, flexShrink: 0, borderRadius: `${tokens.shape.sm}px`, overflow: "hidden", bgcolor: c.surfaceContainerHighest, display: "grid", placeItems: "center" }}>
       {url ? <Box component="img" src={url} alt="" sx={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : <Icon name="image" size={16} style={{ color: c.onSurfaceVariant }} />}
-    </ButtonBase>
+    </Box>
   );
+  const close = () => setAnchor(null);
   return (
     <Box sx={{ display: "flex", alignItems: "center", gap: 2, py: 1.25, "&:not(:last-of-type)": { borderBottom: 1, borderColor: "divider" } }}>
-      {tile(current, 56, false, null, 0)}
+      {thumb(current, 56)}
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Typography variant="titleSmall" component="div">
-          {def.label}
+          {def.short}
         </Typography>
-        <Typography variant="bodySmall" color="text.secondary" component="div">
-          {current ? def.hint : empty}
+        <Typography variant="bodySmall" color="text.secondary" component="div" noWrap>
+          {origin}
         </Typography>
       </Box>
-      {/* The others of this kind, to use one for this stream instead. */}
-      {urls.length > 1 && <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", justifyContent: "flex-end" }}>{urls.map((u, i) => tile(u, 36, u === current, () => onPick(u), i))}</Box>}
+      <Button variant="tonal" size="small" endIcon={<Icon name="arrow_drop_down" size={18} />} onClick={(e) => setAnchor(e.currentTarget)} aria-label={`Change ${def.label.toLowerCase()}`} aria-haspopup="menu">
+        Change
+      </Button>
+      <Menu anchorEl={anchor} open={!!anchor} onClose={close}>
+        <ListSubheader sx={{ lineHeight: "32px" }}>{`From ${sourceName}`}</ListSubheader>
+        {urls.length === 0 && <MenuItem disabled>{emptyText}</MenuItem>}
+        {urls.map((u, i) => (
+          <MenuItem
+            key={u.slice(-40) + i}
+            selected={u === current}
+            onClick={() => {
+              close();
+              onPick(u === (source?.[def.pick] ?? null) ? null : u);
+            }}
+            sx={{ gap: 1.5 }}
+          >
+            {thumb(u, 32)}
+            <ListItemText primary={urls.length > 1 ? `${def.short} ${i + 1}` : def.short} secondary={u === source?.[def.pick] ? "Selected on it" : undefined} />
+            {u === current && <Icon name="check" size={20} />}
+          </MenuItem>
+        ))}
+        <Divider />
+        <MenuItem
+          onClick={() => {
+            close();
+            pickFile.current?.();
+          }}
+        >
+          <ListItemIcon>
+            <Icon name="upload" size={20} />
+          </ListItemIcon>
+          <ListItemText primary="Upload for this stream" secondary={`${def.width} × ${def.height}`} />
+        </MenuItem>
+        {def.swatches && (
+          <MenuItem
+            onClick={() => {
+              close();
+              setSwatches(true);
+            }}
+          >
+            <ListItemIcon>
+              <Icon name="palette" size={20} />
+            </ListItemIcon>
+            <ListItemText primary="Colour or gradient for this stream" secondary="Presets, or add a custom one" />
+          </MenuItem>
+        )}
+        {onEdit && (
+          <MenuItem
+            onClick={() => {
+              close();
+              onEdit();
+            }}
+          >
+            <ListItemIcon>
+              <Icon name="edit" size={20} />
+            </ListItemIcon>
+            <ListItemText primary={editLabel} />
+          </MenuItem>
+        )}
+      </Menu>
+      {/* Crops an upload to the image's size; it's this stream's own (the source stays as it is). */}
+      <ImageField headless pickRef={pickFile} label={def.label} width={def.width} height={def.height} onChange={async (file) => onPick(await toDataUrl(file))} />
+      {def.swatches && <BackgroundPickerDialog open={swatches} onClose={() => setSwatches(false)} selected={current} onPick={onPick} title={def.label} />}
     </Box>
   );
 }
 
-/** The host's pictures as this stream uses them. */
-function HostPictures({ form, host, onEditHost }) {
+/** A background and an image, as this stream uses them, and (trial) the picture made of the two. */
+function ImagePair({ pair, form, set, host, onEditSet, onEditHost }) {
   const { control, setValue } = form;
-  const values = useWatch({ control, name: HOST_PICTURES.map((d) => d.field) });
-  if (!host) return null;
+  const [bg, img] = useWatch({ control, name: [pair.background.field, pair.image.field] });
+  const pick = (def) => (url) => {
+    if (def.file) setValue(def.file, null);
+    // null: back to the source's selected one.
+    setValue(def.field, url ?? (def.source === "set" ? set : host)?.[def.pick] ?? null, { shouldDirty: true });
+  };
+  const hostName = hostLabel(host) || "the host";
+  const { width: w, height: h } = pair.background;
   return (
     <Box>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
-        <Typography variant="overline" color="text.secondary" component="h3" sx={{ flex: 1 }}>
-          {`${hostLabel(host)}'s pictures`}
-        </Typography>
-        {onEditHost && (
-          <Button variant="text" size="small" startIcon={<Icon name="edit" size={16} />} onClick={onEditHost}>
-            Edit in Hosts
-          </Button>
-        )}
+      <Typography variant="overline" color="text.secondary" component="h3" sx={{ display: "block", mb: 0.5 }}>
+        {pair.title}
+      </Typography>
+      {/* What the app shows (the background with the host's image cut out on it) on the left; what it's made of on the right. */}
+      <Box sx={{ display: "flex", gap: 2.5, alignItems: "flex-start", flexWrap: { xs: "wrap", sm: "nowrap" } }}>
+        <BakedImage background={bg || set?.[pair.background.pick]} host={img || host?.[pair.image.pick]} w={w} h={h} width={w >= h ? 132 : 120} /> {/* bake trial */}
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <PictureRow def={pair.background} value={bg} source={set} sourceName={set?.name ?? "the game set"} emptyText={set ? `${set.name} has none yet` : "No game set"} editLabel="Edit in Game sets" onEdit={set ? onEditSet : undefined} onPick={pick(pair.background)} />
+          <PictureRow def={pair.image} value={img} source={host} sourceName={hostName} emptyText={host ? `${hostName} has none yet` : "Pick a host first"} editLabel="Edit in Hosts" onEdit={host ? onEditHost : undefined} onPick={pick(pair.image)} />
+        </Box>
       </Box>
-      {HOST_PICTURES.map((d, i) => (
-        <PictureRow
-          key={d.field}
-          def={d}
-          source={host}
-          empty={`${hostLabel(host) || "This host"} has none yet`}
-          value={values[i]}
-          onPick={(url) => {
-            if (d.file) setValue(d.file, null);
-            setValue(d.field, url, { shouldDirty: true });
-          }}
-        />
-      ))}
     </Box>
   );
 }
 
-/** The stream image background as this stream uses it, and its game set's others to switch to. */
-function StreamImage({ form }) {
-  const { control, setValue, getValues } = form;
-  const [bundleId, value, hostPicture, hostId] = useWatch({ control, name: ["bundleId", STREAM_IMAGE.field, "imageUrl", "hostId"] });
+/** The stream's images: the live game host avatar and the hero card, each a background and an image. */
+export function ImagesSection({ form, hosts, frame }) {
+  const { getValues, setValue } = form;
+  const [bundleId, hostId] = useWatch({ control: form.control, name: ["bundleId", "hostId"] });
   const { byId } = useBundles();
   const set = byId[bundleId];
-  const sheet = useSheet();
+  const host = hosts.find((h) => h.id === hostId);
+  const setSheet = useSheet();
+  const hostSheet = useSheet();
   return (
-    <Box>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
-        <Typography variant="overline" color="text.secondary" component="h3" sx={{ flex: 1 }}>
-          {set ? `From ${set.name}` : "Game set"}
-        </Typography>
-        {set && (
-          <Button variant="text" size="small" startIcon={<Icon name="edit" size={16} />} onClick={() => sheet.openEdit(set)}>
-            Edit in Game sets
-          </Button>
-        )}
-      </Box>
-      <PictureRow
-        def={STREAM_IMAGE}
-        source={set}
-        empty={set ? `${set.name} has none yet` : "None yet"}
-        value={value}
-        onPick={(url) => {
-          setValue(STREAM_IMAGE.file, null);
-          setValue(STREAM_IMAGE.field, url, { shouldDirty: true });
-        }}
-      />
-      <StreamBakePreview background={value || set?.streamImageUrl} host={hostPicture} hostId={hostId} setName={set?.name} /> {/* bake trial */}
+    <FormSection {...frame} id="images" title="Images">
+      {IMAGE_PAIRS.map((p) => (
+        <ImagePair key={p.key} pair={p} form={form} set={set} host={host} onEditSet={() => setSheet.openEdit(set)} onEditHost={() => hostSheet.openEdit(host)} />
+      ))}
       {/* Edits the game set in Game sets (every stream of it shows the change). */}
       <GameSetSheet
-        sheet={sheet}
+        sheet={setSheet}
         onSaved={(before, after) => {
           // Upcoming streams still on the game set's old background move to its new one (as the
           // server does): this stream's form follows, without counting as an edit of its own.
-          const current = getValues(STREAM_IMAGE.field);
-          const next = after?.streamImageUrl;
-          if (next && next !== before.streamImageUrl && getValues("status") === "Scheduled" && (!current || current === before.streamImageUrl)) setValue(STREAM_IMAGE.field, next);
+          if (getValues("status") !== "Scheduled") return;
+          IMAGE_PAIRS.forEach(({ background: d }) => {
+            const current = getValues(d.field);
+            const next = after?.[d.pick];
+            if (next && next !== before[d.pick] && (!current || current === before[d.pick])) setValue(d.field, next);
+          });
         }}
       />
-    </Box>
+      {/* Edits the host in the Hosts library (every stream they host shows the change). */}
+      <HostSheet sheet={hostSheet} stats={() => ({ upcoming: 0 })} existing={[]} />
+    </FormSection>
   );
 }
 
-/** The stream itself: its image background first, then title and subtitle, when, who sees it, and its toggles. */
+/** The stream itself: title and subtitle, when, who sees it, and its toggles. */
 export function DetailsSection({ form, frame }) {
   const { control } = form;
   return (
     <FormSection {...frame} id="basics" title="When & title">
-      <StreamImage form={form} />
       <TextInput control={control} name="title" label="Title" max={100} rules={{ validate: titleRule }} helperText="{host} becomes the host's name wherever the title shows." />
       <TextInput control={control} name="subtitle" label="Subtitle" />
       <DateTimeInput control={control} name="startDate" rules={{ required: "Pick a date and time" }} />
@@ -243,7 +320,7 @@ export function DetailsSection({ form, frame }) {
 
 
 
-/** The host, picked from the Hosts library like every other choice; ✎ edits them in the library. */
+/** The host, picked from the Hosts library like every other choice; ✎ edits them in the library. Their images are under Images. */
 export function HostSection({ form, hosts, frame }) {
   const { control, setValue } = form;
   const sheet = useSheet();
@@ -266,7 +343,7 @@ export function HostSection({ form, hosts, frame }) {
             onChange={(h) => {
               setValue("hostId", h?.id ?? "", { shouldDirty: true, shouldValidate: true });
               setValue("hostName", h?.name ?? "", { shouldDirty: true });
-              // A new host brings their selected pictures (picture, hero card); the stream image is the game set's.
+              // A new host brings their images (avatar image, hero card image); the backgrounds are the game set's.
               setValue("imageUrl", h?.imageUrl ?? null, { shouldDirty: true });
               setValue("heroCardImageUrl", h?.heroCardImageUrl ?? null, { shouldDirty: true });
               setValue("hostImageFile", null);
@@ -274,7 +351,6 @@ export function HostSection({ form, hosts, frame }) {
           />
         )}
       />
-      <HostPictures form={form} host={hosts.find((h) => h.id === hostId)} onEditHost={current ? () => sheet.openEdit(hosts.find((x) => x.id === current.id) ?? current) : undefined} />
       {/* Edits the host in the Hosts library (every stream they host shows the change). */}
       <HostSheet sheet={sheet} stats={() => ({ upcoming: 0 })} existing={[]} />
     </FormSection>
@@ -313,10 +389,10 @@ function MaskedWord({ control, name }) {
   );
 }
 
-/** A round's Round Pounder reward cell: the reward, or "Add" when it has none. */
-export function BusterCell({ control, setValue, base, index }) {
-  const buster = useWatch({ control, name: `${base}.roundBusterReward` });
-  const set = (v) => setValue(`${base}.roundBusterReward`, v, { shouldDirty: true });
+/** A round's Round Pounder reward cell (`name`): the reward, or "Add" when it has none. */
+export function BusterCell({ control, setValue, name, index }) {
+  const buster = useWatch({ control, name });
+  const set = (v) => setValue(name, v, { shouldDirty: true });
   if (!buster) {
     return (
       <Button variant="tonal" size="small" startIcon={<Icon name="add" />} onClick={() => set(busterFor(index))}>
@@ -324,17 +400,18 @@ export function BusterCell({ control, setValue, base, index }) {
       </Button>
     );
   }
-  return <RewardCell control={control} name={`${base}.roundBusterReward`} allowed={NON_CASH_REWARDS} label={`Round Pounder reward, round ${index + 1}`} onClear={() => set(null)} />;
+  return <RewardCell control={control} name={name} allowed={NON_CASH_REWARDS} label={`Round Pounder reward, round ${index + 1}`} onClear={() => set(null)} />;
 }
 
 /**
- * Rounds as an M3 data table: word, its time (from the word) and Round Pounder reward, each edited
- * in its cell. Every game has at least five rounds; more can be added, and the last one past five
- * removed. `fields`, `append` and `remove` come from the caller's useFieldArray on `name`.
+ * Rounds as an M3 data table: word and its time (from the word), each edited in its cell. Each
+ * round's Round Pounder is under Rewards. Every game has at least five rounds; more can be added,
+ * and the last one past five removed. `fields`, `append` and `remove` come from the caller's
+ * useFieldArray on `name`; `newReward(i)` is a new round's Round Pounder.
  */
-export function RoundsEditor({ form, name, fields, append, remove, validateWord, defaultDuration = DEFAULT_ROUND_DURATION, detailed = true, masked = false }) {
+export function RoundsEditor({ form, name, fields, append, remove, validateWord, defaultDuration = DEFAULT_ROUND_DURATION, detailed = true, masked = false, newReward = busterFor }) {
   const { control, setValue } = form;
-  // Without `detailed` only the words show; times and Round Pounders keep their values.
+  // Without `detailed` only the words show; times keep their values.
   const extra = (cell) => (detailed ? [cell] : []);
   return (
     <EditTable
@@ -345,7 +422,6 @@ export function RoundsEditor({ form, name, fields, append, remove, validateWord,
         { header: "#", width: "16px" },
         { header: "Word", width: "minmax(96px, 1fr)" },
         ...extra({ header: "Time", width: "64px", align: "right" }),
-        ...extra({ header: "Round Pounder", width: "minmax(148px, 200px)" }),
       ]}
       rows={fields.map((f, i) => {
         const base = `${name}.${i}`;
@@ -359,12 +435,11 @@ export function RoundsEditor({ form, name, fields, append, remove, validateWord,
             </Typography>,
             masked ? <MaskedWord key="w" control={control} name={`${base}.word`} /> : <TextCell key="w" control={control} name={`${base}.word`} label={`Round ${i + 1} word`} placeholder="Add a word" rules={roundWordRules(validateWord, base)} inputProps={{ autoCapitalize: "none", spellCheck: false }} />,
             ...extra(<RoundTimeCell key="t" control={control} setValue={setValue} getValues={form.getValues} base={base} label={`Round ${i + 1} time`} />),
-            ...extra(<BusterCell key="b" control={control} setValue={setValue} base={base} index={i} />),
           ],
         };
       })}
       addLabel="Add round"
-      onAdd={() => append({ roundIndex: fields.length, word: "", durationInSeconds: defaultDuration, roundBusterReward: busterFor(fields.length) })}
+      onAdd={() => append({ roundIndex: fields.length, word: "", durationInSeconds: defaultDuration, roundBusterReward: newReward(fields.length) })}
     />
   );
 }
@@ -395,7 +470,10 @@ function WordSetRow({ form }) {
  */
 export function WordsSection({ form, validateWord, onPickWords, frame }) {
   const { roundFields, appendRound, removeRound, gameMode } = form;
-  const [showdown, rounds] = useWatch({ control: form.control, name: ["showdownConfiguration", "textSavvyRounds.rounds"] });
+  const [showdown, rounds, bundleId] = useWatch({ control: form.control, name: ["showdownConfiguration", "textSavvyRounds.rounds", "bundleId"] });
+  // A round added here gets its Round Pounder from the game set's reward set (set under Rewards).
+  const { byId, rewardsOf } = useBundles();
+  const rewards = rewardsOf(byId[bundleId]);
   // Words stay hidden behind the words password (as in Game modes) once there are any to hide.
   const { hidden, unlock, lock, dialog } = useWordsLock();
   const hasWords = (rounds ?? []).some((r) => r?.word) || !!showdown?.word;
@@ -419,14 +497,14 @@ export function WordsSection({ form, validateWord, onPickWords, frame }) {
     >
       {dialog}
       <WordSetRow form={form} />
-      {/* Each round's word, time and Round Pounder, all in view (words masked while locked). */}
-      <RoundsEditor form={form} name="textSavvyRounds.rounds" fields={roundFields} append={appendRound} remove={removeRound} subText={baseOf(gameMode) === GameMode.SubText} validateWord={validateWord} masked={masked} />
+      {/* Each round's word and time, all in view (words masked while locked). Rewards are under Rewards. */}
+      <RoundsEditor form={form} name="textSavvyRounds.rounds" fields={roundFields} append={appendRound} remove={removeRound} subText={baseOf(gameMode) === GameMode.SubText} validateWord={validateWord} masked={masked} newReward={(i) => roundRewardOf(rewards, i)} />
       {showdown && (
         <Box id="showdown" sx={{ display: "flex", flexDirection: "column", gap: 1, scrollMarginTop: 96 }}>
           <Typography variant="overline" color="text.secondary" component="h3" sx={{ px: 0.5 }}>
             Showdown
           </Typography>
-          <ShowdownFields control={form.control} name="showdownConfiguration" validateWord={validateWord} masked={masked} />
+          <ShowdownFields control={form.control} name="showdownConfiguration" validateWord={validateWord} masked={masked} prize={false} />
         </Box>
       )}
     </FormSection>
@@ -471,9 +549,10 @@ export function ScoringSection({ form, frame }) {
 function ShowdownTypeField({ control, setValue }) {
   const [bundleId, showdown, streamType] = useWatch({ control, name: ["bundleId", "showdownConfiguration", "streamType"] });
   // A showdown added here starts from the stream's bundle (its prize).
-  const { bundles, byId } = useBundles();
+  const { bundles, byId, rewardsOf } = useBundles();
   const superSavvy = streamType === StreamType.SuperSavvy;
-  const setShowdown = (superSavvyOnly) => setValue("showdownConfiguration", { ...(showdown ?? newShowdown(byId[bundleId] ?? bundles[0], streamType)), superSavvyOnly }, { shouldDirty: true });
+  const set = byId[bundleId] ?? bundles[0];
+  const setShowdown = (superSavvyOnly) => setValue("showdownConfiguration", { ...(showdown ?? newShowdown(set, streamType, rewardsOf(set))), superSavvyOnly }, { shouldDirty: true });
   useEffect(() => {
     if (superSavvy && showdown && !showdown.superSavvyOnly) setValue("showdownConfiguration", { ...showdown, superSavvyOnly: true }, { shouldDirty: true });
   }, [superSavvy, showdown, setValue]);
@@ -621,8 +700,11 @@ export const SHOWDOWN_TYPES = [
   { superSavvyOnly: true, label: "Super Savvy Showdown", icon: "diamond" },
 ];
 
-/** Showdown word (left out with `word={false}`) and prize, as a one-row M3 data table. */
-export function ShowdownFields({ control, name, validateWord, word = true, label = "Showdown winner", masked = false, typeSelect = false }) {
+/**
+ * Showdown word (left out with `word={false}`) and prize (left out with `prize={false}`: the prize
+ * is under Rewards), as a one-row M3 data table.
+ */
+export function ShowdownFields({ control, name, validateWord, word = true, prize = true, label = "Showdown winner", masked = false, typeSelect = false }) {
   const { m3: c } = useTheme();
   return (
     <EditTable
@@ -633,7 +715,7 @@ export function ShowdownFields({ control, name, validateWord, word = true, label
       // their values; without a word (game mode defaults) that column stays empty. The showdown
       // select (a game set) takes the spacer too, so its name fits in a side sheet: the prize
       // stays put, as it's placed from the right.
-      columns={[{ header: "", width: "16px" }, { header: word ? "Word" : typeSelect ? "Showdown" : "", width: "minmax(96px, 1fr)" }, ...(!word && typeSelect ? [] : [{ header: "", width: "64px" }]), { header: "Prize", width: "200px" }]}
+      columns={[{ header: "", width: "16px" }, { header: word ? "Word" : typeSelect ? "Showdown" : "", width: "minmax(96px, 1fr)" }, ...(!word && typeSelect ? [] : [{ header: "", width: "64px" }]), ...(prize ? [{ header: "Prize", width: "200px" }] : [])]}
       rows={[
         {
           key: "sd",
@@ -652,64 +734,11 @@ export function ShowdownFields({ control, name, validateWord, word = true, label
               </Typography>
             ),
             ...(!word && typeSelect ? [] : [null]),
-            <RewardCell key="p" control={control} name={`${name}.prize`} allowed={SHOWDOWN_REWARDS} label="Showdown prize" />,
+            ...(prize ? [<RewardCell key="p" control={control} name={`${name}.prize`} allowed={SHOWDOWN_REWARDS} label="Showdown prize" />] : []),
           ],
         },
       ]}
     />
-  );
-}
-
-/**
- * Which kind of showdown (everyone, or Super Savvy members only), its word and prize. Shown when
- * the game mode is a "with Showdown" one. `word={false}` where the word comes later (time slots,
- * game mode defaults); `note` explains where. Super Savvy only streams always run a Super Savvy Showdown.
- */
-export function ShowdownEditor({ control, setValue, name, validateWord, superSavvy, word = true, note }) {
-  const showdown = useWatch({ control, name });
-  const on = !!showdown;
-  const type = superSavvy || showdown?.superSavvyOnly ? 1 : 0;
-  const set = (v) => setValue(name, v, { shouldDirty: true, shouldTouch: true });
-  // Switching the stream to Super Savvy only turns its showdown into a Super Savvy Showdown.
-  useEffect(() => {
-    if (superSavvy && showdown && !showdown.superSavvyOnly) setValue(name, { ...showdown, superSavvyOnly: true }, { shouldDirty: true });
-  }, [superSavvy, showdown, name, setValue]);
-  return (
-    <>
-      {on && (
-        <>
-{/* With a word (a stream): the type on its own line. Without (a bundle): in the prize row. */}
-          {word && (
-                      <ChoiceGroup
-              label="Type"
-              value={type}
-              options={SHOWDOWN_TYPES.map((t, i) => ({ value: i, label: t.label, icon: t.icon }))}
-              onChange={(v) => set({ ...showdown, superSavvyOnly: SHOWDOWN_TYPES[v].superSavvyOnly })}
-              disabled={superSavvy}
-              helperText={superSavvy ? "Super Savvy only streams always run a Super Savvy Showdown." : undefined}
-            />
-          )}
-          <ShowdownFields control={control} name={name} validateWord={validateWord} word={word} typeSelect={!word} />
-          {/* A caption under the table, like the other tables' notes (not a block that reads like a row). */}
-          {note && (
-            <Typography variant="bodySmall" color="text.secondary" sx={{ mt: -1 }}>
-              {note}
-            </Typography>
-          )}
-        </>
-      )}
-    </>
-  );
-}
-
-
-/** Raffle: switched on, then a table of winners (up to 20), each with its reward. */
-export function RaffleSection({ form, frame }) {
-  const { control, setValue } = form;
-  return (
-    <FormSection {...frame} id="raffle" title="Raffle">
-      <RaffleWinners control={control} setValue={setValue} name="raffleSystemWinnersConfiguration" />
-    </FormSection>
   );
 }
 
@@ -846,10 +875,172 @@ export function RewardsEditor({ form, prefix = "", keys, stumper }) {
   );
 }
 
-export function RewardsSection({ form, frame }) {
+/**
+ * Round Pounder rewards as a table, one row per round; `path(i)` is a round's reward (a reward
+ * set's `roundRewards.i`, a stream's round's `roundBusterReward`). With `onAdd` / `onRemove`
+ * rounds can be added (up to 20) and the last one past five removed.
+ */
+function RoundRewardsTable({ control, setValue, count, path, onAdd, onRemove }) {
   return (
-    <FormSection {...frame} id="rewards-card" title="Game rewards">
-      <RewardsEditor form={form} keys={["defaultRewards", "hostBusterReward"]} stumper />
+    <EditTable
+      label="Round Pounder rewards"
+      minWidth={360}
+      reserveRemove
+      removeWidth="48px"
+      // The same tracks as Rewards below, so the rewards line up.
+      columns={[
+        { header: "#", width: "16px" },
+        { header: "Round Pounder", width: "minmax(120px, 1fr)" },
+        { header: "Reward", width: "200px" },
+      ]}
+      rows={Array.from({ length: count }, (_, i) => ({
+        key: i,
+        onRemove: onRemove && count > ROUND_COUNT && i === count - 1 ? () => onRemove(i) : undefined,
+        removeLabel: `Remove round ${i + 1}`,
+        cells: [
+          <Typography key="n" variant="bodyLarge" color="text.secondary">
+            {i + 1}
+          </Typography>,
+          <Typography key="r" variant="bodyLarge" noWrap sx={{ px: 1 }}>
+            Round {i + 1}
+          </Typography>,
+          <BusterCell key="b" control={control} setValue={setValue} name={path(i)} index={i} />,
+        ],
+      }))}
+      {...(onAdd ? { addLabel: `Add round (${count} of 20)`, addDisabled: count >= 20, onAdd } : {})}
+    />
+  );
+}
+
+/** The showdown winner's prize (`name`), as a one-row table lined up with the rewards. */
+function ShowdownPrizeRow({ control, name }) {
+  const { m3: c } = useTheme();
+  return (
+    <EditTable
+      label="Showdown prize"
+      minWidth={360}
+      reserveRemove
+      removeWidth="48px"
+      columns={[
+        { header: "", width: "16px" },
+        { header: "Showdown", width: "minmax(120px, 1fr)" },
+        { header: "Prize", width: "200px" },
+      ]}
+      rows={[
+        {
+          key: "sd",
+          cells: [
+            <Icon key="i" name="trophy" size={20} style={{ color: c.onSurfaceVariant }} />,
+            <Typography key="w" variant="bodyLarge" noWrap sx={{ px: 1 }}>
+              Showdown winner
+            </Typography>,
+            <RewardCell key="p" control={control} name={name} allowed={SHOWDOWN_REWARDS} label="Showdown prize" />,
+          ],
+        },
+      ]}
+    />
+  );
+}
+
+/** A reward set's fields (Library › Gameplay › Reward sets): every reward a stream pays. */
+export function RewardSetFields({ form }) {
+  const { control, setValue } = form;
+  const rounds = useWatch({ control, name: "roundRewards" }) ?? [];
+  const set = (v) => setValue("roundRewards", v, { shouldDirty: true, shouldTouch: true });
+  return (
+    <>
+      <FieldGroup title="Rounds" description="Each round's Round Pounder. A stream with more rounds keeps counting up (5, 10, 15 … Sparks).">
+        <RoundRewardsTable control={control} setValue={setValue} count={rounds.length} path={(i) => `roundRewards.${i}`} onAdd={() => set([...rounds, busterFor(rounds.length)])} onRemove={(i) => set(rounds.filter((_, j) => j !== i))} />
+      </FieldGroup>
+      <FieldGroup title="Showdown" description="Paid when the stream has a showdown.">
+        <ShowdownPrizeRow control={control} name="showdownPrize" />
+      </FieldGroup>
+      <FieldGroup title="Game rewards">
+        <RewardsEditor form={form} stumper />
+      </FieldGroup>
+    </>
+  );
+}
+
+/** A reward set in a line: the showdown prize and how many rounds pay a Round Pounder. */
+export const rewardSetSummary = (p) => {
+  const pounders = (p.roundRewards ?? []).filter(Boolean).length;
+  return [p.showdownPrize && `Showdown ${prizeText(p.showdownPrize)}`, `${pounders} Round ${pounders === 1 ? "Pounder" : "Pounders"}`].filter(Boolean).join(" · ");
+};
+
+/** The rewards a stream (a saved one, or the form's values) pays, in a reward set's shape. */
+const rewardsOfStream = (s) => {
+  const rounds = s.textSavvyRounds?.rounds ?? [];
+  return {
+    roundRewards: rounds.map((r) => r?.roundBusterReward ?? null),
+    showdownPrize: s.showdownConfiguration ? s.showdownConfiguration.prize ?? null : null,
+    defaultRewards: s.defaultRewards ?? [],
+    hostBusterReward: s.hostBusterReward ?? null,
+    hostStumperBonusXp: s.hostStumperBonusXp ?? null,
+    raffleSystemWinnersConfiguration: s.raffleSystemWinnersConfiguration?.length ? s.raffleSystemWinnersConfiguration : null,
+  };
+};
+/** Does the stream pay exactly what the reward set gives it (for its rounds and showdown)? */
+export const sameRewards = (rs, s) => sameJson(streamRewards(rs, s.textSavvyRounds?.rounds?.length ?? 0, s.showdownConfiguration), rewardsOfStream(s));
+
+const REWARD_FIELDS = ["textSavvyRounds.rounds", "showdownConfiguration", "defaultRewards", "hostBusterReward", "hostStumperBonusXp", "raffleSystemWinnersConfiguration"];
+/** The stream's rewards as the form holds them, in a stream's shape. */
+function useStreamRewards(control) {
+  const [rounds, showdown, defaultRewards, hostBusterReward, hostStumperBonusXp, raffle] = useWatch({ control, name: REWARD_FIELDS });
+  return { textSavvyRounds: { rounds }, showdownConfiguration: showdown, defaultRewards, hostBusterReward, hostStumperBonusXp, raffleSystemWinnersConfiguration: raffle };
+}
+
+/** Puts a reward set's rewards on the stream's form (its rounds and showdown as they are). */
+export function applyRewardSet({ getValues, setValue }, rs) {
+  const rounds = getValues("textSavvyRounds.rounds") ?? [];
+  const showdown = getValues("showdownConfiguration");
+  const pays = streamRewards(rs, rounds.length, showdown);
+  const opts = { shouldDirty: true, shouldTouch: true };
+  rounds.forEach((_, i) => setValue(`textSavvyRounds.rounds.${i}.roundBusterReward`, pays.roundRewards[i], opts));
+  if (showdown) setValue("showdownConfiguration.prize", pays.showdownPrize, opts);
+  ["defaultRewards", "hostBusterReward", "hostStumperBonusXp", "raffleSystemWinnersConfiguration"].forEach((k) => setValue(k, pays[k], opts));
+}
+
+/** Which reward set (Library › Gameplay › Reward sets) the stream pays: picking one fills in its rewards; rewards changed by hand show as Custom. */
+function RewardSetField({ form }) {
+  const stream = useStreamRewards(form.control);
+  const { rewardSets } = useRewardSets();
+  const current = rewardSets.find((r) => sameRewards(r, stream));
+  return (
+    <SelectButton
+      label="Reward set"
+      value={current?.id ?? ""}
+      placeholder="Custom"
+      options={rewardSets.map((r) => ({ value: r.id, label: r.name }))}
+      onChange={(id) => {
+        const rs = rewardSets.find((r) => r.id === id);
+        if (rs) applyRewardSet(form, rs);
+      }}
+      sx={{ maxWidth: 320 }}
+    />
+  );
+}
+
+/** Everything this stream pays: a reward set, then this stream's copy (rounds, showdown, game rewards, raffle). */
+export function RewardsSection({ form, frame }) {
+  const { control, setValue } = form;
+  const [rounds, showdown] = useWatch({ control, name: ["textSavvyRounds.rounds", "showdownConfiguration"] });
+  return (
+    <FormSection {...frame} id="rewards-card" title="Rewards" action={<PresetsLink kind="rewards" />}>
+      <RewardSetField form={form} />
+      {/* One per round (rounds are added in Words). */}
+      <RoundRewardsTable control={control} setValue={setValue} count={(rounds ?? []).length} path={(i) => `textSavvyRounds.rounds.${i}.roundBusterReward`} />
+      {showdown && <ShowdownPrizeRow control={control} name="showdownConfiguration.prize" />}
+      <RewardsEditor form={form} stumper />
+    </FormSection>
+  );
+}
+
+/** The power-ups this stream's How to play shows: its game set's, changeable for this stream. */
+export function PowerUpsSection({ form, frame }) {
+  return (
+    <FormSection {...frame} id="power-ups" title="Power-ups">
+      <PowerUpPicker control={form.control} setValue={form.setValue} />
     </FormSection>
   );
 }
@@ -1119,10 +1310,13 @@ export function useSectionStatus(form, sections, hosts) {
   const { formatDate } = useTimezoneFormat();
   // Words show here only once unlocked (words password), like everywhere else.
   const { hidden: wordsHidden } = useWordsLock();
-  const [title, startDate, hostId, hostName, gameMode, rounds, showdown, scoring, sponsorship, participation, buster, stumper, raffle, cards, streamType, ...notes] = useWatch({
+  const [title, startDate, hostId, hostName, gameMode, rounds, showdown, scoring, sponsorship, participation, buster, stumper, raffle, cards, streamType, powerUpIds, ...rest] = useWatch({
     control,
-    name: ["title", "startDate", "hostId", "hostName", "gameMode", "textSavvyRounds.rounds", "showdownConfiguration", "roundScoring", "sponsorship", "defaultRewards", "hostBusterReward", "hostStumperBonusXp", "raffleSystemWinnersConfiguration", "shareableCards", "streamType", ...NOTIFICATION_KEYS],
+    name: ["title", "startDate", "hostId", "hostName", "gameMode", "textSavvyRounds.rounds", "showdownConfiguration", "roundScoring", "sponsorship", "defaultRewards", "hostBusterReward", "hostStumperBonusXp", "raffleSystemWinnersConfiguration", "shareableCards", "streamType", "powerUpIds", ...IMAGE_FIELDS, ...NOTIFICATION_KEYS],
   });
+  const images = Object.fromEntries(IMAGE_FIELDS.map((f, i) => [f, rest[i]]));
+  const notes = rest.slice(IMAGE_FIELDS.length);
+  const { rewardSets } = useRewardSets();
   const { data: shareData } = useList({ resource: "SharePreset", dataProviderName: DP.sharePresets, pagination: { mode: "off" } });
   const { data: noteData } = useList({ resource: "NotificationPreset", dataProviderName: DP.notificationPresets, pagination: { mode: "off" } });
   const { data: scoringData } = useList({ resource: "ScoringPreset", dataProviderName: DP.scoringPresets, pagination: { mode: "off" } });
@@ -1130,7 +1324,7 @@ export function useSectionStatus(form, sections, hosts) {
 
   const mode = GAME_MODES[modeId(gameMode)];
   // The bundle the stream was made from; none when that bundle was deleted since.
-  const { byId } = useBundles();
+  const { byId, rewardsOf } = useBundles();
   const bundle = byId[form.getValues?.("bundleId")];
   const words = (rounds ?? []).map((r) => r?.word).filter(Boolean);
   const missingWords = (rounds ?? []).length - words.length;
@@ -1152,18 +1346,28 @@ export function useSectionStatus(form, sections, hosts) {
   const part = (text, isDefault, names) => ({ summary: from(text, isDefault), onReset: isDefault || !bundle ? undefined : resetTo(names) });
   const sponsorName = sponsorship ? (sponsorData?.data ?? []).find((sp) => sp.title === sponsorship.title)?.name ?? sponsorship.title ?? "Custom sponsor" : "No sponsor";
   const sponsorIsDefault = (sponsorship?.title ?? null) === (template.sponsorship?.title ?? null);
-  const rewardsAreDefault = sameJson(participation ?? [], template.defaultRewards) && !on(buster) && (stumper ?? null) === (template.hostStumperBonusXp ?? null);
+  const stream = { textSavvyRounds: { rounds }, showdownConfiguration: showdown, defaultRewards: participation, hostBusterReward: buster, hostStumperBonusXp: stumper, raffleSystemWinnersConfiguration: raffle };
+  const rewardSet = rewardSets.find((r) => sameRewards(r, stream));
+  const rewardsAreDefault = !!bundle && sameRewards(rewardsOf(bundle), stream);
+  const powerUpsAreDefault = sameJson([...(powerUpIds ?? [])].sort(), [...(template.powerUpIds ?? [])].sort());
+  // Each image: the game set's selected background or the host's image, unless switched for this stream.
+  const imageDefaults = { heroImageUrl: bundle?.avatarBackgroundUrl ?? null, heroCardBackgroundUrl: bundle?.heroCardBackgroundUrl ?? null, imageUrl: host?.imageUrl ?? null, heroCardImageUrl: host?.heroCardImageUrl ?? null };
+  const imagesAreDefault = IMAGE_FIELDS.every((f) => !images[f] || images[f] === imageDefaults[f]);
   const shareIsDefault = sameJson(cards, template.shareableCards);
   const notesAreDefault = NOTIFICATION_KEYS.every((k, i) => (notes[i] ?? "") === (template[k] ?? ""));
 
   const parts = {
     basics: {
-      todo: [!title?.trim() && "Add a title", !startDate && "Pick a date", !form.heroImageUrl && "Stream image background missing"].filter(Boolean),
+      todo: [!title?.trim() && "Add a title", !startDate && "Pick a date"].filter(Boolean),
       summary: [fillHost(title?.trim(), hostLabel(host) || hostName) || "Untitled", startDate && formatDate(startDate, "ddd, MMM D · h:mm A"), streamType === StreamType.Internal ? "Internal" : streamType === StreamType.SuperSavvy ? "Super Savvy only" : "Public", showdown && (showdown.superSavvyOnly ? "Super Savvy Showdown" : "Savvy Showdown")].filter(Boolean).join(" · "),
     },
-    // The host's pictures come from the host: missing ones are added in Hosts. The stream image is
-    // the game set's (When & title).
-    host: { todo: [!hostId && "Pick a host", hostId && !form.imageUrl && "Host picture missing"].filter(Boolean), ...(hostId ? part(hostLabel(host) || hostName, !defaultHost || hostId === defaultHost.id, ["hostId", "hostName", "imageUrl", "heroCardImageUrl"]) : { summary: "No host" }) },
+    // Backgrounds from the game set, images from the host (or this stream's own).
+    images: {
+      todo: [!images.heroImageUrl && "Live game host avatar background missing", hostId && !images.imageUrl && !host?.imageUrl && "Live game host avatar image missing"].filter(Boolean),
+      summary: [`${IMAGE_FIELDS.filter((f) => images[f] || imageDefaults[f]).length} of ${IMAGE_FIELDS.length} images`, bundle && (imagesAreDefault ? "From game set and host" : "Changed")].filter(Boolean).join(" · "),
+      onReset: imagesAreDefault || !bundle ? undefined : () => IMAGE_FIELDS.forEach((f) => form.setValue(f, imageDefaults[f], { shouldDirty: true })),
+    },
+    host: { todo: [!hostId && "Pick a host"].filter(Boolean), ...(hostId ? part(hostLabel(host) || hostName, !defaultHost || hostId === defaultHost.id, ["hostId", "hostName", "imageUrl", "heroCardImageUrl"]) : { summary: "No host" }) },
     words: {
       // The game mode comes with the word set: none yet means no word set.
       todo: [!mode && "Pick a word set", missingWords > 0 && `${missingWords} ${missingWords === 1 ? "word" : "words"} missing`, (rounds ?? []).length === 0 && "No rounds", showdown && !showdown.word && "Showdown word missing"].filter(Boolean),
@@ -1175,9 +1379,11 @@ export function useSectionStatus(form, sections, hosts) {
     sponsor: { todo: [], ...part(sponsorName, sponsorIsDefault, ["sponsorship"]) },
     "rewards-card": {
       todo: [],
-      ...part([on(participation) ? `Participation: ${rewardText(participationReward)}` : "No participation reward", on(buster) && `Host buster: ${rewardText(buster)}`, stumper != null && `Stumper: ${stumper} XP`].filter(Boolean).join(" · "), rewardsAreDefault, ["defaultRewards", "hostBusterReward", "hostStumperBonusXp"]),
+      summary: from([rewardSet ? `${rewardSet.name} reward set` : "Own rewards", showdown?.prize && `Showdown ${prizeText(showdown.prize)}`, on(participation) && `Participation: ${rewardText(participationReward)}`, on(raffle) && `Raffle: ${raffle.length} ${raffle.length === 1 ? "winner" : "winners"}`].filter(Boolean).join(" · "), rewardsAreDefault),
+      // Back to the game set's reward set.
+      onReset: rewardsAreDefault || !bundle ? undefined : () => applyRewardSet(form, rewardsOf(bundle)),
     },
-    raffle: { todo: [], summary: on(raffle) ? `${raffle.length} ${raffle.length === 1 ? "winner" : "winners"}` : "Off" },
+    "power-ups": { todo: [], ...part(`${(powerUpIds ?? []).length} ${(powerUpIds ?? []).length === 1 ? "power-up" : "power-ups"}`, powerUpsAreDefault, ["powerUpIds"]) },
     share: { todo: [], ...part(sharePreset ? `${sharePreset.name} preset` : "Own cards", shareIsDefault, ["shareableCards"]) },
     "notifications-card": { todo: [], ...part(notePreset ? `${notePreset.name} preset` : "Own texts", notesAreDefault, NOTIFICATION_KEYS) },
   };

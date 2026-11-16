@@ -84,9 +84,10 @@ export function SelectButton({ label, value, options, onChange, error, helperTex
 }
 
 /** A few options (2–6) as a connected button group; `options` are { value, label, icon?, leading? }. */
-export function ChoiceGroup({ label, value, options, onChange, error, helperText, disabled, sx }) {
+export function ChoiceGroup({ label, hideLabel, value, options, onChange, error, helperText, disabled, sx }) {
+  // `hideLabel`: a section title already names it; the label stays for screen readers.
   return (
-    <Labelled label={label} error={error} helperText={helperText} sx={sx}>
+    <Labelled label={hideLabel ? null : label} error={error} helperText={helperText} sx={sx}>
       <ToggleButtonGroup
         exclusive
         value={value ?? null}

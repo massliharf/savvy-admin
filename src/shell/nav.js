@@ -23,10 +23,11 @@ export const DESTINATIONS = [
       { icon: "ios_share", label: "Share cards", path: "/share-cards" },
       { icon: "notifications", label: "Notifications", path: "/notifications" },
       // `section` puts a sub-heading above the first page that has it. Gameplay: what a new stream
-      // starts with (game set, words, points) and what players see of each game (title, logo, power-ups).
+      // starts with (game set, words, points, rewards) and what players see of each game (title, logo, power-ups).
       { icon: "inventory_2", label: "Game sets", path: "/game-sets", section: "Gameplay" },
       { icon: "spellcheck", label: "Word sets", path: "/word-sets", section: "Gameplay" },
       { icon: "scoreboard", label: "Scoring", path: "/scoring", section: "Gameplay" },
+      { icon: "redeem", label: "Reward sets", path: "/reward-sets", section: "Gameplay" },
       { icon: "sports_esports", label: "Game modes", path: "/game-modes", section: "Gameplay" },
       { icon: "auto_fix_high", label: "Power-ups", path: "/power-ups", section: "Gameplay" },
     ],

@@ -106,9 +106,13 @@ export function NewStreamDialog({ open, source, date, hosts, onClose, onCreated 
         bundleId: values.bundleId,
         hostId: values.hostId,
         hostName: values.hostName,
+        // Images come from the host, backgrounds from the game set: a copy with the same host or
+        // set keeps the source's (its own uploads too).
         imageUrl: sameHost ? copy.imageUrl : values.imageUrl,
-        // The stream image belongs to the game set: a copy in the same set keeps the source's.
+        heroCardImageUrl: sameHost ? copy.heroCardImageUrl : values.heroCardImageUrl,
         heroImageUrl: sameSet ? copy.heroImageUrl : values.heroImageUrl,
+        heroCardBackgroundUrl: sameSet ? copy.heroCardBackgroundUrl : values.heroCardBackgroundUrl,
+        powerUpIds: sameSet ? copy.powerUpIds : values.powerUpIds,
         textSavvyRounds: sameMode ? { rounds: (copy.textSavvyRounds?.rounds ?? []).map((r) => ({ ...r, word: "" })) } : values.textSavvyRounds,
         showdownConfiguration: sameMode && copy.showdownConfiguration ? { ...copy.showdownConfiguration, word: "" } : values.showdownConfiguration,
         roundScoring: sameMode ? copy.roundScoring : values.roundScoring,

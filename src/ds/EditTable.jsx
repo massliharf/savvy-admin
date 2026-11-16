@@ -193,12 +193,13 @@ export function ImageCell({ src, label, onPick, error }) {
  * { key, cells: [node per column], onRemove?, removeLabel?, canRemove? }. A last column holds the
  * remove buttons; `onAdd` adds a "+ addLabel" row at the bottom.
  */
-export function EditTable({ label, columns, rows, onAdd, addLabel, addDisabled, minWidth = 360, reserveRemove, header = true }) {
+export function EditTable({ label, columns, rows, onAdd, addLabel, addDisabled, minWidth = 360, reserveRemove, removeWidth = "32px", header = true }) {
   const { m3: c, tokens } = useTheme();
   // `reserveRemove` keeps the remove column even when no row can be removed, so tables stacked
   // in a section keep the same columns.
   const removable = reserveRemove || rows.some((r) => r.onRemove);
-  const cols = [...columns.map((col) => col.width ?? "1fr"), ...(removable ? ["32px"] : [])].join(" ");
+  // `removeWidth` lines the remove column up with a stacked table's last column (Rewards' "On").
+  const cols = [...columns.map((col) => col.width ?? "1fr"), ...(removable ? [removeWidth] : [])].join(" ");
   // Rows are segments like ListGroup's: 2px apart, outer corners 12px, corners between 4px.
   const { xs, md: lg } = tokens.shape;
   const segment = (first, last) => ({

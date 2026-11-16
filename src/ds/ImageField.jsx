@@ -50,8 +50,10 @@ export function useFilePreview(file, url) {
  * Image picker that crops to an exact output size.
  * `value` is the current image URL; `onChange(file)` receives the cropped PNG; `onRemove()` clears it.
  * `fit="contain"` shows the whole image (logos) instead of filling the frame.
+ * `headless` renders only the file picker and crop dialog; `pickRef.current()` opens the picker
+ * (e.g. from a menu item).
  */
-export function ImageField({ label, value, width, height, onChange, onRemove, hint, compact, tileWidth, fit = "cover" }) {
+export function ImageField({ label, value, width, height, onChange, onRemove, hint, compact, tileWidth, fit = "cover", headless, pickRef }) {
   const { m3: c, tokens } = useTheme();
   const inputRef = useRef(null);
   const [source, setSource] = useState(null);
@@ -62,6 +64,9 @@ export function ImageField({ label, value, width, height, onChange, onRemove, hi
   const [broken, setBroken] = useState(false);
 
   useEffect(() => () => local && URL.revokeObjectURL(local), [local]);
+  useEffect(() => {
+    if (pickRef) pickRef.current = () => inputRef.current?.click();
+  }, [pickRef]);
   useEffect(() => setBroken(false), [value, local]);
   // A new saved/picked URL replaces a cropped file's preview.
   useEffect(() => setLocal(null), [value]);
@@ -165,6 +170,7 @@ export function ImageField({ label, value, width, height, onChange, onRemove, hi
     </>
   );
 
+  if (headless) return cropper;
   if (compact) {
     return (
       <>

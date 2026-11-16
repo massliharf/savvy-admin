@@ -1,6 +1,6 @@
-// A bundle's settings under Streams › Bundles: what a new stream of it starts with. Stream image,
-// game (points per round, the showdown and its prize, rewards) and Messaging. Hosts and sponsors
-// are picked per stream, not here. How the game shows in the app is edited in Streams › How to play.
+// A game set's settings (Library › Gameplay › Game sets): what a new stream of it starts with.
+// Backgrounds, who can join, scoring, the showdown, a reward set, power-ups and Messaging. Hosts
+// and sponsors are picked per stream, not here; a stream can change any of these for itself.
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useForm } from "@refinedev/react-hook-form";
@@ -24,8 +24,11 @@ import { KINDS, PresetSheet } from "../liveops/presets";
 import { useNotify } from "../../shell/notifications";
 import { DP } from "../../providers";
 import { bundleLine, useBundles } from "../streams/gameModes";
-import { RewardsEditor, ShowdownEditor } from "../streams/detail/sections";
+import { SHOWDOWN_TYPES } from "../streams/detail/sections";
 import { AudienceField } from "../streams/pickers";
+import { ChoiceGroup } from "../../ds/SelectButton";
+import { PowerUpPicker } from "./powerUps";
+import { BackgroundSwatches } from "../library/backgrounds";
 import { StreamType } from "../streams/enums";
 import { useDelete, useList } from "@refinedev/core";
 import { ConfirmDialog } from "../../ds/ConfirmDialog";
@@ -66,43 +69,80 @@ function BundlePresets({ kind, control, setValue, name }) {
             }
           />
         ))}
-        <ListAdd label="Add preset" onClick={sheet.openNew} />
+        <ListAdd label={k.addLabel ?? "Add preset"} onClick={sheet.openNew} />
       </ListGroup>
       <PresetSheet kind={kind} sheet={sheet} />
     </>
   );
 }
 
-/**
- * The game set's stream image backgrounds (behind the stream's screen, 900 × 1200): up to five, the selected one is
- * what its new streams start with; a stream can switch to another of these on its page.
- */
-function StreamImages({ control, setValue }) {
-  const [urls, picked] = useWatch({ control, name: ["streamImageUrls", "streamImageUrl"] });
+// The two backgrounds a game set keeps (up to five each; the selected one is what its new streams
+// start with, and a stream can switch to another of these or upload its own). The host's images
+// are placed on them.
+// The avatar background is square and can also be a colour or gradient (presets, or Custom).
+const BACKGROUNDS = [
+  { list: "avatarBackgroundUrls", pick: "avatarBackgroundUrl", label: "Live game host avatar background", hint: "Behind the host in the live game · square, 1024 × 1024", width: 1024, height: 1024, max: 8, swatches: true },
+  { list: "heroCardBackgroundUrls", pick: "heroCardBackgroundUrl", label: "Hero card background", hint: "Behind the host on the home screen hero card · 900 × 1200", width: 900, height: 1200, max: 5 },
+];
+
+/** The game set's backgrounds, one gallery each. */
+function Backgrounds({ control, setValue }) {
+  const notify = useNotify();
+  const values = useWatch({ control, name: BACKGROUNDS.flatMap((b) => [b.list, b.pick]) });
   return (
-    <ImageGallery
-      label="Stream image background"
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
+      {BACKGROUNDS.map((b, i) => {
+        const urls = values[i * 2] ?? [];
+        const set = (next, sel) => {
+          setValue(b.list, next, { shouldDirty: true });
+          setValue(b.pick, sel, { shouldDirty: true });
+        };
+        return (
+          <Box key={b.list} sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+            <ImageGallery label={b.label} hint={b.hint} width={b.width} height={b.height} max={b.max} urls={urls} selected={values[i * 2 + 1]} onChange={set} />
+            {/* A colour or gradient joins the backgrounds (selected); one already there is just selected. */}
+            {b.swatches && (
+              <BackgroundSwatches
+                selected={values[i * 2 + 1]}
+                onPick={(url) => {
+                  if (urls.includes(url)) return set(urls, url);
+                  if (urls.length >= b.max) return notify(`Up to ${b.max} backgrounds: remove one first`, { variant: "error" });
+                  set([...urls, url], url);
+                }}
+              />
+            )}
+          </Box>
+        );
+      })}
+    </Box>
+  );
+}
+
+/** Savvy or Super Savvy Showdown for new streams (its prize is in the reward set). */
+function ShowdownKind({ control, setValue, superSavvy }) {
+  const showdown = useWatch({ control, name: "showdown" });
+  const type = superSavvy || showdown?.superSavvyOnly ? 1 : 0;
+  return (
+    <ChoiceGroup
+      label="Showdown"
       hideLabel
-      hint="900 × 1200"
-      width={900}
-      height={1200}
-      urls={urls ?? []}
-      selected={picked}
-      onChange={(next, sel) => {
-        setValue("streamImageUrls", next, { shouldDirty: true });
-        setValue("streamImageUrl", sel, { shouldDirty: true });
-      }}
+      value={type}
+      options={SHOWDOWN_TYPES.map((t, i) => ({ value: i, label: t.label, icon: t.icon }))}
+      onChange={(v) => setValue("showdown", { ...showdown, superSavvyOnly: SHOWDOWN_TYPES[v].superSavvyOnly }, { shouldDirty: true, shouldTouch: true })}
+      disabled={superSavvy}
+      helperText={superSavvy ? "Super Savvy only streams always run a Super Savvy Showdown." : "Each stream gets its showdown word from its word set."}
     />
   );
 }
 
-/** A game set as its form edits it: older ones get their gallery, audience and a reward. */
+/** A game set as its form edits it: older ones get their galleries, audience and power-ups. */
 export const gameSetForm = (mode) => ({
   ...mode,
-  streamImageUrls: mode.streamImageUrls ?? (mode.streamImageUrl ? [mode.streamImageUrl] : []),
-  streamImageUrl: mode.streamImageUrl ?? null,
+  ...Object.fromEntries(BACKGROUNDS.flatMap((b) => [[b.list, mode[b.list] ?? (mode[b.pick] ? [mode[b.pick]] : [])], [b.pick, mode[b.pick] ?? null]])),
   streamType: mode.streamType ?? StreamType.Public,
-  defaultRewards: mode.defaultRewards?.length ? mode.defaultRewards : [{ rewardType: "BombPowerup", amount: 1 }],
+  showdown: { superSavvyOnly: !!mode.showdown?.superSavvyOnly },
+  rewardSetId: mode.rewardSetId ?? null,
+  powerUpIds: mode.powerUpIds ?? [],
 });
 
 const nameRule = { validate: (v) => (v?.trim() ? (v.trim().length <= 40 ? true : "Use 40 characters or fewer") : "Enter a name") };
@@ -142,8 +182,8 @@ export function GameSetFields({ form, inSheet = false }) {
             <TextInput control={control} name="name" slotProps={{ htmlInput: { "aria-label": "Name" } }} max={40} rules={nameRule} />
           </FormSection>
         )}
-        <Part inSheet={inSheet} id="image" title="Stream image background" description="Behind the stream's screen. New streams of this game set start with the selected one; a stream can switch to another of these.">
-          <StreamImages control={control} setValue={setValue} />
+        <Part inSheet={inSheet} id="backgrounds" title="Backgrounds" description="The host's images are placed on these. New streams start with the selected ones; a stream can switch to another or upload its own.">
+          <Backgrounds control={control} setValue={setValue} />
         </Part>
         {/* Public or Internal, and (for a public one) Super Savvy only: new streams of this game set get it. */}
         <Part inSheet={inSheet} id="audience" title="Who can join">
@@ -152,9 +192,14 @@ export function GameSetFields({ form, inSheet = false }) {
         <Part inSheet={inSheet} id="scoring" title="Scoring" description="The preset new streams start from. Open one to see and edit its points.">
           <BundlePresets kind="scoring" control={control} setValue={setValue} name="defaultScoringPresetId" />
         </Part>
-        <Part inSheet={inSheet} id="game" title="Game" description="The showdown and the rewards.">
-          <ShowdownEditor control={control} setValue={setValue} name="showdown" word={false} superSavvy={streamType === StreamType.SuperSavvy} note="Each stream gets its showdown word from its word set." />
-          <RewardsEditor form={form} keys={["defaultRewards"]} stumper />
+        <Part inSheet={inSheet} id="showdown" title="Showdown">
+          <ShowdownKind control={control} setValue={setValue} superSavvy={streamType === StreamType.SuperSavvy} />
+        </Part>
+        <Part inSheet={inSheet} id="rewards" title="Rewards" description="The reward set new streams start from: Round Pounders, the showdown prize, game rewards and raffle. Open one to see and edit it.">
+          <BundlePresets kind="rewards" control={control} setValue={setValue} name="rewardSetId" />
+        </Part>
+        <Part inSheet={inSheet} id="power-ups" title="Power-ups" description="The ones its streams' How to play shows. A stream can change its own.">
+          <PowerUpPicker control={control} setValue={setValue} />
         </Part>
       </SectionGroup>
       {/* The library's presets, as in Library: pick one per kind; a row opens it to edit. */}
@@ -198,7 +243,7 @@ export function GameModeSettings({ id }) {
       successNotification: () => ({ message: "Game set saved", type: "success" }),
     },
   });
-  // The same parts as a stream's page (scoring, rewards) take the form as one object.
+  // The same parts as a stream's page take the form as one object.
   const modeForm = { control, setValue, getValues, trigger };
   const mode = query?.data?.data;
 
@@ -263,7 +308,7 @@ export function GameModeSettings({ id }) {
 export default function GameModeDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { byId, isLoading } = useBundles();
+  const { byId, rewardsOf, isLoading } = useBundles();
   const bundle = byId[id];
   useEffect(() => {
     if (bundle) document.title = `${bundle.name} · Game sets · Savvy Admin`;
@@ -275,9 +320,9 @@ export default function GameModeDetail() {
       <DetailHeader
         onBack={() => navigate("/game-sets")}
         backLabel="Back to game sets"
-        media={<IconTile icon={bundle.showdown?.superSavvyOnly ? "diamond" : "trophy"} tone={bundle.showdown?.prize?.rewardType === "Cash" ? "green" : "violet"} />}
+        media={<IconTile icon={bundle.showdown?.superSavvyOnly ? "diamond" : "trophy"} tone={rewardsOf(bundle)?.showdownPrize?.rewardType === "Cash" ? "green" : "violet"} />}
         title={bundle.name}
-        subtitle={bundleLine(bundle)}
+        subtitle={bundleLine(bundle, rewardsOf(bundle))}
       />
       <Box sx={{ px: { xs: 2, sm: 3.5 }, py: 3 }}>
         <GameModeSettings key={id} id={id} />
