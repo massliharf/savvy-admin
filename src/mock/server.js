@@ -4,12 +4,12 @@
 import * as seed from "./seed";
 import { LOGO_URL } from "../assets";
 import { DEFAULT_AVATAR_BACKGROUND, seedBackgroundPresets } from "../utils/backgrounds";
-import { HOST_PICTURE_URL, MODE_LOGOS, STREAM_HERO_URL } from "../assets";
+import { HOST_PICTURE_URL, MODE_LOGOS, SCOTT_PHOTOS, STREAM_HERO_URL } from "../assets";
 
 // Version 2 keeps its own saved data: version 1 is published on the same site (same browser
 // storage) and must not be touched by it.
 const DB_KEY = "savvy-mock-db-2";
-const DB_VERSION = 60;
+const DB_VERSION = 61;
 
 // The demo data: one host (Scott), one sponsor (Wendy's) and one stream per state and edge case,
 // spread over the month around today (see DEMO_STREAMS). Streams are built like new ones: from a
@@ -702,6 +702,25 @@ function load() {
           h.heroCardImageUrls ??= h.heroCardImageUrl ? [h.heroCardImageUrl] : [];
         });
         parsed.version = 60;
+      }
+      if (parsed.version === 60) {
+        // v61: Scott's five photos are his live game host avatar images and hero card images (his
+        // old pictures go). His streams showing an old picture of his get the first new one; an
+        // image uploaded for one stream stays.
+        const scott = (parsed.hosts ?? []).find((h) => h.id === seed.SCOTT.id);
+        if (scott) {
+          const old = new Set([scott.imageUrl, scott.heroCardImageUrl, ...(scott.pictureUrls ?? []), ...(scott.heroCardImageUrls ?? [])].filter(Boolean));
+          const isOld = (u) => !u || old.has(u) || /host-scott/.test(u);
+          Object.assign(scott, { imageUrl: SCOTT_PHOTOS[0], pictureUrls: [...SCOTT_PHOTOS], heroCardImageUrl: SCOTT_PHOTOS[0], heroCardImageUrls: [...SCOTT_PHOTOS] });
+          (parsed.streams ?? []).filter((st) => st.hostId === scott.id).forEach((st) => {
+            if (isOld(st.imageUrl)) st.imageUrl = SCOTT_PHOTOS[0];
+            if (st.heroCardImageUrl && isOld(st.heroCardImageUrl)) st.heroCardImageUrl = SCOTT_PHOTOS[0];
+            if (isOld(st.heroCardHostImageUrl)) st.heroCardHostImageUrl = SCOTT_PHOTOS[0];
+          });
+          const u = (parsed.users ?? []).find((x) => x.id === scott.id);
+          if (u) u.imageUrl = SCOTT_PHOTOS[0];
+        }
+        parsed.version = 61;
       }
       if (parsed.version === DB_VERSION) return parsed;
       // Older versions: add what's new and keep everything else.

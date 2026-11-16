@@ -2,7 +2,7 @@
 // Config/catalog data (how-to-play, share config, rewards, packs, swag, seasons, polls, this week's
 // streams) was captured read-only from the live dev dashboard on 2026-10-19.
 // Anything containing personal data (users, phone numbers, cashouts, shipping addresses) is SYNTHETIC.
-import { HOST_PICTURE_URL, LOGO_URL, MODE_LOGOS, WENDYS_LOGO_URL } from "../assets";
+import { LOGO_URL, MODE_LOGOS, SCOTT_PHOTOS, WENDYS_LOGO_URL } from "../assets";
 
 // Item images (power-ups, packs, swag, seasons) ship with the app in src/assets/items, by id; an
 // id without one gets sample art picked from the id.
@@ -437,7 +437,7 @@ const seedBaseModes = () => [
 // Host and sponsor libraries (prototype: not part of the production API yet).
 // A host's id is the Savvy account id the stream is attached to (the stream's `hostId`).
 // The one host: every stream and time slot is his. His picture is also the hero card picture.
-export const SCOTT = { id: "hostScot0000000000000000000005", name: "Scott Rogowsky", displayName: "Puzzle Papi", imageUrl: HOST_PICTURE_URL, heroCardImageUrl: HOST_PICTURE_URL };
+export const SCOTT = { id: "hostScot0000000000000000000005", name: "Scott Rogowsky", displayName: "Puzzle Papi", imageUrl: SCOTT_PHOTOS[0], pictureUrls: [...SCOTT_PHOTOS], heroCardImageUrl: SCOTT_PHOTOS[0], heroCardImageUrls: [...SCOTT_PHOTOS] };
 
 export const hostAccount = (h) => ({ id: h.id, username: h.name, phoneNumber: null, regionCode: "US", userAccountStatus: 1, sparks: 0, totalScore: 0, powerups: [] });
 
