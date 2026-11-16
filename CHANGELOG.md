@@ -5,7 +5,7 @@ Proposed changes to the Savvy admin dashboard design. Not released yet.
 ## 2026-11-15
 
 - **Clearer image names.** A stream shows its host twice, each as an image on a background: the **Live game host avatar** (background + image) and the **Hero card** (background + image). "Stream image background" is now **Live game host avatar background**; "Host picture" is now **Live game host avatar image**.
-- **Backgrounds on the game set, images on the host.** A game set keeps both backgrounds (up to five each). A host has one avatar image and one hero card image (no galleries).
+- **Backgrounds on the game set, images on the host.** A game set keeps both backgrounds (up to five each). A host keeps up to five live game host avatar images and five hero card images, one of each selected for new streams; a stream's Change menu lists all of them.
 - **Images on a stream's page.** A new Images section shows all four. Each has **Change**: pick another of the game set's backgrounds (or the host's image), **Upload for this stream** (only this stream changes, not the game set or host), or edit the game set / host in a side sheet. The trial bake previews both results.
 - **Reward sets.** A new page under Library › Gameplay. A reward set is everything a stream pays: each round's Round Pounder, the showdown prize, participation, host buster and stumper rewards, and raffle winners. There can be several; a game set picks one (like its scoring preset); a stream can pick another or change its own copy ("Custom"), and reset to its game set's.
 - **Words and rewards apart.** A stream's Words section has only words and times; everything paid is in one Rewards section. Word sets were already words only.

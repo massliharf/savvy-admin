@@ -111,13 +111,13 @@ const IMAGE_PAIRS = [
     title: "Live game host avatar",
     // Square; also a colour or gradient (presets, or Custom).
     background: { label: "Live game host avatar background", short: "Background", source: "set", list: "avatarBackgroundUrls", pick: "avatarBackgroundUrl", field: "heroImageUrl", file: "heroImageFile", width: 1024, height: 1024, swatches: true },
-    image: { label: "Live game host avatar image", short: "Image", source: "host", pick: "imageUrl", field: "imageUrl", file: "hostImageFile", width: 256, height: 256 },
+    image: { label: "Live game host avatar image", short: "Image", source: "host", list: "pictureUrls", pick: "imageUrl", field: "imageUrl", file: "hostImageFile", width: 256, height: 256 },
   },
   {
     key: "heroCard",
     title: "Hero card",
     background: { label: "Hero card background", short: "Background", source: "set", list: "heroCardBackgroundUrls", pick: "heroCardBackgroundUrl", field: "heroCardBackgroundUrl", file: null, width: 900, height: 1200 },
-    image: { label: "Hero card image", short: "Image", source: "host", pick: "heroCardImageUrl", field: "heroCardImageUrl", file: null, width: 256, height: 256 },
+    image: { label: "Hero card image", short: "Image", source: "host", list: "heroCardImageUrls", pick: "heroCardImageUrl", field: "heroCardImageUrl", file: null, width: 256, height: 256 },
   },
 ];
 export const IMAGE_FIELDS = IMAGE_PAIRS.flatMap((p) => [p.background.field, p.image.field]);

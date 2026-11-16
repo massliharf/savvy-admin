@@ -9,7 +9,7 @@ import { HOST_PICTURE_URL, MODE_LOGOS, STREAM_HERO_URL } from "../assets";
 // Version 2 keeps its own saved data: version 1 is published on the same site (same browser
 // storage) and must not be touched by it.
 const DB_KEY = "savvy-mock-db-2";
-const DB_VERSION = 59;
+const DB_VERSION = 60;
 
 // The demo data: one host (Scott), one sponsor (Wendy's) and one stream per state and edge case,
 // spread over the month around today (see DEMO_STREAMS). Streams are built like new ones: from a
@@ -693,6 +693,15 @@ function load() {
           b.avatarBackgroundUrl ??= blue;
         });
         parsed.version = 59;
+      }
+      if (parsed.version === 59) {
+        // v60: hosts keep up to five of each image again (live game host avatar image, hero card
+        // image), one selected; each starts with its current one.
+        (parsed.hosts ?? []).forEach((h) => {
+          h.pictureUrls ??= h.imageUrl ? [h.imageUrl] : [];
+          h.heroCardImageUrls ??= h.heroCardImageUrl ? [h.heroCardImageUrl] : [];
+        });
+        parsed.version = 60;
       }
       if (parsed.version === DB_VERSION) return parsed;
       // Older versions: add what's new and keep everything else.
@@ -1655,17 +1664,30 @@ on("post", "/admin/word-sets/:id/release", ({ params }) => {
 
 // ---- Host & sponsor libraries (prototype endpoints)
 const textLen = (v) => String(v ?? "").trim().length;
-// A host has one of each picture: the live game host avatar image (imageUrl) and the hero card
-// image (heroCardImageUrl). The backgrounds they're placed on are the game set's.
-const HOST_PICTURES = ["imageUrl", "heroCardImageUrl"];
+// A host's two pictures: the live game host avatar image (imageUrl) and the hero card image
+// (heroCardImageUrl). The backgrounds they're placed on are the game set's.
+// Each keeps up to five; the selected one is what new streams use.
+const HOST_GALLERIES = [
+  ["pictureUrls", "imageUrl"],
+  ["heroCardImageUrls", "heroCardImageUrl"],
+];
 function hostFromBody(b, prev) {
   const h = {
     id: prev?.id ?? String(b.id ?? "").trim(),
     name: String(b.name ?? "").trim(),
     displayName: b.displayName ? String(b.displayName).trim() : null,
   };
-  HOST_PICTURES.forEach((k) => (h[k] = k in b ? b[k] || null : prev?.[k] ?? null));
+  HOST_GALLERIES.forEach(([list, pick]) => {
+    const urls = (Array.isArray(b[list]) ? compactArr(b[list]) : prev?.[list] ?? (prev?.[pick] ? [prev[pick]] : [])).filter(Boolean).slice(0, 5);
+    const chosen = pick in b ? b[pick] || null : prev?.[pick] ?? null;
+    h[list] = urls;
+    h[pick] = urls.includes(chosen) ? chosen : (urls[0] ?? null);
+  });
   return h;
+}
+/** A host with its galleries (older profiles only have the selected picture). */
+function withGalleries(h) {
+  return { ...h, ...Object.fromEntries(HOST_GALLERIES.map(([list, pick]) => [list, h[list] ?? (h[pick] ? [h[pick]] : [])])) };
 }
 function validateHost(h, isNew) {
   const errors = {};
@@ -1687,7 +1709,7 @@ function hostProfile(id) {
   }
   return h;
 }
-const withAccount = (h) => ({ ...h, username: db.users.find((u) => u.id === h.id)?.username ?? null });
+const withAccount = (h) => ({ ...withGalleries(h), username: db.users.find((u) => u.id === h.id)?.username ?? null });
 on("get", "/admin/hosts", () => json(db.users.filter((u) => isHost(u.id)).map((u) => withAccount(hostProfile(u.id)))));
 on("get", "/admin/hosts/:id", ({ params }) => (isHost(params.id) ? json(withAccount(hostProfile(params.id))) : notFound()));
 // Adding a host gives the account the Host role.
@@ -1702,7 +1724,7 @@ on("post", "/admin/hosts", ({ body }) => {
 on("put", "/admin/hosts/:id", ({ params, body }) => {
   const i = db.hosts.findIndex((x) => x.id === params.id);
   if (i < 0) return notFound();
-  const prev = db.hosts[i];
+  const prev = withGalleries(db.hosts[i]);
   const h = hostFromBody(body, prev);
   const errors = validateHost(h, false);
   if (errors) return badRequest(errors);
