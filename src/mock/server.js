@@ -9,7 +9,7 @@ import { HOST_PICTURE_URL, MODE_LOGOS, SCOTT_PHOTOS, STREAM_HERO_URL } from "../
 // Version 2 keeps its own saved data: version 1 is published on the same site (same browser
 // storage) and must not be touched by it.
 const DB_KEY = "savvy-mock-db-2";
-const DB_VERSION = 62;
+const DB_VERSION = 63;
 
 // The demo data: one host (Scott), one sponsor (Wendy's) and one stream per state and edge case,
 // spread over the month around today (see DEMO_STREAMS). Streams are built like new ones: from a
@@ -730,6 +730,16 @@ function load() {
         (parsed.scoringPresets ?? []).forEach((p) => (p.hostStumperBonusXp ??= fromRewards));
         (parsed.rewardSets ?? []).forEach((r) => delete r.hostStumperBonusXp);
         parsed.version = 62;
+      }
+      if (parsed.version === 62) {
+        // v63: a game can have several game modes, each with a description (as the app shows it
+        // under the logo); the original two keep their game's id and get the app's wording.
+        const OLD = { TextChain: "Each word links to the one before and after it. Then a final showdown word.", SubText: "The words found in the first four rounds are connected by the fifth. Then a final showdown word." };
+        (parsed.gameModes ?? []).forEach((m) => {
+          m.base ??= m.id;
+          if (!m.summary || m.summary === OLD[m.id]) m.summary = seed.MODE_SUMMARY[m.base] ?? m.summary ?? "";
+        });
+        parsed.version = 63;
       }
       if (parsed.version === DB_VERSION) return parsed;
       // Older versions: add what's new and keep everything else.
@@ -1480,28 +1490,41 @@ on("put", "/admin/game-modes/:id", ({ params, body }) => {
   const i = db.gameModes.findIndex((x) => x.id === params.id);
   if (i < 0) return notFound();
   const prev = db.gameModes[i];
-  // A game mode is its title and its logo (power-ups are picked per game set and stream).
-  const name = String(body.name ?? "").trim();
-  if (!name) return badRequest({ name: ["Enter a title."] });
+  // A game mode is its title, logo and description (power-ups are picked per game set and stream).
+  const errors = gameModeErrors(body);
+  if (errors) return badRequest(errors);
   db.gameModes[i] = {
     ...prev,
-    name,
+    name: String(body.name).trim(),
+    summary: String(body.summary).trim(),
     gameLogoUrl: fileUrl(body.gameLogoFile) || body.gameLogoUrl || null,
   };
   refreshUpcoming((s) => s.gameMode === db.gameModes[i].id);
   return json(db.gameModes[i]);
 });
 
-// A new game mode: one per game (TextChain or SubText), with its title and logo. The rest (rounds,
-// How to play) starts from that game's defaults.
+function gameModeErrors(body) {
+  const errors = {};
+  const name = String(body.name ?? "").trim();
+  const summary = String(body.summary ?? "").trim();
+  if (!name) errors.name = ["Enter a title."];
+  else if (name.length > 40) errors.name = ["Use 40 characters or fewer."];
+  if (!summary) errors.summary = ["Enter a description."];
+  else if (summary.length > 80) errors.summary = ["Use 80 characters or fewer."];
+  return Object.keys(errors).length ? errors : null;
+}
+
+// A new game mode for a game (TextChain or SubText), with its own title, logo and description; a
+// game can have several. The rest (rounds, How to play) starts from that game's defaults. The
+// first one of a game keeps the game's id.
 on("post", "/admin/game-modes", ({ body }) => {
   const base = String(body.base ?? "");
   const template = seed.seedGameModes().find((m) => m.id === base);
   if (!template) return badRequest({ base: ["Pick a game."] });
-  if (db.gameModes.some((m) => m.id === base)) return badRequest({ base: ["This game already has a game mode."] });
-  const name = String(body.name ?? "").trim();
-  if (!name) return badRequest({ name: ["Enter a title."] });
-  const m = { ...template, name, gameLogoUrl: fileUrl(body.gameLogoFile) || body.gameLogoUrl || null };
+  const errors = gameModeErrors(body);
+  if (errors) return badRequest(errors);
+  const id = db.gameModes.some((m) => m.id === base) ? `${base}-${uuid().slice(0, 8)}` : base;
+  const m = { ...template, id, base, name: String(body.name).trim(), summary: String(body.summary).trim(), gameLogoUrl: fileUrl(body.gameLogoFile) || body.gameLogoUrl || null };
   db.gameModes.push(m);
   return json(m, 201);
 });
@@ -1628,8 +1651,8 @@ function wordSetFromBody(b, prev) {
   const sd = "showdown" in b ? b.showdown : prev?.showdown;
   // Words only: rewards and the showdown prize belong to the stream (from its game set).
   const showdown = sd ? { word: word(sd.word) } : null;
-  // The game mode the set is written for (TextChain or SubText); none for any.
-  const gameMode = ["TextChain", "SubText"].includes(b.gameMode) ? b.gameMode : "gameMode" in b ? null : (prev?.gameMode ?? null);
+  // The game mode the set is written for (one set up in Game modes); none for any.
+  const gameMode = db.gameModes.some((m) => m.id === b.gameMode) ? b.gameMode : "gameMode" in b ? null : (prev?.gameMode ?? null);
   return { title, rounds, showdown, gameMode };
 }
 function wordSetErrors(w) {

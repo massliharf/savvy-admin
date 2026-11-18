@@ -322,8 +322,8 @@ export function seedNotificationPresets() {
 
 // "with Showdown" presets: the same game plus default showdown settings (the word is per stream).
 export const MODE_SUMMARY = {
-  TextChain: "Each word links to the one before and after it. Then a final showdown word.",
-  SubText: "The words found in the first four rounds are connected by the fifth. Then a final showdown word.",
+  TextChain: "Each word links to the one before and after it",
+  SubText: "The words found in the first four rounds are connected by the fifth",
   TextChainShowdown: "Each word links to the one before and after it. Then a final showdown word.",
   SubTextShowdown: "The words found in the first four rounds are connected by the fifth. Then a final showdown word.",
 };
@@ -389,7 +389,7 @@ export const seedBundles = () => [
 
 // Two game modes, Savvy TextChain and Savvy SubText: five rounds, then a Savvy Showdown.
 export const SHOWDOWN_DEFAULTS = { prize: { rewardType: "Cash", amount: 100 }, superSavvyOnly: false };
-export const seedGameModes = () => seedBaseModes().map((m) => ({ ...m, name: `Savvy ${m.name}`, summary: MODE_SUMMARY[m.id], roundCount: 5, showdown: SHOWDOWN_DEFAULTS }));
+export const seedGameModes = () => seedBaseModes().map((m) => ({ ...m, base: m.id, name: `Savvy ${m.name}`, summary: MODE_SUMMARY[m.id], roundCount: 5, showdown: SHOWDOWN_DEFAULTS }));
 const seedBaseModes = () => [
   {
     id: "TextChain",

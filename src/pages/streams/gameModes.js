@@ -14,7 +14,7 @@ export const GAME_MODES = {
     label: "Savvy TextChain",
     icon: "link",
     tone: "blue",
-    summary: "Each word links to the one before and after it. Then a final showdown word.",
+    summary: "Each word links to the one before and after it",
     rounds: ROUND_COUNT,
     fixedRounds: false,
     roundDuration: DEFAULT_ROUND_DURATION,
@@ -28,7 +28,7 @@ export const GAME_MODES = {
     label: "Savvy SubText",
     icon: "subtitles",
     tone: "violet",
-    summary: "The words found in the first four rounds are connected by the fifth. Then a final showdown word.",
+    summary: "The words found in the first four rounds are connected by the fifth",
     rounds: ROUND_COUNT,
     fixedRounds: false,
     roundDuration: DEFAULT_ROUND_DURATION,
@@ -36,8 +36,13 @@ export const GAME_MODES = {
     hostStumperBonusXp: DEFAULT_HOST_STUMPER_BONUS_XP,
   },
 };
+// The game modes set up in Library › Gameplay › Game modes, by id (filled as they load). A game can
+// have several (each with its own title, logo and description); `base` is the game it plays.
+const SET_UP = {};
+/** The game (TextChain or SubText rules) a game mode id plays; null for none. */
+export const gameOf = (id) => GAME_MODES[id] ?? GAME_MODES[SET_UP[id]?.base] ?? null;
 /** The game a stream plays (TextChain or SubText); null while it has no format yet. */
-export const baseOf = (gameMode) => GAME_MODES[gameMode]?.id ?? null;
+export const baseOf = (gameMode) => gameOf(gameMode)?.id ?? null;
 
 /** Every game mode (one colour each in the calendar). */
 export const BASE_MODES = Object.values(GAME_MODES);
@@ -46,7 +51,10 @@ export const BASE_MODES = Object.values(GAME_MODES);
 export const modeId = (gameMode, showdown) => gameMode ?? null;
 /** A stream without a format yet (no word set, none picked): no icon, no name. */
 export const NO_MODE = { id: null, label: "", icon: null };
-export const modeOf = (s) => GAME_MODES[s.gameMode] ?? NO_MODE;
+export const modeOf = (s) => {
+  const game = gameOf(s.gameMode);
+  return game ? { ...game, id: s.gameMode, label: SET_UP[s.gameMode]?.name ?? game.label } : NO_MODE;
+};
 
 const DEFAULT_SHOWDOWN_PRIZE = { rewardType: RewardType.Cash, amount: 100 };
 /**
@@ -72,6 +80,7 @@ export const NOTIFICATION_DEFAULTS = {
 export function useGameModePresets() {
   const { data, isLoading } = useList({ resource: "GameMode", dataProviderName: DP.gameModes, pagination: { mode: "off" } });
   const presets = Object.fromEntries((data?.data ?? []).map((m) => [m.id, m]));
+  Object.values(presets).forEach((m) => (SET_UP[m.id] = m));
   return { presets, isLoading };
 }
 
@@ -119,7 +128,7 @@ export function streamRewards(rewards, rounds, showdown) {
 
 /** Rounds / duration / scoring a new stream gets, from the game set or the built-in fallback. */
 export function modeDefaults(gameMode, preset) {
-  const mode = GAME_MODES[gameMode] ?? GAME_MODES.TextChain;
+  const mode = gameOf(gameMode) ?? GAME_MODES.TextChain;
   return {
     rounds: ROUND_COUNT,
     roundDuration: preset?.roundDurationInSeconds ?? mode.roundDuration,
@@ -153,7 +162,7 @@ export function streamFromPreset({ title, host, startDate, gameMode = null, stre
     startDate,
     streamType,
     // Its format (How to play & format) is picked on the stream. None yet.
-    gameMode: GAME_MODES[gameMode]?.id ?? null,
+    gameMode: gameOf(gameMode) ? gameMode : null,
     bundleId: preset?.id ?? bundleId ?? null,
     showdownConfiguration: showdown,
     headless: false,
@@ -205,7 +214,7 @@ export function useStreamBuilder() {
 export function setupIssues(stream) {
   const issues = [];
   if (!stream.hostId) issues.push("No host");
-  if (!GAME_MODES[stream.gameMode]) issues.push("Format not picked");
+  if (!gameOf(stream.gameMode)) issues.push("Format not picked");
   const rounds = stream.textSavvyRounds?.rounds ?? [];
   const missing = rounds.filter((r) => !r.word).length;
   if (rounds.length === 0) issues.push("No rounds");

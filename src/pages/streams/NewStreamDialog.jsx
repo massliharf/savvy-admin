@@ -14,7 +14,7 @@ import { TimePicker } from "@mui/x-date-pickers/TimePicker";
 import { Icon } from "../../ds/Icon";
 import { dayjs, useTimezone } from "../../contexts";
 import { richLen } from "./enums";
-import { GAME_MODES, modeOf, useBundles, useStreamBuilder } from "./gameModes";
+import { modeOf, useBundles, useStreamBuilder } from "./gameModes";
 import { GameSetPicker, HostPicker } from "./pickers";
 import { DEFAULT_TITLE, fillHost, hostLabel, titleRule } from "./hosts";
 import { FieldHelper } from "../../ds/FieldHelper";
@@ -77,7 +77,7 @@ export function NewStreamDialog({ open, source, date, hosts, onClose, onCreated 
   };
   const valid = !errors.title && !errors.start;
   const show = (k) => (submitted ? errors[k] : null);
-  const mode = GAME_MODES[form.gameMode];
+  const mode = modeOf({ gameMode: form.gameMode }).id ? modeOf({ gameMode: form.gameMode }) : null;
 
   const submit = async () => {
     setSubmitted(true);

@@ -2,7 +2,7 @@ import Box from "@mui/material/Box";
 import { useTheme } from "@mui/material/styles";
 import { MODE_LOGOS } from "../../assets";
 import { IconTile } from "../../ds/IconTile";
-import { GAME_MODES, useGameModePresets } from "./gameModes";
+import { GAME_MODES, gameOf, useGameModePresets } from "./gameModes";
 
 /**
  * A game mode's logo (the one set in its settings, else the built-in one) on a quiet tile, so a
@@ -12,8 +12,10 @@ import { GAME_MODES, useGameModePresets } from "./gameModes";
 export function ModeLogo({ mode, width = 72, height = 40, bare = false }) {
   const { m3: c, tokens } = useTheme();
   const { presets } = useGameModePresets();
-  const meta = GAME_MODES[mode] ?? GAME_MODES.TextChain;
-  const src = presets[mode]?.gameLogoUrl ?? MODE_LOGOS[mode];
+  const game = gameOf(mode) ?? GAME_MODES.TextChain;
+  const meta = { ...game, label: presets[mode]?.name ?? game.label };
+  // A game mode's own logo; the built-in one only for the game's original mode.
+  const src = presets[mode] ? presets[mode].gameLogoUrl : MODE_LOGOS[mode];
   if (!src) return <IconTile icon={meta.icon} tone={meta.tone} />;
   if (bare) return <Box component="img" src={src} alt={meta.label} sx={{ height, maxWidth: width, objectFit: "contain", objectPosition: "left center", display: "block", flexShrink: 0 }} />;
   return (

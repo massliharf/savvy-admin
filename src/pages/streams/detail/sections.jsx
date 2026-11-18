@@ -33,7 +33,7 @@ import { backgroundUrl } from "../../../utils/backgrounds";
 import { FACE_POSITION, fillHost, hostLabel, titleRule } from "../hosts";
 import { useWordSets, useWordsLock } from "../words";
 import { useSheet } from "../../library/shared";
-import { GAME_MODES, baseOf, modeId, newShowdown, prizeText, roundRewardOf, streamRewards, useBundles, useRewardSets, useStreamBuilder } from "../gameModes";
+import { baseOf, modeId, modeOf, newShowdown, prizeText, roundRewardOf, streamRewards, useBundles, useRewardSets, useStreamBuilder } from "../gameModes";
 import { PowerUpPicker } from "../../gameModes/powerUps";
 import { DP } from "../../../providers";
 import { useTimezoneFormat } from "../../../contexts";
@@ -452,11 +452,11 @@ function WordSetRow({ form }) {
   const [wordSetId, gameMode, id] = useWatch({ control: form.control, name: ["wordSetId", "gameMode", "id"] });
   const { sets } = useWordSets();
   const set = sets.find((w) => w.id === wordSetId) ?? sets.find((w) => w.streamId === id);
-  const mode = GAME_MODES[gameMode];
+  const mode = modeOf({ gameMode }).id ? modeOf({ gameMode }) : null;
   return (
     <ListGroup label="Word set">
       <ListItem
-        leading={mode ? <ModeLogo mode={mode.id} width={72} height={40} /> : <Icon name="spellcheck" size={20} />}
+        leading={mode ? <ModeLogo mode={gameMode} width={72} height={40} /> : <Icon name="spellcheck" size={20} />}
         title={set ? set.title || "Untitled set" : "No word set yet"}
         supporting={mode ? mode.label : "The game mode comes with the word set."}
       />
@@ -1323,7 +1323,7 @@ export function useSectionStatus(form, sections, hosts) {
   const { data: scoringData } = useList({ resource: "ScoringPreset", dataProviderName: DP.scoringPresets, pagination: { mode: "off" } });
   const { data: sponsorData } = useList({ resource: "Sponsor", dataProviderName: DP.sponsors, pagination: { mode: "off" } });
 
-  const mode = GAME_MODES[modeId(gameMode)];
+  const mode = modeOf({ gameMode: modeId(gameMode) }).id ? modeOf({ gameMode: modeId(gameMode) }) : null;
   // The bundle the stream was made from; none when that bundle was deleted since.
   const { byId, rewardsOf } = useBundles();
   const bundle = byId[form.getValues?.("bundleId")];

@@ -24,7 +24,7 @@ import { DP } from "../../providers";
 import { useNotify } from "../../shell/notifications";
 import { StreamType, ROUND_COUNT, durationFor } from "./enums";
 import { SelectInput, TextInput } from "./detail/fields";
-import { GAME_MODES, useGameModePresets } from "./gameModes";
+import { modeOf, useGameModePresets } from "./gameModes";
 import { RoundTimeCell, wordRules } from "./detail/sections";
 import { EditTable, TextCell } from "../../ds/EditTable";
 import Card from "@mui/material/Card";
@@ -170,7 +170,7 @@ function WordTokens({ set, hidden }) {
 /** One line about the set besides its words: how many rounds, and whether it has a showdown word. */
 export function setDetails(set) {
   const n = set.rounds?.length ?? 0;
-  return [GAME_MODES[set.gameMode]?.label, `${n} ${n === 1 ? "round" : "rounds"}${set.showdown ? " + showdown" : ""}`].filter(Boolean).join(" · ");
+  return [modeOf(set).label, `${n} ${n === 1 ? "round" : "rounds"}${set.showdown ? " + showdown" : ""}`].filter(Boolean).join(" · ");
 }
 
 /** Name, words and details of a set; used in the set pickers. */
