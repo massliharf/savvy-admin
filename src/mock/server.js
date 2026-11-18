@@ -1170,10 +1170,9 @@ function applyWordSet(set, s) {
   };
   const superSavvyOnly = s.streamType === "SuperSavvy" || !!(s.showdownConfiguration ?? bundle?.showdown)?.superSavvyOnly;
   const prize = s.showdownConfiguration?.prize ?? pays.showdownPrize ?? { rewardType: "Cash", amount: 100 };
-  // The stream (from its bundle) decides whether there's a showdown; the set only brings its
-  // word. A set without one leaves the showdown waiting for its word.
+  // A set with a showdown switches the stream's on with its word; a set without one switches it off.
   if (set.showdown) s.showdownConfiguration = { word: set.showdown.word, prize: { ...prize }, superSavvyOnly };
-  else if (s.showdownConfiguration) s.showdownConfiguration = { ...s.showdownConfiguration, word: "" };
+  else s.showdownConfiguration = null;
   // The set is written for a game mode: the stream plays it.
   if (set.gameMode) s.gameMode = set.gameMode;
 }
@@ -1569,7 +1568,8 @@ const bundleFrom = (body, prev) => ({
   ...Object.fromEntries(backgroundKinds().flatMap(([list, pick]) => [[list, Array.isArray(body[list]) ? compactArr(body[list]) : prev[list]], [pick, pick in body ? body[pick] || null : prev[pick]]])),
   name: String(body.name ?? "").trim(),
   roundScoring: body.roundScoring ?? prev.roundScoring,
-  showdown: { superSavvyOnly: !!body.showdown?.superSavvyOnly },
+  // null: its new streams start without a showdown.
+  showdown: body.showdown === null ? null : { superSavvyOnly: !!body.showdown?.superSavvyOnly },
   rewardSetId: db.rewardSets.some((r) => r.id === body.rewardSetId) ? body.rewardSetId : null,
   powerUpIds: Array.isArray(body.powerUpIds) ? compactArr(body.powerUpIds).filter((id) => db.powerUps.some((p) => p.id === id)) : (prev.powerUpIds ?? []),
   streamType: ["Public", "SuperSavvy", "Internal"].includes(body.streamType) ? body.streamType : (prev.streamType ?? "Public"),

@@ -145,7 +145,8 @@ export function streamFromPreset({ title, host, startDate, gameMode = null, stre
   const mode = modeDefaults(gameMode, preset);
   // Who can join comes from the game set (a duplicate keeps its source's).
   const streamType = given ?? preset?.streamType ?? StreamType.Public;
-  const showdown = newShowdown(preset, streamType, rewards);
+  // A game set can start its streams without a showdown.
+  const showdown = preset?.showdown === null ? null : newShowdown(preset, streamType, rewards);
   const pays = streamRewards(rewards, mode.rounds, showdown);
   return {
     title,

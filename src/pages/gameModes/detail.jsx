@@ -17,7 +17,7 @@ import { TextInput } from "../streams/detail/fields";
 import { SaveBar } from "../../ds/SaveBar";
 import Radio from "@mui/material/Radio";
 import { useTheme } from "@mui/material/styles";
-import { ListAdd, ListGroup, ListItem } from "../../ds/ListGroup";
+import { ListAdd, ListGroup, ListItem, ListSwitch } from "../../ds/ListGroup";
 import { Pill } from "../../ds/Pill";
 import { useSheet } from "../library/shared";
 import { KINDS, PresetSheet } from "../liveops/presets";
@@ -118,10 +118,25 @@ function Backgrounds({ control, setValue }) {
   );
 }
 
-/** Savvy or Super Savvy Showdown for new streams (its prize is in the reward set). */
+/**
+ * Whether new streams start with a showdown and, if so, Savvy or Super Savvy Showdown (its prize is
+ * in the reward set).
+ */
 function ShowdownKind({ control, setValue, superSavvy }) {
   const showdown = useWatch({ control, name: "showdown" });
   const type = superSavvy || showdown?.superSavvyOnly ? 1 : 0;
+  const turn = (on) => setValue("showdown", on ? { superSavvyOnly: superSavvy } : null, { shouldDirty: true, shouldTouch: true });
+  return (
+    <>
+      <ListGroup label="Showdown">
+        <ListSwitch icon="trophy" title="Showdown" supporting={showdown ? "New streams end with a showdown word" : "Off: new streams have no showdown"} checked={!!showdown} onChange={turn} />
+      </ListGroup>
+      {showdown && <ShowdownType value={type} showdown={showdown} setValue={setValue} superSavvy={superSavvy} />}
+    </>
+  );
+}
+
+function ShowdownType({ value: type, showdown, setValue, superSavvy }) {
   return (
     <ChoiceGroup
       label="Showdown"
@@ -140,7 +155,7 @@ export const gameSetForm = (mode) => ({
   ...mode,
   ...Object.fromEntries(BACKGROUNDS.flatMap((b) => [[b.list, mode[b.list] ?? (mode[b.pick] ? [mode[b.pick]] : [])], [b.pick, mode[b.pick] ?? null]])),
   streamType: mode.streamType ?? StreamType.Public,
-  showdown: { superSavvyOnly: !!mode.showdown?.superSavvyOnly },
+  showdown: mode.showdown === null ? null : { superSavvyOnly: !!mode.showdown?.superSavvyOnly },
   rewardSetId: mode.rewardSetId ?? null,
   powerUpIds: mode.powerUpIds ?? [],
 });

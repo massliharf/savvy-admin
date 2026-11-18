@@ -499,14 +499,14 @@ export function WordsSection({ form, validateWord, onPickWords, frame }) {
       <WordSetRow form={form} />
       {/* Each round's word and time, all in view (words masked while locked). Rewards are under Rewards. */}
       <RoundsEditor form={form} name="textSavvyRounds.rounds" fields={roundFields} append={appendRound} remove={removeRound} subText={baseOf(gameMode) === GameMode.SubText} validateWord={validateWord} masked={masked} newReward={(i) => roundRewardOf(rewards, i)} />
-      {showdown && (
-        <Box id="showdown" sx={{ display: "flex", flexDirection: "column", gap: 1, scrollMarginTop: 96 }}>
-          <Typography variant="overline" color="text.secondary" component="h3" sx={{ px: 0.5 }}>
-            Showdown
-          </Typography>
-          <ShowdownFields control={form.control} name="showdownConfiguration" validateWord={validateWord} masked={masked} prize={false} />
-        </Box>
-      )}
+      {/* The showdown is optional: switched on, it needs its word (its prize is under Rewards). */}
+      <Box id="showdown" sx={{ display: "flex", flexDirection: "column", gap: 1, scrollMarginTop: 96 }}>
+        <Typography variant="overline" color="text.secondary" component="h3" sx={{ px: 0.5 }}>
+          Showdown
+        </Typography>
+        <ShowdownSwitch form={form} />
+        {showdown && <ShowdownFields control={form.control} name="showdownConfiguration" validateWord={validateWord} masked={masked} prize={false} />}
+      </Box>
     </FormSection>
   );
 }
@@ -545,6 +545,24 @@ export function ScoringSection({ form, frame }) {
 }
 
 /**
+ * Turns the stream's showdown on or off. Switched back on, it gets back what it had (else a new one
+ * from the game set's reward set, waiting for its word).
+ */
+function ShowdownSwitch({ form }) {
+  const [bundleId, showdown, streamType] = useWatch({ control: form.control, name: ["bundleId", "showdownConfiguration", "streamType"] });
+  const { bundles, byId, rewardsOf } = useBundles();
+  const last = useRef(null);
+  if (showdown) last.current = showdown;
+  const set = byId[bundleId] ?? bundles[0];
+  const turn = (on) => form.setValue("showdownConfiguration", on ? (last.current ?? newShowdown(set, streamType, rewardsOf(set))) : null, { shouldDirty: true, shouldTouch: true });
+  return (
+    <ListGroup label="Showdown">
+      <ListSwitch icon="trophy" title="Showdown" supporting={showdown ? "A final word after the rounds" : "Off: this stream has no showdown"} checked={!!showdown} onChange={turn} />
+    </ListGroup>
+  );
+}
+
+/**
  * Savvy or Super Savvy Showdown: it follows who can join (a Super Savvy only stream always runs a
  * Super Savvy Showdown), so it sits with the audience.
  */
@@ -558,6 +576,8 @@ function ShowdownTypeField({ control, setValue }) {
   useEffect(() => {
     if (superSavvy && showdown && !showdown.superSavvyOnly) setValue("showdownConfiguration", { ...showdown, superSavvyOnly: true }, { shouldDirty: true });
   }, [superSavvy, showdown, setValue]);
+  // Only for a stream with a showdown (switched on under Words).
+  if (!showdown) return null;
   return (
     <ChoiceGroup
       label="Showdown"

@@ -168,7 +168,7 @@ export default function StreamDetail() {
     const current = form.getValues("showdownConfiguration");
     // The stream decides whether there's a showdown; a set without a showdown word leaves it waiting for one.
     if (set.showdown) form.setValue("showdownConfiguration", { superSavvyOnly: !!bundle?.showdown?.superSavvyOnly, ...current, word: set.showdown.word, prize: current?.prize ?? rewards?.showdownPrize ?? { rewardType: "Cash", amount: 100 } }, { shouldDirty: true });
-    else if (current) form.setValue("showdownConfiguration", { ...current, word: "" }, { shouldDirty: true });
+    else if (current) form.setValue("showdownConfiguration", null, { shouldDirty: true });
     form.setValue("wordSetId", set.id, { shouldDirty: true });
     // The set is written for a game mode: the stream plays it.
     if (set.gameMode) form.setValue("gameMode", set.gameMode, { shouldDirty: true });
