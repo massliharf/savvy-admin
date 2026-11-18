@@ -28,7 +28,7 @@ import { StatusBadge, StreamImage, logoHidden } from "./parts";
 import { StreamType } from "./enums";
 import { GAME_MODES, bundleLine, useBundles } from "./gameModes";
 import { IconTile } from "../../ds/IconTile";
-import { hostLabel, showTitle } from "./hosts";
+import { FACE_POSITION, hostLabel, showTitle } from "./hosts";
 
 export function HostAvatar({ host, size = 32, sx }) {
   return (
@@ -40,6 +40,7 @@ export function HostAvatar({ host, size = 32, sx }) {
         height: size,
         // A person: round, like the host pill on stream cards.
         borderRadius: "50%",
+        "& img": { objectPosition: FACE_POSITION },
         fontSize: Math.round(size / 2.2),
         ...sx,
       }}

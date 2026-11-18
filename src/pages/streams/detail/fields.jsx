@@ -98,13 +98,13 @@ export function SelectInput({ control, name, rules, options, label, helperText, 
 }
 
 /** A choice among a few options bound to the form: a connected button group. */
-export function ChoiceInput({ control, name, rules, options, label, helperText, sx, disabled }) {
+export function ChoiceInput({ control, name, rules, options, label, helperText, sx, disabled, onChange }) {
   return (
     <Controller
       name={name}
       control={control}
       rules={rules}
-      render={({ field, fieldState }) => <ChoiceGroup label={label} value={field.value} options={options} onChange={field.onChange} error={fieldState.error?.message} helperText={helperText} sx={sx} disabled={disabled} />}
+      render={({ field, fieldState }) => <ChoiceGroup label={label} value={field.value} options={options} onChange={onChange ?? field.onChange} error={fieldState.error?.message} helperText={helperText} sx={sx} disabled={disabled} />}
     />
   );
 }

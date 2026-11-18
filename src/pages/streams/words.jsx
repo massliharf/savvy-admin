@@ -3,7 +3,7 @@
 // once; Internal test streams may reuse sets. Listed under Library › Gameplay › Game modes, per game mode.
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useCustomMutation, useInvalidate, useList } from "@refinedev/core";
-import { useFieldArray, useForm } from "react-hook-form";
+import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Dialog from "@mui/material/Dialog";
@@ -17,13 +17,14 @@ import { Icon } from "../../ds/Icon";
 import { EmptyState } from "../../ds/EmptyState";
 import { Pill } from "../../ds/Pill";
 import { SelectList } from "../../ds/SelectList";
+import { ListGroup, ListItem, ListSwitch } from "../../ds/ListGroup";
 import { SideSheet } from "../../ds/SideSheet";
 import { useTimezoneFormat } from "../../contexts";
 import { DP } from "../../providers";
 import { useNotify } from "../../shell/notifications";
 import { StreamType, ROUND_COUNT, durationFor } from "./enums";
 import { SelectInput, TextInput } from "./detail/fields";
-import { BASE_MODES, GAME_MODES } from "./gameModes";
+import { GAME_MODES, useGameModePresets } from "./gameModes";
 import { RoundTimeCell, wordRules } from "./detail/sections";
 import { EditTable, TextCell } from "../../ds/EditTable";
 import Card from "@mui/material/Card";
@@ -197,45 +198,72 @@ const NO_SHOWDOWN = { word: "" };
 const wordInput = { htmlInput: { autoCapitalize: "none", spellCheck: false } };
 
 /**
- * A set's words as one M3 data table: per round the word and its time (at least five rounds),
- * then the showdown word. Rewards and the showdown prize are the stream's, from its bundle.
+ * A set's words: the rounds as an M3 data table (word and time, at least five; "Add round" right
+ * under them), then the showdown on its own. The showdown is optional: switched on, it takes its
+ * word. Rewards and the showdown prize are the stream's, from its game set.
  */
 function SetWordsEditor({ control, setValue, getValues, fields, append, remove, validateWord }) {
-  const { m3: c } = useTheme();
+  const hasShowdown = useWatch({ control, name: "hasShowdown" });
   const number = (text) => (
     <Typography variant="bodyLarge" color="text.secondary">
       {text}
     </Typography>
   );
-  // The showdown is the last row, left empty when the set has none.
-  const wordRow = (key, lead, name, label, rules, time) => ({
-    key,
-    cells: [lead, <TextCell key="w" control={control} name={name} label={label} placeholder={key === "sd" ? "No showdown" : "Add a word"} rules={rules} inputProps={{ autoCapitalize: "none", spellCheck: false }} />, time],
-  });
+  const heading = (text) => (
+    <Typography variant="overline" color="text.secondary" component="h3" sx={{ px: 0.5 }}>
+      {text}
+    </Typography>
+  );
   return (
     <>
-      <EditTable
-        label="Words"
-        columns={[
-          { header: "#", width: "16px" },
-          { header: "Word", width: "minmax(96px, 1fr)" },
-          { header: "Time", width: "64px", align: "right" },
-        ]}
-        minWidth={260}
-        rows={[
-          ...fields.map((f, i) => ({
-            ...wordRow(f.id, number(i + 1), `rounds.${i}.word`, `Round ${i + 1} word`, wordRules(validateWord), <RoundTimeCell key="t" control={control} setValue={setValue} getValues={getValues} base={`rounds.${i}`} label={`Round ${i + 1} time`} />),
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+        {heading("Rounds")}
+        <EditTable
+          label="Rounds"
+          columns={[
+            { header: "#", width: "16px" },
+            { header: "Word", width: "minmax(96px, 1fr)" },
+            { header: "Time", width: "64px", align: "right" },
+          ]}
+          minWidth={260}
+          rows={fields.map((f, i) => ({
+            key: f.id,
+            cells: [
+              number(i + 1),
+              <TextCell key="w" control={control} name={`rounds.${i}.word`} label={`Round ${i + 1} word`} placeholder="Add a word" rules={wordRules(validateWord)} inputProps={{ autoCapitalize: "none", spellCheck: false }} />,
+              <RoundTimeCell key="t" control={control} setValue={setValue} getValues={getValues} base={`rounds.${i}`} label={`Round ${i + 1} time`} />,
+            ],
             onRemove: fields.length > ROUND_COUNT && i === fields.length - 1 ? () => remove(i) : undefined,
             removeLabel: `Remove round ${i + 1}`,
-          })),
-          wordRow("sd", <Icon key="i" name="trophy" size={20} style={{ color: c.onSurfaceVariant }} />, "showdown.word", "Showdown word (optional)", { validate: async (v) => (!v ? true : !/^[a-z]+$/.test(v) ? "Lowercase letters a–z only" : validateWord ? await validateWord(v) : true) }, null),
-        ]}
-        // A new round goes in before the showdown row.
-        addLabel="Add round"
-        onAdd={() => append({ roundIndex: fields.length, word: "", durationInSeconds: durationFor("", fields.length) })}
-      />
+          }))}
+          addLabel={`Add round (${fields.length} of 20)`}
+          addDisabled={fields.length >= 20}
+          onAdd={() => append({ roundIndex: fields.length, word: "", durationInSeconds: durationFor("", fields.length) })}
+        />
+      </Box>
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+        {heading("Showdown")}
+        <ListGroup label="Showdown">
+          <Controller
+            name="hasShowdown"
+            control={control}
+            render={({ field }) => <ListSwitch icon="trophy" title="Showdown" supporting={field.value ? "A final word after the rounds" : "Off: this set has no showdown"} checked={!!field.value} onChange={field.onChange} />}
+          />
+          {hasShowdown && (
+            <ListItem>
+              <TextInput
+                control={control}
+                name="showdown.word"
+                label="Showdown word"
+                inputProps={{ autoCapitalize: "none", spellCheck: false }}
+                rules={{ validate: async (v) => (!v?.trim() ? "Enter the showdown word" : !/^[a-z]+$/.test(v.trim()) ? "Lowercase letters a–z only" : validateWord ? await validateWord(v.trim()) : true) }}
+              />
+            </ListItem>
+          )}
+        </ListGroup>
+      </Box>
       <Typography variant="bodySmall" color="text.secondary" sx={{ mt: -1 }}>
-        Leave the showdown word empty for a set without one. Rewards and the showdown prize come from the stream's game set.
+        Rewards and the showdown prize come from the stream's game set.
       </Typography>
     </>
   );
@@ -249,6 +277,8 @@ export function WordSetSheet({ open, set, onClose, validateWord }) {
   const isNew = !set?.id;
   const { control, setValue, getValues, handleSubmit, reset, formState, setError } = useForm({ defaultValues: { title: "", gameMode: "", rounds: [], hasShowdown: true, showdown: { ...NO_SHOWDOWN } } });
   const { fields, append, remove } = useFieldArray({ control, name: "rounds" });
+  const { presets, isLoading: modesLoading } = useGameModePresets();
+  const modes = Object.values(presets);
 
   // A new set starts with the game mode's rounds and round duration.
   const fresh = () => blankRounds(ROUND_COUNT);
@@ -267,7 +297,7 @@ export function WordSetSheet({ open, set, onClose, validateWord }) {
         title: v.title.trim(),
         gameMode: v.gameMode || null,
         rounds: v.rounds.map((r, i) => ({ word: r.word, durationInSeconds: r.durationInSeconds ?? durationFor(r.word, i) })),
-        showdown: v.showdown?.word?.trim() ? { word: v.showdown.word.trim() } : null,
+        showdown: v.hasShowdown ? { word: v.showdown.word.trim() } : null,
       };
       try {
         await mutateAsync({ url: isNew ? "/admin/word-sets" : `/admin/word-sets/${set.id}`, method: isNew ? "post" : "put", dataProviderName: DP.wordSets, values, successNotification: false, errorNotification: false });
@@ -306,7 +336,16 @@ export function WordSetSheet({ open, set, onClose, validateWord }) {
       }
     >
       <TextInput control={control} name="title" label="Name" max={40} rules={{ validate: (v) => (v?.trim() ? (v.trim().length <= 40 ? true : "Use 40 characters or fewer") : "Enter a name") }} />
-      <SelectInput control={control} name="gameMode" label="Game mode" options={BASE_MODES.map((m) => ({ value: m.id, label: m.label }))} rules={{ required: "Pick a game mode" }} />
+      {/* Only the game modes set up in Library › Gameplay › Game modes. */}
+      <SelectInput
+        control={control}
+        name="gameMode"
+        label="Game mode"
+        options={modes.map((m) => ({ value: m.id, label: m.name }))}
+        disabled={!modesLoading && modes.length === 0}
+        helperText={!modesLoading && modes.length === 0 ? "No game modes yet. Add one in Library › Gameplay › Game modes first." : undefined}
+        rules={{ validate: (v) => (modes.some((m) => m.id === v) ? true : "Pick a game mode") }}
+      />
       <SetWordsEditor control={control} setValue={setValue} getValues={getValues} fields={fields} append={append} remove={remove} validateWord={validateWord} />
     </SideSheet>
   );

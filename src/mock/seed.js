@@ -361,7 +361,7 @@ const bundle = (id, name, rewardSetId, superSavvyOnly) => ({
 export const DEFAULT_BUNDLE_ID = "bundle-cash-savvy";
 // Scoring presets (Library › Gameplay › Scoring): points per round. New streams start from the Default; a
 // stream can pick another one.
-export const seedScoringPresets = () => [{ id: "scoring-standard", name: "Standard", roundScoring: structuredClone(BUNDLE_SCORING), isDefault: true }];
+export const seedScoringPresets = () => [{ id: "scoring-standard", name: "Standard", roundScoring: structuredClone(BUNDLE_SCORING), hostStumperBonusXp: 500, isDefault: true }];
 // Reward sets (Library › Gameplay › Reward sets): everything a stream pays. Rounds pay Sparks (the
 // Round Pounder reward); a cash game pays cash in the showdown, a sparks game Sparks.
 export const roundRewardsFor = (n = 5) => Array.from({ length: n }, (_, i) => ({ rewardType: "Sparks", amount: 5 * (i + 1) }));
@@ -373,7 +373,6 @@ const rewardSet = (id, name, showdownPrize, isDefault = false) => ({
   showdownPrize,
   defaultRewards: [{ rewardType: "BombPowerup", amount: 1 }],
   hostBusterReward: null,
-  hostStumperBonusXp: 500,
   raffleSystemWinnersConfiguration: null,
 });
 export const DEFAULT_REWARD_SET_ID = "rewards-cash";

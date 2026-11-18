@@ -47,3 +47,6 @@ export function useChangeHost() {
   };
   return { changeHost, changingHost: isPending };
 }
+
+/** Where a host photo is cropped in a square or round thumbnail: the face, near the top of a tall cut-out. */
+export const FACE_POSITION = "50% 12%";

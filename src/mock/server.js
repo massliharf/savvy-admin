@@ -9,7 +9,7 @@ import { HOST_PICTURE_URL, MODE_LOGOS, SCOTT_PHOTOS, STREAM_HERO_URL } from "../
 // Version 2 keeps its own saved data: version 1 is published on the same site (same browser
 // storage) and must not be touched by it.
 const DB_KEY = "savvy-mock-db-2";
-const DB_VERSION = 61;
+const DB_VERSION = 62;
 
 // The demo data: one host (Scott), one sponsor (Wendy's) and one stream per state and edge case,
 // spread over the month around today (see DEMO_STREAMS). Streams are built like new ones: from a
@@ -165,7 +165,8 @@ function populate(d) {
       textSavvyRounds: { rounds },
       showdownConfiguration: hasShowdown ? { word: p.showdown === "word" ? showdownWord : "", prize: { ...pays.showdownPrize }, superSavvyOnly: streamType === "SuperSavvy" || !!bundle.showdown?.superSavvyOnly } : null,
       roundScoring: structuredClone(bundle.roundScoring),
-      hostStumperBonusXp: pays.hostStumperBonusXp ?? null,
+      // The host stumper bonus comes with scoring (the game set's scoring preset, else the Default).
+      hostStumperBonusXp: ((d.scoringPresets ?? []).find((x) => x.id === bundle.defaultScoringPresetId) ?? (d.scoringPresets ?? []).find((x) => x.isDefault))?.hostStumperBonusXp ?? 500,
       defaultRewards: structuredClone(pays.defaultRewards ?? []),
       hostBusterReward: p.buster ? { rewardType: "Sparks", amount: 25 } : null,
       raffleSystemWinnersConfiguration: p.raffle ? [{ rewardType: "Cash", amount: 10 }, { rewardType: "Cash", amount: 5 }] : null,
@@ -721,6 +722,14 @@ function load() {
           if (u) u.imageUrl = SCOTT_PHOTOS[0];
         }
         parsed.version = 61;
+      }
+      if (parsed.version === 61) {
+        // v62: the host stumper bonus belongs to scoring, not to reward sets. Each scoring preset
+        // takes the Default reward set's (else 500); reward sets drop it.
+        const fromRewards = (parsed.rewardSets ?? []).find((r) => r.isDefault)?.hostStumperBonusXp ?? 500;
+        (parsed.scoringPresets ?? []).forEach((p) => (p.hostStumperBonusXp ??= fromRewards));
+        (parsed.rewardSets ?? []).forEach((r) => delete r.hostStumperBonusXp);
+        parsed.version = 62;
       }
       if (parsed.version === DB_VERSION) return parsed;
       // Older versions: add what's new and keep everything else.
@@ -1483,6 +1492,20 @@ on("put", "/admin/game-modes/:id", ({ params, body }) => {
   return json(db.gameModes[i]);
 });
 
+// A new game mode: one per game (TextChain or SubText), with its title and logo. The rest (rounds,
+// How to play) starts from that game's defaults.
+on("post", "/admin/game-modes", ({ body }) => {
+  const base = String(body.base ?? "");
+  const template = seed.seedGameModes().find((m) => m.id === base);
+  if (!template) return badRequest({ base: ["Pick a game."] });
+  if (db.gameModes.some((m) => m.id === base)) return badRequest({ base: ["This game already has a game mode."] });
+  const name = String(body.name ?? "").trim();
+  if (!name) return badRequest({ name: ["Enter a title."] });
+  const m = { ...template, name, gameLogoUrl: fileUrl(body.gameLogoFile) || body.gameLogoUrl || null };
+  db.gameModes.push(m);
+  return json(m, 201);
+});
+
 // ---- Bundles (prototype endpoints): what new streams start with. JSON bodies.
 // A game set's two backgrounds, up to five of each, the selected one is what its new streams start
 // with: the live game host avatar background (900 × 1200; the stream's heroImageUrl) and the hero
@@ -1503,7 +1526,7 @@ function withBackgrounds(b) {
 }
 /** Do two reward sets pay the same (whatever their names)? */
 function samePays(a, b) {
-  const pick = (r) => JSON.stringify(["roundRewards", "showdownPrize", "defaultRewards", "hostBusterReward", "hostStumperBonusXp", "raffleSystemWinnersConfiguration"].map((k) => r[k] ?? null));
+  const pick = (r) => JSON.stringify(["roundRewards", "showdownPrize", "defaultRewards", "hostBusterReward", "raffleSystemWinnersConfiguration"].map((k) => r[k] ?? null));
   return pick(a) === pick(b);
 }
 /** The reward set a game set pays with: its own pick, else the Default one. */
@@ -1619,7 +1642,9 @@ function wordSetErrors(w) {
     if (!okWord(r.word)) errors[`rounds[${i}].word`] = ["Lowercase letters a–z only."];
     if (!(Number.isInteger(r.durationInSeconds) && r.durationInSeconds >= 10 && r.durationInSeconds <= 300)) errors[`rounds[${i}].durationInSeconds`] = ["10–300 s"];
   });
-  if (w.showdown && !okWord(w.showdown.word)) errors["showdown.word"] = ["Lowercase letters a–z only."];
+  if (w.showdown && !okWord(w.showdown.word)) errors["showdown.word"] = [w.showdown.word ? "Lowercase letters a–z only." : "Enter the showdown word."];
+  // Only game modes set up in Library › Gameplay › Game modes.
+  if (!w.gameMode || !db.gameModes.some((m) => m.id === w.gameMode)) errors.gameMode = ["Pick a game mode."];
   return errors;
 }
 // Words are hidden in the admin until someone enters the words password.

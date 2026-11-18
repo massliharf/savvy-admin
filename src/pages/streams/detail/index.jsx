@@ -47,12 +47,12 @@ const SECTIONS = [
   { id: "images", group: "Stream", label: "Images", icon: "image", fields: ["heroImageUrl", "imageUrl", "heroCardImageUrl", "heroCardBackgroundUrl"] },
   // Words holds the word set (and the game mode it brings), the rounds and the showdown word.
   { id: "words", group: "Game", label: "Words", icon: "spellcheck", fields: ["gameMode", "textSavvyRounds", "showdownConfiguration.word"] },
-  { id: "game", group: "Game", label: "Scoring", icon: "scoreboard", fields: ["roundScoring"] },
+  { id: "game", group: "Game", label: "Scoring", icon: "scoreboard", fields: ["roundScoring", "hostStumperBonusXp"] },
   { id: "power-ups", group: "Game", label: "Power-ups", icon: "auto_fix_high", fields: ["powerUpIds"] },
   { id: "host", group: "Host", label: "Host", icon: "person", fields: ["hostId", "hostName"] },
   { id: "sponsor", group: "Sponsor", label: "Sponsor", icon: "handshake", fields: ["sponsorship"] },
   // Everything the stream pays (a reward set, then its own copy): rounds, showdown prize, game rewards, raffle.
-  { id: "rewards-card", group: "Rewards", label: "Rewards", icon: "redeem", fields: ["showdownConfiguration.prize", "defaultRewards", "hostBusterReward", "hostStumperBonusXp", "raffleSystemWinnersConfiguration"] },
+  { id: "rewards-card", group: "Rewards", label: "Rewards", icon: "redeem", fields: ["showdownConfiguration.prize", "defaultRewards", "hostBusterReward", "raffleSystemWinnersConfiguration"] },
   { id: "share", group: "Messaging", label: "Share cards", icon: "style", fields: ["shareableCards"] },
   { id: "notifications-card", group: "Messaging", label: "Notifications", icon: "notifications", fields: ["lobbyOpenTitle", "lobbyOpenBody", "goingLiveTitle", "goingLiveBody", "round1StartsTitle", "round1StartsBody", "round1StartsAt"] },
 ];

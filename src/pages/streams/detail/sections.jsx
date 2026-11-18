@@ -30,7 +30,7 @@ import { GameSetSheet } from "../../gameModes/sheet";
 import { BakedImage } from "../bakeTrial"; // bake trial
 import { BackgroundPickerDialog, useBackgroundPresets } from "../../library/backgrounds";
 import { backgroundUrl } from "../../../utils/backgrounds";
-import { fillHost, hostLabel, titleRule } from "../hosts";
+import { FACE_POSITION, fillHost, hostLabel, titleRule } from "../hosts";
 import { useWordSets, useWordsLock } from "../words";
 import { useSheet } from "../../library/shared";
 import { GAME_MODES, baseOf, modeId, newShowdown, prizeText, roundRewardOf, streamRewards, useBundles, useRewardSets, useStreamBuilder } from "../gameModes";
@@ -141,7 +141,7 @@ function PictureRow({ def, value, source, sourceName, emptyText, editLabel, onEd
   const ratio = def.width / def.height;
   const thumb = (url, size) => (
     <Box sx={{ width: Math.round(size * ratio), height: size, flexShrink: 0, borderRadius: `${tokens.shape.sm}px`, overflow: "hidden", bgcolor: c.surfaceContainerHighest, display: "grid", placeItems: "center" }}>
-      {url ? <Box component="img" src={url} alt="" sx={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : <Icon name="image" size={16} style={{ color: c.onSurfaceVariant }} />}
+      {url ? <Box component="img" src={url} alt="" sx={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: def.source === "host" ? FACE_POSITION : "center", display: "block" }} /> : <Icon name="image" size={16} style={{ color: c.onSurfaceVariant }} />}
     </Box>
   );
   const close = () => setAnchor(null);
@@ -520,14 +520,16 @@ export function WordsSection({ form, validateWord, onPickWords, frame }) {
  * points changed by hand show as Custom.
  */
 function ScoringPresetField({ control, setValue }) {
-  const scoring = useWatch({ control, name: "roundScoring" });
+  const [scoring, stumper] = useWatch({ control, name: ["roundScoring", "hostStumperBonusXp"] });
   const { data } = useList({ resource: "ScoringPreset", dataProviderName: DP.scoringPresets, pagination: { mode: "off" } });
   const presets = data?.data ?? [];
-  const current = presets.find((p) => sameScoring(p.roundScoring, scoring));
+  // A preset is its points and its host stumper bonus.
+  const current = presets.find((p) => sameScoring(p.roundScoring, scoring) && Number(p.hostStumperBonusXp ?? 0) === Number(stumper ?? 0));
   const pick = (id) => {
     const p = presets.find((x) => x.id === id);
     if (!p) return;
     setValue("roundScoring", structuredClone(p.roundScoring), { shouldDirty: true, shouldValidate: true });
+    setValue("hostStumperBonusXp", p.hostStumperBonusXp ?? null, { shouldDirty: true, shouldValidate: true });
   };
   return <SelectButton label="Preset" value={current?.id ?? ""} placeholder="Custom" options={presets.map((p) => ({ value: p.id, label: p.name }))} onChange={pick} sx={{ maxWidth: 320 }} />;
 }
@@ -537,7 +539,7 @@ export function ScoringSection({ form, frame }) {
   return (
     <FormSection {...frame} id="game" title="Scoring" action={<PresetsLink kind="scoring" />}>
       <ScoringPresetField control={form.control} setValue={form.setValue} />
-      <ScoringFields control={form.control} setValue={form.setValue} subText={baseOf(form.gameMode) === GameMode.SubText} roundCount={form.roundFields?.length ?? 5} withStumper={false} />
+      <ScoringFields control={form.control} setValue={form.setValue} subText={baseOf(form.gameMode) === GameMode.SubText} roundCount={form.roundFields?.length ?? 5} />
     </FormSection>
   );
 }
@@ -956,7 +958,7 @@ export function RewardSetFields({ form }) {
         <ShowdownPrizeRow control={control} name="showdownPrize" />
       </FieldGroup>
       <FieldGroup title="Game rewards">
-        <RewardsEditor form={form} stumper />
+        <RewardsEditor form={form} />
       </FieldGroup>
     </>
   );
@@ -976,18 +978,17 @@ const rewardsOfStream = (s) => {
     showdownPrize: s.showdownConfiguration ? s.showdownConfiguration.prize ?? null : null,
     defaultRewards: s.defaultRewards ?? [],
     hostBusterReward: s.hostBusterReward ?? null,
-    hostStumperBonusXp: s.hostStumperBonusXp ?? null,
     raffleSystemWinnersConfiguration: s.raffleSystemWinnersConfiguration?.length ? s.raffleSystemWinnersConfiguration : null,
   };
 };
 /** Does the stream pay exactly what the reward set gives it (for its rounds and showdown)? */
 export const sameRewards = (rs, s) => sameJson(streamRewards(rs, s.textSavvyRounds?.rounds?.length ?? 0, s.showdownConfiguration), rewardsOfStream(s));
 
-const REWARD_FIELDS = ["textSavvyRounds.rounds", "showdownConfiguration", "defaultRewards", "hostBusterReward", "hostStumperBonusXp", "raffleSystemWinnersConfiguration"];
+const REWARD_FIELDS = ["textSavvyRounds.rounds", "showdownConfiguration", "defaultRewards", "hostBusterReward", "raffleSystemWinnersConfiguration"];
 /** The stream's rewards as the form holds them, in a stream's shape. */
 function useStreamRewards(control) {
-  const [rounds, showdown, defaultRewards, hostBusterReward, hostStumperBonusXp, raffle] = useWatch({ control, name: REWARD_FIELDS });
-  return { textSavvyRounds: { rounds }, showdownConfiguration: showdown, defaultRewards, hostBusterReward, hostStumperBonusXp, raffleSystemWinnersConfiguration: raffle };
+  const [rounds, showdown, defaultRewards, hostBusterReward, raffle] = useWatch({ control, name: REWARD_FIELDS });
+  return { textSavvyRounds: { rounds }, showdownConfiguration: showdown, defaultRewards, hostBusterReward, raffleSystemWinnersConfiguration: raffle };
 }
 
 /** Puts a reward set's rewards on the stream's form (its rounds and showdown as they are). */
@@ -998,7 +999,7 @@ export function applyRewardSet({ getValues, setValue }, rs) {
   const opts = { shouldDirty: true, shouldTouch: true };
   rounds.forEach((_, i) => setValue(`textSavvyRounds.rounds.${i}.roundBusterReward`, pays.roundRewards[i], opts));
   if (showdown) setValue("showdownConfiguration.prize", pays.showdownPrize, opts);
-  ["defaultRewards", "hostBusterReward", "hostStumperBonusXp", "raffleSystemWinnersConfiguration"].forEach((k) => setValue(k, pays[k], opts));
+  ["defaultRewards", "hostBusterReward", "raffleSystemWinnersConfiguration"].forEach((k) => setValue(k, pays[k], opts));
 }
 
 /** Which reward set (Library › Gameplay › Reward sets) the stream pays: picking one fills in its rewards; rewards changed by hand show as Custom. */
@@ -1031,7 +1032,7 @@ export function RewardsSection({ form, frame }) {
       {/* One per round (rounds are added in Words). */}
       <RoundRewardsTable control={control} setValue={setValue} count={(rounds ?? []).length} path={(i) => `textSavvyRounds.rounds.${i}.roundBusterReward`} />
       {showdown && <ShowdownPrizeRow control={control} name="showdownConfiguration.prize" />}
-      <RewardsEditor form={form} stumper />
+      <RewardsEditor form={form} />
     </FormSection>
   );
 }

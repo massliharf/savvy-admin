@@ -22,7 +22,7 @@ import { GAME_MODES, modeOf } from "./gameModes";
 import { STREAM_TYPES, StreamItem, logoHidden } from "./parts";
 import { NewStreamDialog } from "./NewStreamDialog";
 import { StreamKeyDialog } from "./StreamKeyDialog";
-import { WordSetPickerDialog, useWordSetActions, useWordsLock } from "./words";
+import { WordSetPickerDialog, useWordSetActions } from "./words";
 import { StreamSummary } from "./pickers";
 import { useHosts, showTitle } from "./hosts";
 import { MonthCalendar, MonthNav, StreamLegend, WeekCalendar, WeekNav } from "./calendar";
@@ -121,7 +121,6 @@ export default function StreamList() {
   const [wordsFor, setWordsFor] = useState(null);
   const { assign, busy: assigning } = useWordSetActions();
   // Picking a set shows its words: the words password first, like opening a set.
-  const { unlock, dialog: unlockDialog } = useWordsLock();
   const [deleting, setDeleting] = useState(null);
   const [highlight, setHighlight] = useState(null);
   // "Create event": one stream or a recurring one; the only way to add streams (`date` from a
@@ -232,7 +231,8 @@ export default function StreamList() {
     if (action === "edit") navigate(`/streams/edit/${stream.id}`);
     if (action === "duplicate") navigate(`/streams/create?from=${stream.id}`);
     if (action === "key") setKeyStream(stream);
-    if (action === "words") unlock(() => setWordsFor(stream));
+    // Assigning a word set needs no password: the picker shows set names, words stay masked.
+    if (action === "words") setWordsFor(stream);
     if (action === "delete") setDeleting(stream);
   };
 
@@ -374,7 +374,6 @@ export default function StreamList() {
       />
       <CreateEventDialog open={eventOpen} date={eventDate} onClose={() => setEventOpen(false)} streams={streams} hosts={hosts} timezone={timezone} onCreated={(start) => setMonth(start.tz(timezone).startOf("month"))} />
       <StreamKeyDialog stream={keyStream} onClose={() => setKeyStream(null)} />
-      {unlockDialog}
       {/* A word set's "Assign to a stream", the other way round: this stream, then its set. */}
       <WordSetPickerDialog
         open={!!wordsFor}

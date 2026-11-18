@@ -97,7 +97,7 @@ export function ChoiceGroup({ label, hideLabel, value, options, onChange, error,
         sx={{ flexWrap: "wrap", maxWidth: "100%" }}
       >
         {options.map((o) => (
-          <ToggleButton key={o.value} value={o.value}>
+          <ToggleButton key={o.value} value={o.value} disabled={o.disabled}>
             {o.leading ?? (o.icon && <Icon name={o.icon} size={16} />)}
             {o.label}
           </ToggleButton>

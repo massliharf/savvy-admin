@@ -12,7 +12,7 @@ import { CardCorner } from "../../ds/CardCorner";
 import { ActionMenu } from "../../ds/ActionMenu";
 import { cornerFor } from "../../ds/IconTile";
 import { layer, radius } from "../../theme/tokens";
-import { hostLabel, useHosts, showTitle } from "./hosts";
+import { FACE_POSITION, hostLabel, useHosts, showTitle } from "./hosts";
 import { useTimezoneFormat } from "../../contexts";
 import { modeOf, setupIssues } from "./gameModes";
 import { useWordSets } from "./words";
@@ -53,7 +53,7 @@ export function StreamImage({ stream, size = 56 }) {
       src={stream.imageUrl}
       alt=""
       loading="lazy"
-      sx={{ width: size, height: size, borderRadius: `${cornerFor(size)}px`, objectFit: "cover", flexShrink: 0, bgcolor: "action.hover", display: "block" }}
+      sx={{ width: size, height: size, borderRadius: `${cornerFor(size)}px`, objectFit: "cover", objectPosition: FACE_POSITION, flexShrink: 0, bgcolor: "action.hover", display: "block" }}
     />
   );
 }
@@ -86,7 +86,7 @@ function useHostOf(stream) {
 /** Host picture, tinted from the surface it sits on. */
 function HostFace({ host, size, color }) {
   return (
-    <Avatar src={host.picture} alt="" sx={{ width: size, height: size, fontSize: Math.round(size * 0.55), bgcolor: alpha(color, 0.16), color, flexShrink: 0 }}>
+    <Avatar src={host.picture} alt="" sx={{ "& img": { objectPosition: FACE_POSITION }, width: size, height: size, fontSize: Math.round(size * 0.55), bgcolor: alpha(color, 0.16), color, flexShrink: 0 }}>
       {host.name[0]}
     </Avatar>
   );

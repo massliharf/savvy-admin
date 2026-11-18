@@ -19,10 +19,10 @@ const toDataUrl = (file) =>
  * Up to `max` images of one kind, one of them selected (ringed, with a check). Click an image to
  * select it, × to remove it, the dashed tile to upload and crop another. The first upload is
  * selected; removing the selected one selects the first left.
- * `onChange(urls, selected)`. `hideLabel` leaves the label out (a section title already names it;
+ * `onChange(urls, selected)`. `position` is where a thumbnail crops (object-position). `hideLabel` leaves the label out (a section title already names it;
  * it still names the images for screen readers).
  */
-export function ImageGallery({ label, hideLabel, hint, width, height, urls = [], selected, onChange, max = 5 }) {
+export function ImageGallery({ label, hideLabel, hint, width, height, urls = [], selected, onChange, max = 5, position = "center" }) {
   const { m3: c, tokens } = useTheme();
   const h = 88;
   const w = Math.min(Math.round(h * (width / height)), 156);
@@ -67,7 +67,7 @@ export function ImageGallery({ label, hideLabel, hint, width, height, urls = [],
                   "&.Mui-focusVisible": { outline: `2px solid ${c.focus}`, outlineOffset: 2 },
                 }}
               >
-                <Box component="img" src={url} alt="" sx={{ width: "100%", height: "100%", objectFit: "cover", display: "block", opacity: on ? 1 : 0.85 }} />
+                <Box component="img" src={url} alt="" sx={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: position, display: "block", opacity: on ? 1 : 0.85 }} />
               </ButtonBase>
               {on && (
                 <Box sx={{ position: "absolute", left: 4, bottom: 4, width: 20, height: 20, borderRadius: "50%", bgcolor: c.primary, color: c.onPrimary, display: "grid", placeItems: "center", pointerEvents: "none" }}>

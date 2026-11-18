@@ -87,7 +87,7 @@ export const KINDS = {
   share: { resource: "SharePreset", dataProviderName: DP.sharePresets, noun: "Share card preset", title: "Stream share cards", description: "New streams start from the Default.", icon: "style", empty: () => ({ name: "", cards: structuredClone(EMPTY_CARDS) }), summary: (p) => p.cards?.liveHome?.title },
   app: { resource: "AppCardPreset", dataProviderName: DP.appCardPresets, noun: "App share card preset", title: "App share cards", description: "Shared from the profile and after a live show.", icon: "ios_share", puzzle: false, empty: () => ({ name: "", cards: emptyAppCards(false) }), summary: (p) => p.cards?.profileShare?.title },
   puzzle: { resource: "PuzzleCardPreset", dataProviderName: DP.puzzleCardPresets, noun: "Daily puzzle share card preset", title: "Daily puzzle share cards", description: "Shared after today's puzzle.", icon: "extension", puzzle: true, empty: () => ({ name: "", cards: emptyAppCards(true) }), summary: (p) => stripRichText(p.cards?.dailyPuzzleSuccess?.title ?? "") },
-  scoring: { resource: "ScoringPreset", dataProviderName: DP.scoringPresets, noun: "Scoring preset", title: "Scoring", description: "Points per round. Each game set picks one (else the Default); a stream can pick another.", icon: "scoreboard", empty: () => ({ name: "", roundScoring: structuredClone(DEFAULT_ROUND_SCORING) }), summary: (p) => `Solve bonus ${SCORE_BRACKETS.map((k) => (p.roundScoring?.[k]?.solveBonusXp ?? 0).toLocaleString()).join(" / ")}` },
+  scoring: { resource: "ScoringPreset", dataProviderName: DP.scoringPresets, noun: "Scoring preset", title: "Scoring", description: "Points per round. Each game set picks one (else the Default); a stream can pick another.", icon: "scoreboard", empty: () => ({ name: "", roundScoring: structuredClone(DEFAULT_ROUND_SCORING), hostStumperBonusXp: 500 }), summary: (p) => `Solve bonus ${SCORE_BRACKETS.map((k) => (p.roundScoring?.[k]?.solveBonusXp ?? 0).toLocaleString()).join(" / ")}` },
   rewards: {
     resource: "RewardSet",
     dataProviderName: DP.rewardSets,
@@ -100,7 +100,7 @@ export const KINDS = {
     addLabel: "Add reward set",
     emptyTitle: "No reward sets yet",
     sheetTitle: "Reward sets",
-    empty: () => ({ name: "", roundRewards: roundRewardsFor(5), showdownPrize: { rewardType: "Cash", amount: 100 }, defaultRewards: [{ rewardType: "BombPowerup", amount: 1 }], hostBusterReward: null, hostStumperBonusXp: 500, raffleSystemWinnersConfiguration: null }),
+    empty: () => ({ name: "", roundRewards: roundRewardsFor(5), showdownPrize: { rewardType: "Cash", amount: 100 }, defaultRewards: [{ rewardType: "BombPowerup", amount: 1 }], hostBusterReward: null, raffleSystemWinnersConfiguration: null }),
     // Read when called: sections.jsx imports this module too.
     summary: (p) => rewardSetSummary(p),
   },

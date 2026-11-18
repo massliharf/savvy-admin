@@ -123,7 +123,7 @@ const MEDIA = 88;
  * shop switch and the drag grip, on the title's line. The same card for swag, packs, hosts,
  * sponsors and game modes.
  */
-export function ShopCard({ image, icon, media, aspect = "1 / 1", title, meta, pills, end, reorder, onOpen, sortable }) {
+export function ShopCard({ image, imagePosition, icon, media, aspect = "1 / 1", title, meta, pills, end, reorder, onOpen, sortable }) {
   const { m3: c, tokens } = useTheme();
   const { sx: dragSx, ...dragProps } = sortable ?? {};
   const [w, h] = aspect.split("/").map(Number);
@@ -138,7 +138,7 @@ export function ShopCard({ image, icon, media, aspect = "1 / 1", title, meta, pi
     <Card {...dragProps} sx={{ position: "relative", height: MEDIA + inset * 2, ...dragSx }}>
       <CardActionArea onClick={onOpen} sx={{ height: "100%", overflow: "hidden", display: "flex", alignItems: "stretch", justifyContent: "flex-start", gap: 2, p: `${inset}px`, pr: `${12 + corner}px` }}>
         <Box sx={{ width: mediaWidth, height: MEDIA, flexShrink: 0, borderRadius: `${tokens.shape.lg - inset}px`, overflow: "hidden", bgcolor: c.surfaceContainerHigh }}>
-          {media ?? <Thumb src={image} size="100%" radius={0} icon={icon} />}
+          {media ?? <Thumb src={image} size="100%" radius={0} icon={icon} position={imagePosition} />}
         </Box>
         {/* Lines never squash: each shows whole or not at all (the card clips below its picture). */}
         <Box sx={{ flex: 1, minWidth: 0, py: 0.5, display: "flex", flexDirection: "column", gap: 0.5, "& > *": { flexShrink: 0 } }}>
@@ -159,13 +159,13 @@ export function ShopCard({ image, icon, media, aspect = "1 / 1", title, meta, pi
   );
 }
 
-export function Thumb({ src, size = 48, icon = "image", radius }) {
+export function Thumb({ src, size = 48, icon = "image", radius, position = "center" }) {
   const { m3: c } = useTheme();
   const [broken, setBroken] = useState(false);
   const px = typeof size === "number";
   return (
     <Box sx={{ width: size, height: size, borderRadius: radius ?? (px ? `${cornerFor(size)}px` : `${shape.lg}px`), overflow: "hidden", flexShrink: 0, bgcolor: c.surfaceCardInset, color: c.onSurfaceVariant, display: "grid", placeItems: "center" }}>
-      {src && !broken ? <Box component="img" src={src} alt="" onError={() => setBroken(true)} sx={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Icon name={icon} size={px ? Math.round(size / 2) : 40} />}
+      {src && !broken ? <Box component="img" src={src} alt="" onError={() => setBroken(true)} sx={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: position }} /> : <Icon name={icon} size={px ? Math.round(size / 2) : 40} />}
     </Box>
   );
 }

@@ -548,7 +548,7 @@ export const gameModesProvider = (http) => ({
   update: async ({ id, variables }) => ({
     data: ok(await http.put(`${API}/admin/game-modes/${id}`, toFormData(variables), { headers: {} })).data,
   }),
-  create: async ({ variables }) => ({ data: ok(await http.post(`${API}/admin/game-modes`, variables)).data }),
+  create: async ({ variables }) => ({ data: ok(await http.post(`${API}/admin/game-modes`, toFormData(variables), { headers: {} })).data }),
   deleteOne: async ({ id }) => ({ data: ok(await http.delete(`${API}/admin/game-modes/${id}`)).data }),
 });
 

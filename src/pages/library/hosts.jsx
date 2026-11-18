@@ -26,7 +26,7 @@ import { useDebounced } from "../../ds/SearchField";
 import { dayjs, useTimezone, useTimezoneFormat } from "../../contexts";
 import { DP } from "../../providers";
 import { TextInput } from "../streams/detail/fields";
-import { hostLabel, useChangeHost } from "../streams/hosts";
+import { FACE_POSITION, hostLabel, useChangeHost } from "../streams/hosts";
 import { HostPicker } from "../streams/pickers";
 import { CardGrid, ShopCard } from "../shop/shared";
 import { ConfirmDelete, LibraryToolbar, useLibraryMutations, useSheet } from "./shared";
@@ -47,6 +47,7 @@ function HostCard({ host, onOpen }) {
   return (
     <ShopCard
       image={host.imageUrl}
+      imagePosition={FACE_POSITION}
       icon="mic"
       title={hostLabel(host)}
       meta={
@@ -280,6 +281,7 @@ export function HostSheet({ sheet, stats, existing, onHandOver }) {
             hint={g.hint}
             width={g.width}
             height={g.height}
+            position={FACE_POSITION}
             urls={gallery[i * 2] ?? []}
             selected={gallery[i * 2 + 1]}
             onChange={(urls, picked) => {

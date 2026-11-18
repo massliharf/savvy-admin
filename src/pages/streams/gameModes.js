@@ -77,7 +77,7 @@ export function useGameModePresets() {
 
 /**
  * Reward sets (Library › Gameplay › Reward sets): everything a stream pays (Round Pounders, the
- * showdown prize, participation, host buster and stumper, raffle). `of(set)` is the one a game set
+ * showdown prize, participation, host buster, raffle; the host stumper bonus is scoring's). `of(set)` is the one a game set
  * picked, else the Default one.
  */
 export function useRewardSets() {
@@ -113,7 +113,6 @@ export function streamRewards(rewards, rounds, showdown) {
     showdownPrize: showdown ? { ...(rewards?.showdownPrize ?? DEFAULT_SHOWDOWN_PRIZE) } : null,
     defaultRewards: structuredClone(rewards?.defaultRewards ?? []),
     hostBusterReward: rewards?.hostBusterReward ? { ...rewards.hostBusterReward } : null,
-    hostStumperBonusXp: rewards?.hostStumperBonusXp ?? null,
     raffleSystemWinnersConfiguration: rewards?.raffleSystemWinnersConfiguration?.length ? structuredClone(rewards.raffleSystemWinnersConfiguration) : null,
   };
 }
@@ -164,7 +163,8 @@ export function streamFromPreset({ title, host, startDate, gameMode = null, stre
       rounds: Array.from({ length: mode.rounds }, (_, i) => ({ roundIndex: i, word: "", durationInSeconds: durationFor("", i), roundBusterReward: pays.roundRewards[i] })),
     },
     roundScoring: mode.scoring,
-    hostStumperBonusXp: pays.hostStumperBonusXp ?? undefined,
+    // The host stumper bonus comes with scoring (the game set's scoring preset).
+    hostStumperBonusXp: preset?.hostStumperBonusXp ?? DEFAULT_HOST_STUMPER_BONUS_XP,
     defaultRewards: pays.defaultRewards,
     hostBusterReward: pays.hostBusterReward,
     raffleSystemWinnersConfiguration: pays.raffleSystemWinnersConfiguration,
@@ -188,7 +188,7 @@ export function useStreamBuilder() {
     const set = byId[base.bundleId] ?? bundles[0];
     // Points per round from the game set's scoring preset, else the Default one (Library › Gameplay › Scoring).
     const points = scoring?.data?.find((p) => p.id === set?.defaultScoringPresetId) ?? scoring?.data?.find((p) => p.isDefault) ?? scoring?.data?.[0];
-    const preset = set && points ? { ...set, roundScoring: points.roundScoring } : set;
+    const preset = set && points ? { ...set, roundScoring: points.roundScoring, hostStumperBonusXp: points.hostStumperBonusXp } : set;
     const values = streamFromPreset(base, preset, rewardsOf(set));
     // The game mode's presets, else the libraries' Default ones.
     const sharePreset = share?.data?.find((p) => p.id === preset?.defaultSharePresetId) ?? share?.data?.find((p) => p.isDefault) ?? share?.data?.[0];
