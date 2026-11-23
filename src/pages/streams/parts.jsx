@@ -123,7 +123,7 @@ export function useStreamSurface(tinted = false) {
     if (stream.status === "InProgress") return look(c.errorContainer, c.onErrorContainer, c.onErrorContainer, c.error);
     // Ended: a clear grey, a step darker than a day and than the page, so it reads as a block (and
     // its legend swatch shows on the page too).
-    if (isEnded(stream)) return look(c.surface3, c.onSurfaceVariant, c.onSurfaceVariant, c.outline);
+    if (isEnded(stream)) return look(c.surface3, c.textBody, c.textBody, c.outline);
     // Scheduled: the one accent. The game mode shows as its icon, not as a colour.
     return look(c.primaryContainer, c.onPrimaryContainer, c.onPrimaryContainer, c.primary);
   };

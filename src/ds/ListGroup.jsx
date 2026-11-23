@@ -25,6 +25,10 @@ function useSegment() {
   const { xs, md } = tokens.shape;
   return {
     bgcolor: c.surfaceContainerHigh,
+    // Straight on the page panel the group is a block (white in light): the panel and the grey row
+    // are the same tone in light, so a grey row there disappears. Inside a card it is grey again.
+    "main &": { bgcolor: c.surfaceCard },
+    "main .MuiCard-root &, main .MuiPaper-root &": { bgcolor: c.surfaceContainerHigh },
     // Layers alternate (panel → block → nested): a group inside a block (a list item, a card) is
     // the panel colour again so it still stands apart.
     "[role='listitem'] &, .MuiCard-root .MuiCard-root &, .MuiDrawer-paper .MuiCard-root &, .MuiDialog-paper .MuiCard-root &": { bgcolor: c.nested },

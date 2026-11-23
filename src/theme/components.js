@@ -204,7 +204,8 @@ export function componentOverrides(theme) {
           color: c.onSurfaceVariant,
           transition: "background-color 150ms ease-in-out, color 150ms ease-in-out",
           "&:hover": { backgroundColor: c.hover, color: c.onSurface },
-          "&.Mui-selected, &.Mui-selected:hover": { backgroundColor: c.segment, color: c.onSurface, boxShadow: elevation[1] },
+          // The chosen option is the ink pill (inverse), so the choice is clear on any surface.
+          "&.Mui-selected, &.Mui-selected:hover": { backgroundColor: c.secondary, color: c.onSecondary, boxShadow: "none" },
           // On a grey block the block is the track: the chosen item is the white pill (Savvy Admin's segmented).
           "&.Mui-focusVisible": focusRing,
           "& .material-symbols-rounded": { fontSize: 16 },
@@ -387,11 +388,12 @@ export function componentOverrides(theme) {
           borderRadius: shape.sm,
           // Savvy Admin: tone, not a line — a grey fill at rest, a shade darker on hover; the ink
           // edge only while focused (red when wrong).
-          boxShadow: "none",
+          // A visible resting edge (3:1), so an empty field reads as a field on any surface.
+          boxShadow: `inset 0 0 0 1px ${c.fieldLine}`,
           transition: "box-shadow 150ms ease-in-out, background-color 150ms ease-in-out",
-          "&:hover": { backgroundColor: c.fieldHover },
-          "&.Mui-focused": { backgroundColor: c.field, boxShadow: `inset 0 0 0 1px ${c.fieldActive}` },
-          "&.Mui-error": { boxShadow: `inset 0 0 0 1px ${c.fieldError}` },
+          "&:hover": { backgroundColor: c.fieldHover, boxShadow: `inset 0 0 0 1px ${c.fieldLineHover}` },
+          "&.Mui-focused, &.Mui-focused:hover": { backgroundColor: c.field, boxShadow: `inset 0 0 0 1.5px ${c.fieldActive}` },
+          "&.Mui-error, &.Mui-error:hover": { boxShadow: `inset 0 0 0 1.5px ${c.fieldError}` },
           "&.Mui-disabled": { color: c.onSurface, backgroundColor: c.field, opacity: 0.5 },
           "& .MuiInputAdornment-root": { color: c.onSurfaceVariant, marginTop: "0 !important" },
           "& .MuiInputAdornment-root .material-symbols-rounded": { fontSize: 16 },
@@ -450,7 +452,7 @@ export function componentOverrides(theme) {
           color: "#FFFFFF",
           transition: "transform 300ms",
           "&:hover": { backgroundColor: "transparent" },
-          "& .MuiSwitch-thumb": { border: `2px solid ${c.surface4}` },
+          "& .MuiSwitch-thumb": { border: `2px solid ${c.switchOff}` },
           "&.Mui-focusVisible + .MuiSwitch-track": focusRing,
           "&.Mui-checked": {
             transform: "translateX(16px)",
@@ -463,7 +465,7 @@ export function componentOverrides(theme) {
           "&.Mui-disabled": { color: "#FFFFFF", "& + .MuiSwitch-track": { opacity: 0.5 }, "&.Mui-checked + .MuiSwitch-track": { opacity: 0.5 } },
         },
         thumb: { width: 16, height: 16, boxShadow: "none", boxSizing: "border-box", transition: "border-color 300ms" },
-        track: { boxSizing: "border-box", borderRadius: 8, backgroundColor: c.surface4, opacity: 1, transition: "background-color 300ms" },
+        track: { boxSizing: "border-box", borderRadius: 8, backgroundColor: c.switchOff, opacity: 1, transition: "background-color 300ms" },
         input: { left: 0, width: 32 },
       },
     },
