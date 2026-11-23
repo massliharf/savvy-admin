@@ -31,6 +31,7 @@ import Card from "@mui/material/Card";
 import CardActionArea from "@mui/material/CardActionArea";
 import { CardCorner } from "../../ds/CardCorner";
 import { showTitle } from "./hosts";
+import { useCurrentMember } from "../../auth/currentMember";
 
 
 /** Every word in a set: its rounds, then its showdown word. */
@@ -42,11 +43,13 @@ export const missingRoundWords = (s) => (s.textSavvyRounds?.rounds ?? []).filter
 export const needsSet = (s) => missingRoundWords(s) > 0 || (!!s.showdownConfiguration && !s.showdownConfiguration.word);
 
 // Words stay hidden until someone enters the words password; they hide again with "Hide words"
-// or a reload. Shared by every page that shows sets.
-let wordsOpen = false;
+// or a reload. Shared by every page that shows sets. Admins never need the password: words show
+// to them straight away. The unlock belongs to the member who entered it (`wordsOpenFor`), so
+// signing in as someone else hides the words again.
+let wordsOpenFor = null;
 const lockListeners = new Set();
-const setWordsOpen = (v) => {
-  wordsOpen = v;
+const setWordsOpenFor = (memberId) => {
+  wordsOpenFor = memberId;
   lockListeners.forEach((l) => l());
 };
 const subscribeLock = (l) => {
@@ -56,14 +59,17 @@ const subscribeLock = (l) => {
 
 /**
  * `hidden` while locked; `unlock(then)` asks for the password first (then runs `then`), `lock()`
- * hides the words again. Render `dialog` once.
+ * hides the words again. Render `dialog` once. `canLock`: the signed-in role uses the password
+ * (everyone but admins), so pages show the Show / Hide words button only then.
  */
 export function useWordsLock() {
-  const open = useSyncExternalStore(subscribeLock, () => wordsOpen);
+  const openFor = useSyncExternalStore(subscribeLock, () => wordsOpenFor);
+  const { member, role, isAdmin } = useCurrentMember();
+  const open = isAdmin || (!!member && openFor === member.id);
   const [asking, setAsking] = useState(null); // null, or what to do once unlocked
   const unlock = (then) => (open ? then?.() : setAsking({ then }));
-  const dialog = <UnlockWordsDialog open={!!asking} onClose={() => setAsking(null)} onUnlocked={() => { const next = asking?.then; setAsking(null); setWordsOpen(true); next?.(); }} />;
-  return { hidden: !open, unlock, lock: () => setWordsOpen(false), dialog };
+  const dialog = <UnlockWordsDialog open={!!asking} onClose={() => setAsking(null)} onUnlocked={() => { const next = asking?.then; setAsking(null); setWordsOpenFor(member?.id ?? null); next?.(); }} />;
+  return { hidden: !open, unlock, lock: () => setWordsOpenFor(null), canLock: role !== null && !isAdmin, dialog };
 }
 
 function UnlockWordsDialog({ open, onClose, onUnlocked }) {

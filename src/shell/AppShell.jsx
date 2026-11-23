@@ -19,6 +19,9 @@ import { DESTINATIONS, findDestination, findTab, isRecordPage } from "./nav";
 import { radius } from "../theme/tokens";
 import { RailContext } from "./railContext";
 import { useGameModePresets } from "../pages/streams/gameModes";
+import { useCurrentMember } from "../auth/currentMember";
+import { teamRole } from "../pages/users/shared";
+import { SwitchMemberDialog } from "./SwitchMemberDialog";
 
 const RAIL_WIDTH = 72;
 const EXPANDED_WIDTH = 236;
@@ -88,8 +91,13 @@ function AccountMenu({ rail = false, expanded = true }) {
   const { mutate: logout } = useLogout();
   const { dark, update } = useThemeSettings();
   const [anchor, setAnchor] = useState(null);
-  const email = identity?.email ?? "";
-  const initial = (email[0] ?? "A").toUpperCase();
+  const [switching, setSwitching] = useState(false);
+  // The signed-in team member and their role (Settings › Team).
+  const { member, role } = useCurrentMember();
+  const email = member?.email ?? identity?.email ?? "";
+  const name = member?.name ?? "Admin";
+  const roleLabel = role ? teamRole(role).label : "No role";
+  const initial = (name[0] ?? email[0] ?? "A").toUpperCase();
   const { m3: c, tokens } = useTheme();
 
   return (
@@ -103,8 +111,8 @@ function AccountMenu({ rail = false, expanded = true }) {
         >
           <Avatar sx={{ width: 28, height: 28, fontSize: 12, flexShrink: 0 }}>{initial}</Avatar>
           <Box sx={{ flex: 1, minWidth: 0, ...fade(expanded) }}>
-            <Typography variant="labelLarge" component="div">
-              Admin
+            <Typography variant="labelLarge" component="div" noWrap>
+              {name}
             </Typography>
             <Typography variant="bodySmall" color="text.secondary" component="div" noWrap>
               {email}
@@ -130,11 +138,11 @@ function AccountMenu({ rail = false, expanded = true }) {
         slotProps={{ paper: { sx: rail && expanded ? { mt: -1, width: 220 } : rail ? { ml: 1, minWidth: 240 } : { mt: 1, minWidth: 240 } } }}
       >
         <Box sx={{ px: 1, py: 1 }}>
-          <Typography variant="titleSmall" component="div">
-            Signed in as admin
+          <Typography variant="titleSmall" component="div" noWrap>
+            {name}
           </Typography>
           <Typography variant="bodySmall" color="text.secondary" component="div" noWrap>
-            {email}
+            {`${roleLabel} · ${email}`}
           </Typography>
         </Box>
         <Divider />
@@ -147,15 +155,30 @@ function AccountMenu({ rail = false, expanded = true }) {
           <Icon name={dark ? "light_mode" : "dark_mode"} size={16} />
           {dark ? "Light theme" : "Dark theme"}
         </MenuItem>
+        <MenuItem component={Link} to="/team" onClick={() => setAnchor(null)}>
+          <Icon name="manage_accounts" size={16} />
+          Team
+        </MenuItem>
         <MenuItem component={Link} to="/settings" onClick={() => setAnchor(null)}>
           <Icon name="settings" size={16} />
           Settings
+        </MenuItem>
+        {/* Prototype only: see the dashboard with another member's role. */}
+        <MenuItem
+          onClick={() => {
+            setSwitching(true);
+            setAnchor(null);
+          }}
+        >
+          <Icon name="switch_account" size={16} />
+          Switch member
         </MenuItem>
         <MenuItem onClick={() => logout()}>
           <Icon name="logout" size={16} />
           Sign out
         </MenuItem>
       </Menu>
+      <SwitchMemberDialog open={switching} onClose={() => setSwitching(false)} />
     </>
   );
 }

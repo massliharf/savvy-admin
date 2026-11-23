@@ -37,6 +37,7 @@ import LoginPage from "./pages/login";
 import UsersPage from "./pages/users/users";
 import CashoutsPage from "./pages/users/cashouts";
 import DeveloperPage from "./pages/settings/developer";
+import TeamPage from "./pages/settings/team";
 import SparkPacksPage from "./pages/shop/sparkPacks";
 import PowerupPacksPage from "./pages/shop/powerupPacks";
 import SwagPage from "./pages/shop/swag";
@@ -96,6 +97,7 @@ const resources = [
   { name: "SwagItem", list: "/savvy-swag", meta: { dataProviderName: DP.savvySwag } },
   { name: "SwagOrder", list: "/swag-orders", meta: { dataProviderName: DP.swagOrders } },
   { name: "Events", list: "/developer", meta: { dataProviderName: DP.amplitudeEvent } },
+  { name: "TeamMember", list: "/team", meta: { label: "Team", dataProviderName: DP.team } },
 ];
 
 export default function App() {
@@ -152,6 +154,7 @@ export default function App() {
                       <Route path="/events/create" element={<Navigate to="/developer" replace />} />
                       <Route path="/developer" element={<DeveloperPage />} />
                       <Route path="/settings" element={<AppearancePage />} />
+                      <Route path="/team" element={<TeamPage />} />
                       <Route path="/design-system" element={<DesignSystemPage />} />
                       <Route path="/game-sets" element={<GameSetsPage />} />
                       <Route path="/word-sets" element={<WordSetsPage />} />

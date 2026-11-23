@@ -277,6 +277,18 @@ export const seedHowToPlay = () => ({
 // checks its own; this one only exists in the mock.
 export const WORDS_PASSWORD = "savvywords";
 
+// The dashboard team: who can sign in, and with which role (the same names as a Savvy account's
+// role: Admin, Internal, Host). The first admin is the default signed-in account; anyone who signs
+// in to the mock with an email that isn't on the team joins as an admin, so it never locks you out.
+export const DEFAULT_ADMIN = { id: "team-admin", name: "Savvy admin", email: "admin@example.com", role: "Admin" };
+const teamMember = (m, status, daysAgo) => ({ ...m, status, addedAt: new Date(Date.now() - daysAgo * 864e5).toISOString() });
+export const seedTeam = () => [
+  teamMember(DEFAULT_ADMIN, "Active", 120),
+  teamMember({ id: "team-riley", name: "Riley Chen", email: "riley@example.com", role: "Internal" }, "Active", 60),
+  teamMember({ id: "team-scott", name: "Scott Rogowsky", email: "scott@example.com", role: "Host" }, "Active", 45),
+  teamMember({ id: "team-maya", name: "Maya Chen", email: "maya@example.com", role: "Host" }, "Invited", 2),
+];
+
 export const STREAM_CARD_DEFAULTS = {
   liveHome: { title: "You vs {host}", subtitle: "Jump in and play along" },
   upcomingHome: { title: "You vs {host}", subtitle: "Set a reminder so you don't miss it" },

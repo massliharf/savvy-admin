@@ -34,6 +34,7 @@ export const DP = {
   notificationPresets: "notificationPresets",
   appCardPresets: "appCardPresets",
   puzzleCardPresets: "puzzleCardPresets",
+  team: "team",
 };
 
 const ok = (res) => {
@@ -637,4 +638,6 @@ export const buildDataProviders = (http) => ({
   [DP.notificationPresets]: jsonCollectionProvider(http, "notification-presets"),
   [DP.appCardPresets]: jsonCollectionProvider(http, "app-card-presets"),
   [DP.puzzleCardPresets]: jsonCollectionProvider(http, "puzzle-card-presets"),
+  // The dashboard team (Settings › Team): who can sign in and their role.
+  [DP.team]: jsonCollectionProvider(http, "team"),
 });

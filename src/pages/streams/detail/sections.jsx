@@ -474,8 +474,9 @@ export function WordsSection({ form, validateWord, onPickWords, frame }) {
   // A round added here gets its Round Pounder from the game set's reward set (set under Rewards).
   const { byId, rewardsOf } = useBundles();
   const rewards = rewardsOf(byId[bundleId]);
-  // Words stay hidden behind the words password (as in Game modes) once there are any to hide.
-  const { hidden, unlock, lock, dialog } = useWordsLock();
+  // Words stay hidden behind the words password (as in Game modes) once there are any to hide;
+  // admins see them straight away.
+  const { hidden, unlock, lock, canLock, dialog } = useWordsLock();
   const hasWords = (rounds ?? []).some((r) => r?.word) || !!showdown?.word;
   const masked = hidden && hasWords;
   return (
@@ -484,7 +485,7 @@ export function WordsSection({ form, validateWord, onPickWords, frame }) {
       title="Words"
       action={
         <Box sx={{ display: "flex", gap: 1 }}>
-          {hasWords && (
+          {hasWords && canLock && (
             <Button variant="tonal" size="small" startIcon={<Icon name={hidden ? "lock_open" : "visibility_off"} />} onClick={() => (hidden ? unlock() : lock())}>
               {hidden ? "Show words" : "Hide words"}
             </Button>

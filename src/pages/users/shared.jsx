@@ -37,6 +37,16 @@ export const ROLES = [
   { value: "Admin", label: "Admin", icon: "shield_person", hint: "Full access to this dashboard." },
 ];
 
+// The roles of the dashboard team (Settings › Team): the account roles above, minus Player, with
+// what each may do here. Only admins manage the team and see words without the words password.
+const TEAM_HINTS = {
+  Admin: "Manages the team. Sees words without the password.",
+  Internal: "Uses the dashboard. Enters the words password to see words.",
+  Host: "Uses the dashboard. Enters the words password to see words.",
+};
+export const TEAM_ROLES = ["Admin", "Internal", "Host"].map((v) => ({ ...ROLES.find((r) => r.value === v), hint: TEAM_HINTS[v] }));
+export const teamRole = (v) => TEAM_ROLES.find((r) => r.value === v) ?? { value: v, label: v ?? "No role", icon: "person", hint: "" };
+
 export const REGIONS = Object.entries(countries.getNames("en", { select: "official" }))
   .map(([code, name]) => ({ code, name }))
   .sort((a, b) => a.name.localeCompare(b.name));

@@ -41,8 +41,8 @@ export default function WordSetsPage() {
   const streamsById = useMemo(() => Object.fromEntries(streams.map((s) => [s.id, s])), [streams]);
   const { assign, release, busy } = useWordSetActions();
   const { validateWord } = useWordValidator();
-  // Words show only after the words password; opening a set (its words) asks for it too.
-  const { hidden, unlock, lock, dialog: unlockDialog } = useWordsLock();
+  // Words show only after the words password (admins see them straight away); opening a set (its words) asks for it too.
+  const { hidden, unlock, lock, canLock, dialog: unlockDialog } = useWordsLock();
   const { mutateAsync: request, isPending: requesting } = useCustomMutation();
 
   const [query, setQuery] = useState("");
@@ -108,7 +108,8 @@ export default function WordSetsPage() {
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
       <PageToolbar
         search={<SearchField value={query} onChange={setQuery} placeholder={hidden ? "Search names" : "Search words or names"} />}
-        secondary={[{ label: hidden ? "Show words" : "Hide words", icon: hidden ? "lock_open" : "visibility_off", onClick: () => (hidden ? unlock() : lock()) }]}
+        // Admins see words without the password, so they get no Show / Hide words button.
+        secondary={canLock ? [{ label: hidden ? "Show words" : "Hide words", icon: hidden ? "lock_open" : "visibility_off", onClick: () => (hidden ? unlock() : lock()) }] : []}
         actionLabel="New word set"
         onAction={() => setSheet({})}
       />
