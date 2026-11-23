@@ -19,7 +19,7 @@ export function Pill({ tone = "neutral", on, leading, icon, children }) {
   const { m3: c, palette } = useTheme();
   const [bg, fg] = on ? [alpha(on, 0.12), on] : {
     // Savvy Admin badges: soft fills, no line. Neutral is the meta-chip grey (surface-2).
-    neutral: [c.surface3, c.onSurface],
+    neutral: [c.surface2, c.onSurface],
     // Informational blue ("Default", "Upcoming"): the info tint, never the solid "chosen" blue.
     primary: [c.primaryContainer, c.onPrimaryContainer],
     success: [palette.success.container, palette.success.onContainer],

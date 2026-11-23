@@ -32,16 +32,16 @@ const NEUTRAL = {
     secondaryContainer: "rgba(115,115,115,.22)", onSecondaryContainer: "#141414",
     tertiary: "#8566DC", onTertiary: "#FFFFFF", tertiaryContainer: "rgba(133,102,220,.1)", onTertiaryContainer: "#5A3DB0",
     error: "#BF371F", onError: "#FFFFFF", errorContainer: "#F9C7BE", onErrorContainer: "#8D1B07",
-    // Light layers, each a clear step: page #DEDEDE, panels #EBEBEB (sidebar white), cards white.
-    background: "#DEDEDE", onBackground: "#141414",
-    surface: "#EBEBEB", onSurface: "#141414", surfaceVariant: "#E6E6E6", onSurfaceVariant: "#4D4D4D",
+    // Light layers, kept light: page #EDEDED, panels #F5F5F5 (sidebar white), cards white.
+    background: "#EDEDED", onBackground: "#141414",
+    surface: "#F5F5F5", onSurface: "#141414", surfaceVariant: "#E6E6E6", onSurfaceVariant: "#4D4D4D",
     surfaceDim: "#E3E3E3", surfaceBright: "#FFFFFF",
     surfaceContainerLowest: "#FFFFFF", surfaceContainerLow: "#FCFCFC", surfaceContainer: "#F5F5F5",
     // Rows inside a white card (list groups, tables, pick cards): a clear step down from white.
-    surfaceContainerHigh: "#EBEBEB", surfaceContainerHighest: "#E3E3E3", nested: "#FFFFFF",
+    surfaceContainerHigh: "#F0F0F0", surfaceContainerHighest: "#E8E8E8", nested: "#FFFFFF",
     inverseSurface: "#1A1A1A", inverseOnSurface: "#F5F5F5",
     outline: "#5E5E5E", outlineVariant: "rgba(16,16,16,.14)", shadow: "#121212", scrim: "#1A1A1A", surfaceTint: "#506BF2",
-    surfaceCard: "#FFFFFF", surfaceCardInset: "#EBEBEB",
+    surfaceCard: "#FFFFFF", surfaceCardInset: "#F0F0F0",
     dialog: "#FFFFFF", overlay: "#FFFFFF", modal: "#FFFFFF",
     textStrong: "#262626", textBody: "#333333", textMuted: "#5E5E5E",
     surface2: "#E6E6E6", surface3: "#D9D9D9", surface4: "#C7C7C7",
@@ -53,11 +53,7 @@ const NEUTRAL = {
     border: "rgba(16,16,16,.14)", borderSubtle: "rgba(16,16,16,.08)", borderStrong: "rgba(16,16,16,.3)",
     outlineBorder: "rgba(16,16,16,.2)", outlineBorderHover: "rgba(16,16,16,.3)", outlineHover: "rgba(16,16,16,.1)",
     // focus outline alpha-2; form-0 / form-border-0 / -active / -error
-    focus: "rgba(16,16,16,.3)", field: "rgba(115,115,115,.16)", fieldHover: "rgba(115,115,115,.22)", fieldBorder: "transparent",
-    // A field's resting edge: 3:1 against white and the grey rows, so an empty field can be seen.
-    fieldLine: "rgba(0,0,0,.5)", fieldLineHover: "rgba(0,0,0,.7)",
-    // Switch off track / knob ring: 3:1 against white.
-    switchOff: "#8F8F8F", fieldActive: "#0F0F0F", fieldError: "#F66951",
+    focus: "rgba(16,16,16,.3)", field: "rgba(115,115,115,.16)", fieldHover: "rgba(115,115,115,.22)", fieldBorder: "transparent", fieldActive: "#0F0F0F", fieldError: "#F66951",
     disabledFill: "#E3E3E3",
     track: "rgba(115,115,115,.2)", trackSelected: "#D9D9D9",
     backdrop: "rgba(26,26,26,.8)",
@@ -92,9 +88,7 @@ const NEUTRAL = {
     control: "rgba(255,255,255,.09)", hover: "rgba(255,255,255,.14)", pressed: "rgba(255,255,255,.2)",
     border: "rgba(255,255,255,.14)", borderSubtle: "rgba(255,255,255,.08)", borderStrong: "rgba(255,255,255,.3)",
     outlineBorder: "rgba(255,255,255,.2)", outlineBorderHover: "rgba(255,255,255,.3)", outlineHover: "rgba(255,255,255,.1)",
-    focus: "rgba(255,255,255,.3)", field: "rgba(255,255,255,.07)", fieldHover: "rgba(255,255,255,.11)", fieldBorder: "transparent",
-    fieldLine: "rgba(255,255,255,.4)", fieldLineHover: "rgba(255,255,255,.6)",
-    switchOff: "#6E6E6E", fieldActive: "#FFFFFF", fieldError: "#F66951",
+    focus: "rgba(255,255,255,.3)", field: "rgba(255,255,255,.07)", fieldHover: "rgba(255,255,255,.11)", fieldBorder: "transparent", fieldActive: "#FFFFFF", fieldError: "#F66951",
     disabledFill: "#363636",
     track: "rgba(255,255,255,.09)", trackSelected: "#454545",
     backdrop: "rgba(26,26,26,.8)",

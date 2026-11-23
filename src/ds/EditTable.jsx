@@ -26,10 +26,10 @@ export function cellSx(c, tokens, error) {
     typography: "bodyMedium",
     px: 1,
     borderRadius: `${tokens.shape.sm}px`,
-    // Cells sit in grey rows: the card surface plus the field edge (3:1) so each cell reads as a
-    // field; the ink edge while focused, red when wrong.
+    // Cells sit in grey rows, so they take the card surface (white in light, dark in dark) to stand
+    // out by tone; the ink edge only while focused, red when wrong.
     bgcolor: c.surfaceCard,
-    boxShadow: `inset 0 0 0 1px ${error ? c.fieldError : c.fieldLine}`,
+    boxShadow: error ? `inset 0 0 0 1px ${c.fieldError}` : "none",
     transition: `background-color ${tokens.motion.effects}, box-shadow ${tokens.motion.effects}`,
     "&.Mui-focused, &[aria-expanded='true']": { bgcolor: c.surfaceCard, boxShadow: `inset 0 0 0 1px ${error ? c.fieldError : c.fieldActive}` },
     // A value that doesn't apply (e.g. no green letters in SubText round 5+) is plain text, not a field.

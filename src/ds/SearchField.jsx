@@ -19,15 +19,14 @@ export function SearchField({ value, onChange, placeholder, dense = false, autoF
         pl: 1.25,
         pr: 0.5,
         borderRadius: radius("sm"),
-        // The search box is a field: form fill with a visible edge (3:1); ink edge on focus.
+        // Savvy Admin's search box: the form fill, no line; a shade darker on hover, ink edge on focus.
         bgcolor: c.field,
-        boxShadow: `inset 0 0 0 1px ${c.fieldLine}`,
         flex: dense ? "1 1 auto" : "1 1 200px",
         minWidth: dense ? 0 : 160,
         maxWidth: dense ? "none" : 320,
         transition: "background-color 150ms, box-shadow 150ms",
-        "&:hover": { bgcolor: c.fieldHover, boxShadow: `inset 0 0 0 1px ${c.fieldLineHover}` },
-        "&:focus-within": { bgcolor: c.field, boxShadow: `inset 0 0 0 1.5px ${c.fieldActive}` },
+        "&:hover": { bgcolor: c.fieldHover },
+        "&:focus-within": { bgcolor: c.field, boxShadow: `inset 0 0 0 1px ${c.fieldActive}` },
         ...sx,
       }}
     >
