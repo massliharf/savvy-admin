@@ -122,7 +122,7 @@ export default function DeveloperPage() {
               Design system
             </Typography>
           </Box>
-          <Icon name="chevron_right" style={{ color: c.onSurfaceVariant }} />
+          <Icon name="chevron_right" style={{ color: c.chevron }} />
         </CardActionArea>
       </Card>
     </Box>

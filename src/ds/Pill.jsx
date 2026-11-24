@@ -9,7 +9,7 @@ const pulse = keyframes`
 `;
 
 /**
- * Small pill. `tone`: neutral (outlined, so it reads on any surface) | primary | success | warning |
+ * Small pill. `tone`: neutral (the Framer pill: 5% fill, #777 text) | primary | success | warning |
  * error | live; `live` is the strong red
  * "on air" look with a pulsing dot. `on` tints it from a surface's content colour instead (for
  * pills on coloured cards). `leading` (e.g. an 18px avatar) sits flush at the start; `icon` (a
@@ -18,8 +18,8 @@ const pulse = keyframes`
 export function Pill({ tone = "neutral", on, leading, icon, children }) {
   const { m3: c, palette } = useTheme();
   const [bg, fg] = on ? [alpha(on, 0.12), on] : {
-    // Savvy Admin badges: soft fills, no line. Neutral is the meta-chip grey (surface-2).
-    neutral: [c.surface2, c.onSurface],
+    // Framer pills: soft fills, no line. Neutral is the 5% fill with pillText (#777, #999 in dark).
+    neutral: [c.ctrl, c.pillText],
     // Informational blue ("Default", "Upcoming"): the info tint, never the solid "chosen" blue.
     primary: [c.primaryContainer, c.onPrimaryContainer],
     success: [palette.success.container, palette.success.onContainer],

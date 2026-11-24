@@ -73,7 +73,7 @@ function Fact({ label, children }) {
       <Typography variant="labelLarge" color="text.secondary" component="div">
         {label}
       </Typography>
-      <Typography variant="bodyLarge" component="div">
+      <Typography variant="bodyMedium" component="div">
         {children}
       </Typography>
     </Box>
@@ -328,7 +328,7 @@ function UserSheetBody({ id, open, onClose }) {
             rows={[{ key: "sparks", label: "Sparks", name: "sparks" }, ...POWERUPS.map((p, i) => ({ key: p.id, label: p.label, name: `powerups.${i}.count` }))].map((r) => ({
               key: r.key,
               cells: [
-                <Typography key="l" variant="bodyMedium" sx={{ fontWeight: 500 }}>
+                <Typography key="l" variant="bodyMedium">
                   {r.label}
                 </Typography>,
                 <NumberCell key="v" control={control} name={r.name} label={`${r.label} amount`} sx={{ width: 140 }} rules={{ validate: (v) => (v == null || v < 0 || !Number.isInteger(v) ? "Use a whole number, 0 or more" : true) }} />,

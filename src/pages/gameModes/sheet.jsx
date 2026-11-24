@@ -51,7 +51,7 @@ export function GameSetSheet({ sheet, onSaved }) {
         set?.id && (
           <Tooltip title="Open game set">
             <IconButton aria-label="Open game set" component={Link} to={`/game-sets/${set.id}`}>
-              <Icon name="inventory_2" />
+              <Icon name="inventory_2" size={20} />
             </IconButton>
           </Tooltip>
         )

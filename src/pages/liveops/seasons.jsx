@@ -49,11 +49,11 @@ function SeasonIcon({ season, size = 48 }) {
   const { m3: c } = useTheme();
   const [broken, setBroken] = useState(false);
   return (
-    <Box sx={{ width: size, height: size, borderRadius: `${cornerFor(size)}px`, overflow: "hidden", flexShrink: 0, bgcolor: c.surfaceContainerHighest, display: "grid", placeItems: "center", color: c.onSurfaceVariant }}>
+    <Box sx={{ width: size, height: size, borderRadius: `${cornerFor(size)}px`, overflow: "hidden", flexShrink: 0, bgcolor: c.surfaceCardInset, display: "grid", placeItems: "center", color: c.onSurfaceVariant }}>
       {season.iconUrl && !broken ? (
         <Box component="img" src={season.iconUrl} alt="" onError={() => setBroken(true)} sx={{ width: "100%", height: "100%", objectFit: "cover" }} />
       ) : (
-        <Icon name="trophy" />
+        <Icon name="trophy" size={20} />
       )}
     </Box>
   );

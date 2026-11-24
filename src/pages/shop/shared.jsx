@@ -98,7 +98,7 @@ export function ListRow({ onClick, children, columns, sortable }) {
         py: 1.5,
         textAlign: "left",
         "&:hover": { bgcolor: "action.hover" },
-        "&.Mui-focusVisible": { outline: `2px solid ${c.focus}`, outlineOffset: -2 },
+        "&.Mui-focusVisible": { outline: `1.5px solid ${c.focus}`, outlineOffset: -2 },
         "&:not(:last-of-type)": { borderBottom: `1px solid ${c.outlineVariant}` },
       }}
     >
@@ -172,12 +172,12 @@ export function Thumb({ src, size = 48, icon = "image", radius, position = "cent
 
 /** Titled group in a read-only detail sheet; `action` sits at the right of the title. */
 export function SheetSection({ title, action, children }) {
-  // Savvy Admin panel section: an upper-case label over its controls; sections after the first are
-  // set off by a hairline.
+  // Panel section: a heading (13/550, the strongest text in the section) over its controls, whose
+  // labels stay 12/450 grey; sections after the first are set off by a hairline.
   return (
     <Box component="section" sx={{ display: "flex", flexDirection: "column", gap: 1.5, "section + &": { borderTop: 1, borderColor: "divider", pt: 2.5 } }}>
       <Box sx={{ display: "flex", alignItems: "center", gap: 1, minHeight: 20 }}>
-        <Typography variant="overline" component="h3" color="text.secondary" sx={{ flex: 1 }}>
+        <Typography variant="titleMedium" component="h3" color="text.primary" sx={{ flex: 1 }}>
           {title}
         </Typography>
         {action}
@@ -213,9 +213,8 @@ export function SheetTabs({ value, onChange }) {
 
 /** Two or three numbers side by side at the top of an overview. */
 export function StatRow({ children }) {
-  const { m3: c } = useTheme();
-  // Outlined, since the cards sit on the sheet's own surface colour.
-  return <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 1.5, "& > .MuiCard-root": { border: `1px solid ${c.outlineVariant}` } }}>{children}</Box>;
+  // Cards already carry the Framer hairline; no extra border.
+  return <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 1.5 }}>{children}</Box>;
 }
 
 /** One line of a "recent" list: who, when, and a value or status at the end. */

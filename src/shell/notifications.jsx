@@ -30,10 +30,10 @@ const Snackbar = forwardRef(function Snackbar({ id, message, variant, descriptio
           borderRadius: radius("xs"),
           bgcolor: c.inverseSurface,
           color: c.inverseOnSurface,
-          boxShadow: (t) => t.tokens.elevation[3],
+          boxShadow: (t) => t.tokens.fx.toast,
         }}
       >
-        {variant === "error" && <Icon name="error" size={20} style={{ color: c.inverseError }} />}
+        {variant === "error" && <Icon name="error" style={{ color: c.inverseError }} />}
         <Box sx={{ flex: 1, py: 0.5 }}>
           <Typography variant="bodyMedium" component="div">
             {message}
@@ -57,7 +57,7 @@ const Snackbar = forwardRef(function Snackbar({ id, message, variant, descriptio
           </Button>
         )}
         <IconButton size="small" aria-label="Dismiss" onClick={() => closeSnackbar(id)} sx={{ color: c.inverseOnSurface }}>
-          <Icon name="close" size={20} />
+          <Icon name="close" />
         </IconButton>
       </Box>
     </SnackbarContent>

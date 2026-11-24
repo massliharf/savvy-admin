@@ -6,7 +6,7 @@ import { useTheme } from "@mui/material/styles";
 import { Icon } from "./Icon";
 import { radius } from "../theme/tokens";
 
-/** Search control: 32 tall, 8px corners, the grey control fill; white with a blue edge when focused. `dense` is the full-width version inside menus. */
+/** Search control (Framer style): 30 tall, 8px corners, the 5% input fill, a grey leading icon 8px in and 6px from the text; a tint edge when focused. `dense` is the full-width version inside menus. */
 export function SearchField({ value, onChange, placeholder, dense = false, autoFocus, label, sx }) {
   const { m3: c } = useTheme();
   return (
@@ -14,27 +14,27 @@ export function SearchField({ value, onChange, placeholder, dense = false, autoF
       sx={{
         display: "flex",
         alignItems: "center",
-        gap: 1,
-        height: 32,
-        pl: 1.25,
+        gap: 0.75,
+        height: 30,
+        pl: 1,
         pr: 0.5,
         borderRadius: radius("sm"),
-        // Savvy Admin's search box: the form fill, no line; a shade darker on hover, ink edge on focus.
+        // Framer input: the 5% fill, no line; 7% on hover, a tint edge on focus.
         bgcolor: c.field,
         flex: dense ? "1 1 auto" : "1 1 200px",
         minWidth: dense ? 0 : 160,
         maxWidth: dense ? "none" : 320,
-        transition: "background-color 150ms, box-shadow 150ms",
+        transition: "background-color 120ms, box-shadow 120ms",
         "&:hover": { bgcolor: c.fieldHover },
         "&:focus-within": { bgcolor: c.field, boxShadow: `inset 0 0 0 1px ${c.fieldActive}` },
         ...sx,
       }}
     >
-      <Icon name="search" size={16} style={{ color: c.onSurfaceVariant }} />
+      <Icon name="search" size={16} style={{ color: c.outline }} />
       <InputBase autoFocus={autoFocus} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} inputProps={{ "aria-label": label ?? placeholder }} sx={{ flex: 1, typography: "bodyMedium", "& input": { p: 0 } }} />
       {value && (
-        <IconButton size="small" aria-label="Clear search" onClick={() => onChange("")} sx={{ width: 24, height: 24, p: 0.5 }}>
-          <Icon name="close" size={16} />
+        <IconButton size="small" aria-label="Clear search" onClick={() => onChange("")} sx={{ width: 20, height: 20, p: 0.25, borderRadius: "5px" }}>
+          <Icon name="close" size={14} />
         </IconButton>
       )}
     </Box>

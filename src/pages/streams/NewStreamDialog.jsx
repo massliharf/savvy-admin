@@ -144,7 +144,7 @@ export function NewStreamDialog({ open, source, date, hosts, onClose, onCreated 
             Stream
           </Typography>
           <ListGroup label="Stream">
-            <ListItem leading={<Icon name="title" size={20} />} title="Title">
+            <ListItem leading={<Icon name="title" />} title="Title">
               <TextField
                 value={form.title}
                 onChange={(e) => set({ title: e.target.value })}
@@ -155,7 +155,7 @@ export function NewStreamDialog({ open, source, date, hosts, onClose, onCreated 
                 sx={{ mt: 1 }}
               />
             </ListItem>
-            <ListItem leading={<Icon name="event" size={20} />} title="When" supporting={show("start") ? undefined : `Time zone: ${timezone.replace(/_/g, " ")}`} error={show("start")}>
+            <ListItem leading={<Icon name="event" />} title="When" supporting={show("start") ? undefined : `Time zone: ${timezone.replace(/_/g, " ")}`} error={show("start")}>
               <Box sx={{ display: "flex", gap: 1.5, mt: 1 }}>
                 <DatePicker
                   label="Date"

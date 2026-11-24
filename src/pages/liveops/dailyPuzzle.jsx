@@ -86,14 +86,14 @@ export function DailyPuzzleReward() {
         {
           key: "reward",
           cells: [
-            <Icon key="i" name="extension" size={20} style={{ color: c.onSurfaceVariant }} />,
-            <Typography key="t" variant="bodyLarge" sx={{ px: 1 }}>
+            <Icon key="i" name="extension" style={{ color: c.outline }} />,
+            <Typography key="t" variant="bodyMedium" sx={{ px: 1 }}>
               Daily puzzle reward
             </Typography>,
             enabled ? (
               <RewardCell key="v" control={reward.control} name="reward" allowed={NON_CASH_REWARDS} label="Daily puzzle reward" />
             ) : (
-              <Typography key="v" variant="bodyLarge" color="text.secondary" sx={{ px: 1 }}>
+              <Typography key="v" variant="bodyMedium" color="text.secondary" sx={{ px: 1 }}>
                 Off
               </Typography>
             ),

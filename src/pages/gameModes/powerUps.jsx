@@ -145,7 +145,7 @@ export default function PowerUpsPage() {
       ) : rows.length === 0 ? (
         <EmptyState icon={q ? "search_off" : "auto_fix_high"} title={q ? "No power-ups match" : "No power-ups yet"}>
           {!q && (
-            <Button color="secondary" startIcon={<Icon name="add" />} onClick={sheet.openNew}>
+            <Button startIcon={<Icon name="add" />} onClick={sheet.openNew}>
               New power-up
             </Button>
           )}

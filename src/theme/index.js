@@ -1,6 +1,6 @@
 import { alpha, createTheme } from "@mui/material/styles";
 import { buildScheme } from "./scheme";
-import { elevation, FONT, motion, shape, state, typeScale } from "./tokens";
+import { effectsFor, elevationFor, FONT, motion, shape, state, typeScale } from "./tokens";
 import { componentOverrides } from "./components";
 
 export { ACCENT, BRAND, CATEGORY } from "./scheme";
@@ -8,6 +8,7 @@ export { shape, motion, elevation, state, typeScale, layer } from "./tokens";
 
 export function createAppTheme({ dark }) {
   const c = buildScheme(dark);
+  const elevation = elevationFor(dark);
 
   const theme = createTheme({
     palette: {
@@ -37,7 +38,7 @@ export function createAppTheme({ dark }) {
         activatedOpacity: state.pressed,
       },
     },
-    shape: { borderRadius: 4 },
+    shape: { borderRadius: 8 },
     shadows: [elevation[0], elevation[1], elevation[2], elevation[3], ...Array(21).fill(elevation[4])],
     typography: {
       fontFamily: FONT,
@@ -60,7 +61,7 @@ export function createAppTheme({ dark }) {
   });
 
   theme.m3 = c;
-  theme.tokens = { shape, motion, elevation, state };
+  theme.tokens = { shape, motion, elevation, state, fx: effectsFor(dark) };
   theme.components = componentOverrides(theme);
   return theme;
 }

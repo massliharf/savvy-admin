@@ -13,7 +13,6 @@ import { useTheme } from "@mui/material/styles";
 import { Icon } from "../ds/Icon";
 import { LOGO_URL } from "../assets";
 import { TextInput } from "./streams/detail/fields";
-import { radius } from "../theme/tokens";
 
 export default function LoginPage() {
   const { m3: c } = useTheme();
@@ -32,9 +31,9 @@ export default function LoginPage() {
   });
 
   return (
-    // Same layers as the app: its outer background, the card a panel on it.
+    // Same layers as the app: the white page, the card a Framer card on it (1px hairline, no shadow).
     <Box sx={{ minHeight: "100dvh", display: "grid", placeItems: "center", bgcolor: c.background, px: 2, py: 4 }}>
-      <Card component="main" sx={{ width: "100%", maxWidth: 420, p: { xs: 3, sm: 5 }, bgcolor: c.surfaceContainerLowest, borderRadius: radius("lg"), border: "none", boxShadow: "none" }}>
+      <Card component="main" sx={{ width: "100%", maxWidth: 420, p: { xs: 3, sm: 5 } }}>
         <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 1, mb: 4 }}>
           <Box component="img" src={LOGO_URL} alt="" sx={{ width: 64, height: 64, mb: 1 }} />
           <Typography variant="headlineMedium" component="h1">

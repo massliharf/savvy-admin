@@ -216,7 +216,7 @@ export function PresetList({ kind, share, bare = false, page = false }) {
   };
   const empty = (
     <EmptyState compact icon={k.icon} title={k.emptyTitle ?? "No presets yet"}>
-      <Button color="secondary" startIcon={<Icon name="add" />} onClick={sheet.openNew}>
+      <Button startIcon={<Icon name="add" />} onClick={sheet.openNew}>
         {k.newLabel ?? "New preset"}
       </Button>
     </EmptyState>
@@ -235,14 +235,14 @@ export function PresetList({ kind, share, bare = false, page = false }) {
           <ListItem
             key={p.id}
             onClick={() => sheet.openEdit(p)}
-            leading={<Icon name={k.icon} style={{ color: c.onSurfaceVariant }} />}
+            leading={<Icon name={k.icon} style={{ color: c.outline }} />}
             title={p.name}
             supporting={supporting(p)}
             trailing={
               <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                 {share && (app.inUse(p) ? <Pill tone="primary">In use</Pill> : <Button variant="tonal" size="small" onClick={() => app.use(p)}>Use</Button>)}
                 {forStreams && (isDefault(p) ? <Pill>Default</Pill> : <Button variant="tonal" size="small" onClick={() => usage.makeDefault(p)}>Make default</Button>)}
-                <Icon name="chevron_right" style={{ color: c.onSurfaceVariant }} />
+                <Icon name="chevron_right" style={{ color: c.chevron }} />
               </Box>
             }
           />
@@ -306,9 +306,11 @@ export function PresetList({ kind, share, bare = false, page = false }) {
   // A titled group of cards, like Polls & trivia's.
   return (
     <Box component="section" id={kind} sx={{ display: "flex", flexDirection: "column", gap: 2, scrollMarginTop: 96 }}>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-        <Icon name={k.icon} />
-        <Box sx={{ flex: 1, minWidth: 0 }}>
+      {/* Section header (as Polls & trivia's): 16px #888 icon, the title over its line, and the
+          section's own "+ New" right beside it, not across the page from its cards. */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+        <Icon name={k.icon} style={{ color: c.outline }} />
+        <Box sx={{ minWidth: 0, mr: 1 }}>
           <Typography variant="titleMedium" component="h2">
             {k.title}
           </Typography>

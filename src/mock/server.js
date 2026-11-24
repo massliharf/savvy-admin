@@ -9,7 +9,7 @@ import { HOST_PICTURE_URL, MODE_LOGOS, SCOTT_PHOTOS, STREAM_HERO_URL } from "../
 // Version 2 keeps its own saved data: version 1 is published on the same site (same browser
 // storage) and must not be touched by it.
 const DB_KEY = "savvy-mock-db-2";
-const DB_VERSION = 63;
+const DB_VERSION = 64;
 
 // The demo data: one host (Scott), one sponsor (Wendy's) and one stream per state and edge case,
 // spread over the month around today (see DEMO_STREAMS). Streams are built like new ones: from a
@@ -235,6 +235,7 @@ function freshDb() {
     streamKeys: Object.fromEntries(streams.map((s) => [s.id, randomKey()])),
     users,
     claims: Object.fromEntries(libraries.hosts.map((h) => [h.id, { role: "Host" }])),
+    team: seed.seedTeam(),
     cashWins: seed.seedCashWins(users),
     howToPlay: seed.seedHowToPlay(),
     ...libraries,
@@ -741,6 +742,11 @@ function load() {
         });
         parsed.version = 63;
       }
+      if (parsed.version === 63) {
+        // v64: the dashboard team (who can sign in, with which role); everything else stays.
+        parsed.team ??= seed.seedTeam();
+        parsed.version = 64;
+      }
       if (parsed.version === DB_VERSION) return parsed;
       // Older versions: add what's new and keep everything else.
       if (parsed.version === 4) {
@@ -1092,7 +1098,23 @@ const on = (method, pattern, handler) => {
   routes.push({ method, re, keys, handler });
 };
 
-export async function handleMockRequest({ method, path, query, body }) {
+// Who is calling: the signed-in team member from the request's Bearer token (the mock token's
+// claims are readable JSON), else null.
+function callerOf(headers) {
+  const token = String(headers?.Authorization ?? headers?.authorization ?? "").replace(/^Bearer\s+/i, "");
+  let claims = null;
+  try {
+    const part = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    claims = JSON.parse(decodeURIComponent(escape(atob(part))));
+  } catch {
+    return null;
+  }
+  const email = String(claims?.email ?? "").toLowerCase();
+  const member = (db.team ?? []).find((m) => m.id === claims.member_id) ?? (db.team ?? []).find((m) => m.email.toLowerCase() === email) ?? null;
+  return { claims, member };
+}
+
+export async function handleMockRequest({ method, path, query, body, headers }) {
   // A real API's latency on reads, so loaders and skeletons show as they will in production.
   // Override with localStorage["savvy-mock-latency"] (ms; 0 turns it off).
   if (method === "get") {
@@ -1107,7 +1129,7 @@ export async function handleMockRequest({ method, path, query, body }) {
     const params = Object.fromEntries(r.keys.map((k, i) => [k, decodeURIComponent(m[i + 1])]));
     const parsed = await parseBody(body);
     try {
-      const res = await r.handler({ params, query, body: parsed });
+      const res = await r.handler({ params, query, body: parsed, caller: callerOf(headers) });
       save();
       return res;
     } catch (e) {
@@ -1334,6 +1356,86 @@ on("post", "/UserRole/:id/prmoteUserToAdmin", promote("Admin"));
 on("post", "/UserRole/:id/clearUserRole", ({ params }) => {
   db.claims[params.id] = {};
   return json({ success: true });
+});
+
+// ---- Dashboard team: who can sign in, with which role. Only admins change it.
+const TEAM_ROLES = ["Admin", "Internal", "Host"];
+const forbidden = (detail) => json({ title: "Forbidden", detail, status: 403 }, 403);
+const isEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+const nameFromEmail = (email) => {
+  const local = email.split("@")[0].replace(/[._-]+/g, " ").trim();
+  return local ? local[0].toUpperCase() + local.slice(1) : email;
+};
+const adminsLeft = (exceptId) => db.team.filter((m) => m.role === "Admin" && m.id !== exceptId).length;
+// Signing in: a member on the team signs in with their role (an invite becomes Active). Anyone
+// else joins as an admin, since the mock takes any email and password.
+on("post", "/admin/team/sign-in", ({ body }) => {
+  const email = String(body?.email ?? "").trim().toLowerCase();
+  if (!email) return badRequest({ email: ["Enter your email"] });
+  db.team ??= [];
+  let m = db.team.find((x) => x.email.toLowerCase() === email);
+  if (!m) {
+    m = { id: uuid(), name: nameFromEmail(email), email, role: "Admin", status: "Active", addedAt: now() };
+    db.team.push(m);
+  }
+  m.status = "Active";
+  m.lastSignInAt = now();
+  return json(m);
+});
+// The signed-in member. A session from before the team existed (its token names no member) joins
+// as an admin, like a new sign-in.
+on("get", "/admin/team/me", ({ caller }) => {
+  if (caller?.member) return json(caller.member);
+  const email = String(caller?.claims?.email ?? "").trim().toLowerCase();
+  if (!email || caller.claims.member_id) return notFound("You're not on the team.");
+  const m = { id: uuid(), name: nameFromEmail(email), email, role: "Admin", status: "Active", addedAt: now(), lastSignInAt: now() };
+  db.team.push(m);
+  return json(m);
+});
+on("get", "/admin/team", () => json(db.team ?? []));
+on("get", "/admin/team/:id", ({ params }) => {
+  const m = db.team.find((x) => x.id === params.id);
+  return m ? json(m) : notFound();
+});
+function teamErrors(m, id) {
+  const errors = {};
+  if (!m.name) errors.name = ["Enter a name"];
+  else if (m.name.length > 40) errors.name = ["Use 40 characters or fewer"];
+  if (!isEmail(m.email)) errors.email = [m.email ? "Enter a valid email" : "Enter an email"];
+  else if (db.team.some((x) => x.id !== id && x.email.toLowerCase() === m.email.toLowerCase())) errors.email = ["Already on the team"];
+  if (!TEAM_ROLES.includes(m.role)) errors.role = ["Pick a role"];
+  return errors;
+}
+// Inviting adds the person as Invited; they're Active once they sign in.
+on("post", "/admin/team", ({ body, caller }) => {
+  if (caller?.member?.role !== "Admin") return forbidden("Only admins can invite people.");
+  const m = { id: uuid(), name: String(body?.name ?? "").trim(), email: String(body?.email ?? "").trim().toLowerCase(), role: body?.role, status: "Invited", addedAt: now() };
+  const errors = teamErrors(m, null);
+  if (Object.keys(errors).length) return badRequest(errors);
+  db.team.push(m);
+  return json(m, 201);
+});
+on("put", "/admin/team/:id", ({ params, body, caller }) => {
+  if (caller?.member?.role !== "Admin") return forbidden("Only admins can change the team.");
+  const i = db.team.findIndex((x) => x.id === params.id);
+  if (i < 0) return notFound();
+  const prev = db.team[i];
+  const next = { ...prev, name: "name" in (body ?? {}) ? String(body.name ?? "").trim() : prev.name, role: body?.role ?? prev.role };
+  const errors = teamErrors(next, prev.id);
+  if (next.role !== prev.role && prev.id === caller.member.id) errors.role = ["You can't change your own role"];
+  else if (prev.role === "Admin" && next.role !== "Admin" && !adminsLeft(prev.id)) errors.role = ["The team needs at least one admin"];
+  if (Object.keys(errors).length) return badRequest(errors);
+  db.team[i] = next;
+  return json(next);
+});
+on("delete", "/admin/team/:id", ({ params, caller }) => {
+  if (caller?.member?.role !== "Admin") return forbidden("Only admins can remove people.");
+  const m = db.team.find((x) => x.id === params.id);
+  if (!m) return notFound();
+  if (m.id === caller.member.id) return badRequest({ id: ["You can't remove yourself"] });
+  if (m.role === "Admin" && !adminsLeft(m.id)) return badRequest({ id: ["The team needs at least one admin"] });
+  db.team = db.team.filter((x) => x.id !== m.id);
+  return json({ id: m.id });
 });
 
 // ---- User management

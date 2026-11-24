@@ -50,7 +50,8 @@ export function ListItem({ leading, leadingControl, title, supporting, trailing,
       {leading && <Box sx={{ display: "flex", flexShrink: 0, mt: children ? 1 : 0 }}>{leading}</Box>}
       <Box sx={{ flex: 1, minWidth: 0, py: children ? 1 : 0, textAlign: "left" }}>
         {title && (
-          <Typography variant="bodyMedium" component="div" noWrap={!!onClick} sx={{ fontWeight: 500 }}>
+          // A title over a second line is 12/550; a one-line row label is 12/450 (like table rows).
+          <Typography variant="bodyMedium" component="div" color="text.primary" noWrap={!!onClick} sx={{ fontWeight: error || supporting ? 550 : 450 }}>
             {title}
           </Typography>
         )}
@@ -79,11 +80,11 @@ export function ListItem({ leading, leadingControl, title, supporting, trailing,
         ...(onClick && { transition: `background-color ${tokens.motion.effects}`, "&:hover": { bgcolor: c.hover } }),
       }}
     >
-      <Box sx={{ display: "flex", alignItems: children ? "flex-start" : "center", gap: 1.5, minHeight: 32 }}>
+      <Box sx={{ display: "flex", alignItems: children ? "flex-start" : "center", gap: "10px", minHeight: 30 }}>
         {/* An icon button (drag handle) puts its glyph on the 12px icon line. */}
         {leadingControl && <Box sx={{ display: "flex", flexShrink: 0, "& > .MuiIconButton-root": { ml: "-6px" } }}>{leadingControl}</Box>}
         {onClick ? (
-          <ButtonBase onClick={onClick} sx={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 1.5, my: -1, py: 1, ml: leadingControl ? -1 : -1.5, pl: leadingControl ? 1 : 1.5, mr: -1.5, pr: 1.5, borderRadius: "inherit", "&.Mui-focusVisible": { outline: `2px solid ${c.focus}`, outlineOffset: -2 } }}>
+          <ButtonBase onClick={onClick} sx={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", justifyContent: "flex-start", gap: "10px", my: -1, py: 1, ml: leadingControl ? -1 : -1.5, pl: leadingControl ? 1 : 1.5, mr: -1.5, pr: 1.5, borderRadius: "inherit", "&.Mui-focusVisible": { outline: `1.5px solid ${c.focus}`, outlineOffset: -2 } }}>
             {main}
           </ButtonBase>
         ) : (
@@ -111,17 +112,18 @@ export function ListAdd({ label, onClick, disabled }) {
       sx={{
         ...segment,
         justifyContent: "flex-start",
-        gap: 1.5,
+        gap: "10px",
         px: 1.5,
-        minHeight: 44,
+        // The same height as an item (8 + 30 + 8).
+        minHeight: 46,
         color: disabled ? "text.disabled" : c.onSurface,
         typography: "labelLarge",
         transition: `background-color ${tokens.motion.effects}`,
         "&:hover": { bgcolor: c.hover },
-        "&.Mui-focusVisible": { outline: `2px solid ${c.focus}`, outlineOffset: -2 },
+        "&.Mui-focusVisible": { outline: `1.5px solid ${c.focus}`, outlineOffset: -2 },
       }}
     >
-      <Icon name="add" size={20} />
+      <Icon name="add" size={16} style={{ color: disabled ? undefined : c.outline }} />
       {label}
     </ButtonBase>
   );
@@ -132,7 +134,7 @@ export function ListSwitch({ icon, title, supporting, checked, onChange, disable
   const { m3: c } = useTheme();
   return (
     <ListItem
-      leading={icon && <Icon name={icon} size={20} style={{ color: c.onSurfaceVariant }} />}
+      leading={icon && <Icon name={icon} size={16} style={{ color: c.outline }} />}
       title={title}
       supporting={supporting}
       trailing={<Switch checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} slotProps={{ input: { "aria-label": title } }} />}

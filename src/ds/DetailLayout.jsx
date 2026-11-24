@@ -79,7 +79,8 @@ export function SectionNav({ sections, active, onSelect, errorIds = [], warningI
           <Fragment key={s.id}>
           {starts && i > 0 && <Box aria-hidden sx={{ display: { xs: "none", lg: "block" }, height: many ? 0 : 8 }} />}
           {many && (
-            <Typography variant="overline" color="text.secondary" component="div" sx={{ display: { xs: "none", lg: "block" }, px: 1.5, pt: i > 0 ? 1.5 : 0, pb: 0.25 }}>
+            // Group label: the same muted 12px label, inset and spacing as the sidebar's groups.
+            <Typography variant="overline" component="div" sx={{ display: { xs: "none", lg: "block" }, color: c.textMuted, px: 1.5, pt: i > 0 ? 1.5 : 0, pb: 0.5 }}>
               {s.group}
             </Typography>
           )}
@@ -89,20 +90,23 @@ export function SectionNav({ sections, active, onSelect, errorIds = [], warningI
             sx={{
               justifyContent: "flex-start",
               gap: 1,
-              height: 32,
+              height: 30,
               px: 1.5,
               flexShrink: 0,
               borderRadius: radius("sm"),
-              typography: "labelLarge",
-              fontWeight: on ? 600 : 500,
+              // The sidebar's row (RailItem): 12/450 #666 with a #888 icon; where you are is the
+              // #F3F3F3 row with #000 text and an ink icon. Weight never changes.
+              typography: "labelMedium",
               color: on ? c.onSecondaryContainer : c.onSurfaceVariant,
               bgcolor: on ? c.secondaryContainer : "transparent",
-              transition: `background-color ${tokens.motion.effects}`,
-              "&:hover": { bgcolor: on ? c.secondaryContainer : "action.hover", color: on ? c.onSecondaryContainer : c.onSurface },
-              "&.Mui-focusVisible": { outline: `2px solid ${c.focus}`, outlineOffset: -2 },
+              transition: `background-color ${tokens.motion.effects}, color ${tokens.motion.effects}`,
+              "& .nav-icon": { color: on ? c.onSurface : c.outline, transition: `color ${tokens.motion.effects}` },
+              "&:hover": { bgcolor: on ? c.secondaryContainer : c.hover, color: on ? c.onSecondaryContainer : c.onSurface },
+              "&:hover .nav-icon": { color: c.onSurface },
+              "&.Mui-focusVisible": { outline: `1.5px solid ${c.focus}`, outlineOffset: -2 },
             }}
           >
-            <Icon name={s.icon} size={16} />
+            <Icon name={s.icon} size={16} className="nav-icon" />
             <Box component="span" sx={{ flex: 1, textAlign: "left", whiteSpace: "nowrap" }}>
               {s.label}
             </Box>
@@ -140,13 +144,13 @@ export function DetailHeader({ onBack, backLabel, media, title, badge, subtitle,
     >
       <Tooltip title={backLabel}>
         <IconButton aria-label={backLabel} onClick={onBack} edge="start">
-          <Icon name="arrow_back" size={20} />
+          <Icon name="arrow_back" />
         </IconButton>
       </Tooltip>
       {media && <Box sx={{ display: { xs: "none", sm: "block" } }}>{media}</Box>}
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <Typography variant="titleLarge" component="h1" noWrap sx={{ fontSize: 18, lineHeight: "27px", fontWeight: 500, letterSpacing: 0 }}>
+          <Typography variant="titleLarge" component="h1" color="text.primary" noWrap>
             {title}
           </Typography>
           {badge}

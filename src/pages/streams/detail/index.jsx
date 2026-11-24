@@ -258,7 +258,7 @@ export default function StreamDetail() {
             {pending.map((s, i) => (
               <Fragment key={s.id}>
                 {i > 0 && " · "}
-                <Link component="button" type="button" color="inherit" onClick={() => goTo(s.id)} sx={{ fontWeight: 600, verticalAlign: "baseline" }}>
+                <Link component="button" type="button" color="inherit" onClick={() => goTo(s.id)} sx={{ fontWeight: 550, verticalAlign: "baseline" }}>
                   {s.label}
                 </Link>
                 {parts[s.id].state === "error" ? " (errors)" : ` (${parts[s.id].todo.join(", ").toLowerCase()})`}

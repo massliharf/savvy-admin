@@ -73,8 +73,8 @@ const COLOR_GROUPS = [
 ];
 // The surface ladder by what each step is for, from the back of the app to the front.
 const SURFACES = [
-  ["App ground", "background", "Behind the floating rail and workspace"],
-  ["Workspace", "surface", "The main area every page sits on"],
+  ["Panel", "background", "The rail and the app behind it (panelBackground)"],
+  ["Page", "surface", "The main area every page sits on (settingsContainerBackground)"],
   ["Card", "surfaceContainerLowest", "Cards, the rail, menus, dialogs, sheets"],
   ["Card tint", "surfaceContainerLow", "Hover on a card, a card's header row"],
   ["Quiet fill", "surfaceContainer", "Calendar headers, inset panels"],
@@ -188,7 +188,7 @@ export default function DesignSystemPage() {
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 6, maxWidth: FORM_WIDTH + 160 }}>
-      <Section title="Colour roles" description="Savvy Admin's own colours, measured from its app in light and dark: #F5F5F5 / #0F0F0F ground, #FAFAFA / #161616 workspace, white / #1A1A1A cards and menus, #EDEDED / #2B2B2B tracks, faint grey control fills and ink hairlines. Savvy Admin blue (#506BF2) is the action and switch colour; a chosen segment or tab is the white pill, a chosen chip the ink pill, where you are the grey active wash, focus an ink edge. Pink is brand only, violet is Sparks, and each game mode has a Savvy Admin category colour.">
+      <Section title="Colour roles" description="Framer style: the colours of Framer's editor (Fresco), read live in light and dark. A white page (#111 in dark) with white cards edged by a 1px #EEE hairline; panels are split by 1px dividers. What sits on the page is flat (cards and raised buttons: a hairline, no shadow); what floats over it (menus, popovers, tooltips, dialogs, sheets) gets Framer's float shadow, 0 3px 6px 8% with a 1px edge, and toasts a soft drop. Controls are a 5% black fill with no line (7% on hover); text is #222 titles, #333 body, #666 labels and #767676 captions (#888 in dark), so every line reaches 4.5:1. One accent, #0099FF, marks the primary action (every “+ New …” page action), selection, focus and active states; text on a tint is a deeper step of its hue (#0070CC, #CC2B3A, #9E5F00, #00805B) so it stays readable: a chosen segment is the white pill with tint text, a chosen chip the soft tint, where you are the #F3F3F3 row. Purple #8855FF is the component accent; danger is #F24A58 on a 10% fill.">
         <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(4, 1fr)" }, gap: 1.5 }}>
           {COLOR_GROUPS.map((group) => (
             <Box key={group[0]} sx={{ borderRadius: `${shape.md}px`, overflow: "hidden" }}>
@@ -253,7 +253,7 @@ export default function DesignSystemPage() {
         </Card>
       </Section>
 
-      <Section title="Shape" description="Savvy Admin corners: 4 (meta chips), 8 (controls), 12 (blocks), 16 (cards, menus, shell). Tiles, avatars and images take their radius from their size (cornerFor).">
+      <Section title="Shape" description="Fresco corners: 5 (small chips), 8 (controls, rows), 12 (blocks), 15 (cards); menus take 13 and popovers, dialogs and floating bars 18. Tiles, avatars and images take their radius from their size (cornerFor).">
         <Row gap={2}>
           {Object.entries(shape)
             .filter(([k]) => ["xs", "sm", "md", "lg"].includes(k))
@@ -278,7 +278,7 @@ export default function DesignSystemPage() {
         </Row>
       </Section>
 
-      <Section title="Buttons">
+      <Section title="Buttons" description="Primary (#0099FF) is the one main action: every page's “+ New …”, Save, Create, Approve. Tonal (the 5% grey fill) is every other page or row action; a create action in a section header (pages with several lists) is the small tonal button. Text buttons are for low-weight actions inside a card. Destructive actions use the soft red fill. No shadows; the white raised button keeps a 1px hairline.">
         <Row>
           <Button>Filled</Button>
           <Button variant="tonal">Tonal</Button>
@@ -289,8 +289,8 @@ export default function DesignSystemPage() {
         </Row>
         <Row>
           <Button startIcon={<Icon name="add" />}>New stream</Button>
-          <Button variant="tonal" startIcon={<Icon name="event_repeat" />}>
-            Create event
+          <Button variant="tonal" startIcon={<Icon name="download" />}>
+            Export results
           </Button>
           <Button color="error">Delete</Button>
           <Button variant="text" endIcon={<Icon name="arrow_forward" />}>
@@ -304,7 +304,7 @@ export default function DesignSystemPage() {
         </Row>
       </Section>
 
-      <Section title="Icon buttons, menus, segmented buttons">
+      <Section title="Icon buttons, menus, segmented buttons" description="Menus (Framer §3.11): 5px padding, 13px corners, the float shadow, 5px from their trigger. Rows are at least 30 tall with 4px / 10px padding and a 10px gap, so pictures and two-line rows never touch the edge; 12/450 #333 text, 16px #999 icons, a muted second line. Hover is #F2F2F2 (#2E2E2E in dark). The chosen row has no fill, only the #444 checkmark at the end (MenuCheck). Groups are split by a separator, then a muted heading. Every icon is 16px unless it fills a placeholder.">
         <Row gap={2}>
           <Tooltip title="Edit">
             <IconButton aria-label="Edit">
@@ -434,7 +434,7 @@ export default function DesignSystemPage() {
         </Box>
       </Section>
 
-      <Section title="Word sets and selection lists">
+      <Section title="Word sets and selection lists" description="A picker list in a dialog (SelectList) uses the menu row: 8px corners, text lined up with the dialog title, the #F2F2F2 hover and the 14px Framer radio; the chosen row gets no fill. Multi-select lists use the same row with the 14px checkbox.">
         <Card>
           <SelectList label="Word sets" items={WORD_SETS} value={picked} onChange={setPicked} renderItem={(w) => <WordSetSummary set={w} />} />
         </Card>

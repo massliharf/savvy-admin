@@ -7,7 +7,7 @@ export function SwitchRow({ label, description, checked, onChange, disabled }) {
   return (
     <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
       <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography variant="bodyMedium" component="div" sx={{ fontWeight: 500 }}>
+        <Typography variant="bodyMedium" component="div" sx={{ fontWeight: 550 }}>
           {label}
         </Typography>
         {description && (

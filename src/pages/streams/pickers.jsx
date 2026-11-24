@@ -18,6 +18,7 @@ import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Typography from "@mui/material/Typography";
 import { Icon } from "../../ds/Icon";
+import { MenuCheck } from "../../ds/MenuCheck";
 import { SwitchRow } from "../../ds/SwitchRow";
 import { ListGroup, ListSwitch } from "../../ds/ListGroup";
 import { Choice, ChoiceGroup } from "../../ds/SelectButton";
@@ -81,10 +82,11 @@ export function PickCard({ label, value, options, onChange, media, title, suppor
           p: 1.5,
           pr: 2,
           textAlign: "left",
-          borderRadius: `${tokens.shape.lg}px`,
+          // A pick inside a card: the nested row (12px corners, #F5F5F5).
+          borderRadius: `${tokens.shape.md}px`,
           bgcolor: c.surfaceContainerHigh,
           "[role='listitem'] &": { bgcolor: c.nested },
-          outline: error ? `2px solid ${c.error}` : "none",
+          outline: error ? `1.5px solid ${c.fieldError}` : "none",
           transition: `background-color ${tokens.motion.effects}`,
           "&:hover": { bgcolor: c.surfaceContainerHighest },
         }}
@@ -100,14 +102,14 @@ export function PickCard({ label, value, options, onChange, media, title, suppor
             </Typography>
           )}
         </Box>
-        <Icon name="unfold_more" style={{ color: c.onSurfaceVariant }} />
+        <Icon name="unfold_more" size={16} style={{ color: c.outline }} />
       </ButtonBase>
       <Menu anchorEl={anchor} open={!!anchor} onClose={() => setAnchor(null)} slotProps={{ paper: { sx: { minWidth: anchor?.offsetWidth ?? 280, maxHeight: 400 } } }}>
         {options.map((o) => (
-          <MenuItem key={o.value} selected={o.value === value} onClick={() => run(() => onChange(o.value))} sx={{ gap: 1.5 }}>
+          <MenuItem key={o.value} selected={o.value === value} onClick={() => run(() => onChange(o.value))}>
             {o.media}
             <ListItemText primary={o.primary} secondary={o.secondary || null} />
-            {o.value === value && <Icon name="check" />}
+            {o.value === value && <MenuCheck />}
           </MenuItem>
         ))}
         {actions.length > 0 && <Divider />}
@@ -132,8 +134,8 @@ export function PickCard({ label, value, options, onChange, media, title, suppor
 export function PickPlaceholder({ icon }) {
   const { m3: c } = useTheme();
   return (
-    <Box sx={{ width: 48, height: 48, borderRadius: "50%", display: "grid", placeItems: "center", flexShrink: 0, bgcolor: c.surfaceContainerHighest, color: c.onSurfaceVariant }}>
-      <Icon name={icon} />
+    <Box sx={{ width: 48, height: 48, borderRadius: "50%", display: "grid", placeItems: "center", flexShrink: 0, bgcolor: c.surfaceCard, color: c.outline }}>
+      <Icon name={icon} size={20} />
     </Box>
   );
 }
@@ -240,7 +242,7 @@ export function AudienceField({ value, onChange, error, superSavvySwitch = true,
 export function StreamSummary({ stream: s, note }) {
   const { formatDate } = useTimezoneFormat();
   return (
-    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, minWidth: 0 }}>
+    <Box sx={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
       <StreamImage stream={s} size={40} />
       <Box sx={{ minWidth: 0 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}>
@@ -273,7 +275,7 @@ export function StreamPickerDialog({ open, title, header, streams, describe, dis
       <DialogContent dividers sx={{ p: 0 }}>
         {header}
         {toggle && (
-          <Box sx={{ px: 3, py: 1.5 }}>
+          <Box sx={{ px: 2.5, py: 1.5 }}>
             <SwitchRow label={toggle.label} checked={toggle.value} onChange={toggle.onChange} />
           </Box>
         )}
@@ -281,6 +283,7 @@ export function StreamPickerDialog({ open, title, header, streams, describe, dis
           <EmptyState compact icon="event_busy" title="No matching streams" description={emptyText} />
         ) : (
           <SelectList
+            centered
             label="Streams"
             items={items}
             value={picked?.id}

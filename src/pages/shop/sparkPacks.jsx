@@ -149,7 +149,7 @@ export default function SparkPacksPage() {
       ) : shown.length === 0 ? (
         <EmptyState icon={term ? "search_off" : "auto_awesome"} title={term ? "No spark packs match" : "No spark packs yet"}>
           {!term && (
-            <Button color="secondary" startIcon={<Icon name="add" />} onClick={sheet.openNew}>
+            <Button startIcon={<Icon name="add" />} onClick={sheet.openNew}>
               New spark pack
             </Button>
           )}

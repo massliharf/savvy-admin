@@ -11,6 +11,7 @@ import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Typography from "@mui/material/Typography";
 import { Icon } from "./Icon";
+import { MenuCheck } from "./MenuCheck";
 
 // Picking from fixed options is never a text field (that reads as "type here"). Like Audience,
 // a choice is a small label over its control: a connected button group for a few options
@@ -53,10 +54,10 @@ export function SelectButton({ label, value, options, onChange, error, helperTex
         aria-haspopup="listbox"
         aria-expanded={!!anchor}
         aria-label={ariaLabel ?? (label ? `${label}: ${current?.label ?? placeholder}` : undefined)}
-        // The control box (opaque, lined), value then ⌄ at the end.
-        sx={{ maxWidth: "100%", justifyContent: "flex-start", px: 1.5, fontWeight: 500, ...(!error && { bgcolor: (t) => t.m3.ctrl, color: "text.primary", boxShadow: (t) => `inset 0 0 0 1px ${t.m3.ctrlBorder}`, "&:hover": { bgcolor: (t) => t.m3.ctrlHover, boxShadow: (t) => `inset 0 0 0 1px ${t.m3.ctrlBorderHover}` } }), "& .MuiButton-endIcon": { ml: "auto", pl: 1, color: "text.secondary" } }}
+        // The GUU select: the 5% fill, 8px sides, 12/450 title text, the #BBB chevron at the end.
+        sx={{ maxWidth: "100%", justifyContent: "flex-start", px: 1, gap: 0.75, fontWeight: 450, ...(!error && { bgcolor: (t) => t.m3.field, color: (t) => t.m3.textStrong, "&:hover": { bgcolor: (t) => t.m3.fieldHover } }), "& .MuiButton-endIcon": { ml: "auto", pl: 0.5, color: (t) => t.m3.chevron } }}
       >
-        {current?.leading && <Box sx={{ display: "inline-flex", flexShrink: 0, mr: 1 }}>{current.leading}</Box>}
+        {current?.leading && <Box sx={{ display: "inline-flex", flexShrink: 0 }}>{current.leading}</Box>}
         <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {current?.label ?? placeholder}
         </Box>
@@ -75,7 +76,7 @@ export function SelectButton({ label, value, options, onChange, error, helperTex
           >
             {o.leading && <ListItemIcon>{o.leading}</ListItemIcon>}
             <ListItemText>{o.label}</ListItemText>
-            {o.value === value && <Icon name="check" size={16} style={{ marginLeft: 16 }} />}
+            {o.value === value && <MenuCheck />}
           </MenuItem>
         ))}
       </Menu>

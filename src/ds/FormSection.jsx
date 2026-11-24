@@ -57,7 +57,7 @@ export function FormSection({ id, title, description, action, status, collapsibl
             onClick={onToggle}
             aria-expanded={open}
             aria-controls={`${id}-body`}
-            sx={{ flex: "1 1 280px", minWidth: 0, display: "flex", alignItems: "center", gap: 2, textAlign: "left", borderRadius: 2, m: -1, p: 1, "&.Mui-focusVisible": { outline: `2px solid ${c.focus}` } }}
+            sx={{ flex: "1 1 280px", minWidth: 0, display: "flex", alignItems: "center", gap: 2, textAlign: "left", borderRadius: 2, m: -1, p: 1, "&.Mui-focusVisible": { outline: `1.5px solid ${c.focus}` } }}
           >
             {heading}
           </ButtonBase>
@@ -76,7 +76,7 @@ export function FormSection({ id, title, description, action, status, collapsibl
             {!folded && action}
             {collapsible && (
               <IconButton aria-label={open ? `Collapse ${title}` : `Expand ${title}`} aria-expanded={open} aria-controls={`${id}-body`} onClick={onToggle} sx={{ mr: -1 }}>
-                <Icon name={open ? "keyboard_arrow_up" : "keyboard_arrow_down"} size={20} />
+                <Icon name={open ? "keyboard_arrow_up" : "keyboard_arrow_down"} />
               </IconButton>
             )}
           </Box>
@@ -149,7 +149,7 @@ export function AddTile({ icon, title, description, onClick }) {
           color: c.onSurface,
           transition: `background-color ${tokens.motion.effects}`,
           "&:hover": { bgcolor: "action.hover" },
-          "&.Mui-focusVisible": { outline: `2px solid ${c.focus}`, outlineOffset: -2 },
+          "&.Mui-focusVisible": { outline: `1.5px solid ${c.focus}`, outlineOffset: -2 },
         }}
       >
       <IconTile icon={icon} size={32} />

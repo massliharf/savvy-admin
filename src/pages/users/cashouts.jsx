@@ -78,26 +78,29 @@ export function CashoutRow({ row, user, loaded = false, showUser = true, actions
   const { m3: c } = useTheme();
   const { formatDate } = useTimezoneFormat();
   const pending = row.status === "InProgress";
+  // Inside a side sheet (no user column) the row is always compact: when on the left, amount and
+  // status on the right, the actions on their own line under them. The wide grid only fits a page.
+  const compact = !showUser;
   return (
     <Box
       sx={{
         display: "grid",
         // Fixed action column, so the status lines up whether or not a row has Decline / Approve.
-        gridTemplateColumns: showUser ? { xs: "1fr", md: "minmax(0,1.6fr) minmax(0,1fr) 96px 104px 196px" } : { xs: "1fr", md: "minmax(0,1fr) 96px 104px 196px" },
+        gridTemplateColumns: compact ? "minmax(0,1fr) auto" : { xs: "1fr", md: "minmax(0,320px) minmax(0,160px) 96px 104px minmax(196px,1fr)" },
         alignItems: "center",
         columnGap: 2,
         rowGap: 1,
-        px: 2,
+        px: compact ? 0 : 2,
         py: 1.5,
         "&:not(:last-of-type)": { borderBottom: `1px solid ${c.border}` },
       }}
     >
       {/* Phones lead with the amount and status; wide screens read who → when → how much. */}
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, justifyContent: { md: "flex-end" }, order: { xs: 1, md: 3 } }}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, justifyContent: compact ? "flex-end" : { md: "flex-end" }, order: compact ? 2 : { xs: 1, md: 3 } }}>
         <Typography variant="titleMedium" sx={{ fontVariantNumeric: "tabular-nums" }}>
           {money(row.amount)}
         </Typography>
-        <Box sx={{ display: { md: "none" } }}>
+        <Box sx={{ display: compact ? "block" : { md: "none" } }}>
           <CashStatusPill value={row.status} />
         </Box>
       </Box>
@@ -115,7 +118,7 @@ export function CashoutRow({ row, user, loaded = false, showUser = true, actions
         </Box>
       )}
       {/* Date over time, like the user column's name over phone, so rows keep one height. */}
-      <Box sx={{ order: { xs: 4, md: 2 }, minWidth: 0 }}>
+      <Box sx={{ order: compact ? 1 : { xs: 4, md: 2 }, minWidth: 0 }}>
         <Typography variant="bodyMedium" component="div" noWrap>
           {formatDate(row.date, "MMM D, YYYY")}
         </Typography>
@@ -123,10 +126,12 @@ export function CashoutRow({ row, user, loaded = false, showUser = true, actions
           {formatDate(row.date, "h:mm A")}
         </Typography>
       </Box>
-      <Box sx={{ display: { xs: "none", md: "block" }, order: { md: 4 } }}>
-        <CashStatusPill value={row.status} />
-      </Box>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, justifyContent: "flex-end", order: 5, mr: { xs: -1, md: 0 } }}>
+      {!compact && (
+        <Box sx={{ display: { xs: "none", md: "block" }, order: { md: 4 } }}>
+          <CashStatusPill value={row.status} />
+        </Box>
+      )}
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, justifyContent: "flex-end", order: 5, mr: compact ? -0.75 : { xs: -1, md: 0 }, ...(compact && { gridColumn: "1 / -1" }) }}>
         {pending && (
           <>
             <Button variant="tonal" size="small" disabled={actions.busy} onClick={() => actions.askDecline(row)}>

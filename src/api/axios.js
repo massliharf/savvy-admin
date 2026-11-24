@@ -21,6 +21,8 @@ if (USE_MOCK) {
       path,
       query,
       body: config.data,
+      // The mock reads the signed-in member from the token, like the real backend.
+      headers: { Authorization: config.headers?.Authorization },
     });
     // small latency so loading states are visible, like the real backend
     await new Promise((r) => setTimeout(r, 120));

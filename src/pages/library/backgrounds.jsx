@@ -122,7 +122,7 @@ export function BackgroundSwatches({ selected, onPick, label = "Colours & gradie
   const { mutate: remove } = useDelete();
   const [custom, setCustom] = useState(false);
   const size = 40;
-  const ring = (on) => (on ? `0 0 0 2px ${c.surfaceContainerLow}, 0 0 0 4px ${c.primary}` : `inset 0 0 0 1px ${c.outlineVariant}`);
+  const ring = (on) => (on ? `0 0 0 2px ${c.surfaceCard}, 0 0 0 4px ${c.primary}` : `inset 0 0 0 1px ${c.outlineVariant}`);
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
       {label && (
@@ -142,7 +142,7 @@ export function BackgroundSwatches({ selected, onPick, label = "Colours & gradie
                   aria-checked={on}
                   aria-label={p.name}
                   onClick={() => onPick(url, p)}
-                  sx={{ width: size, height: size, borderRadius: `${tokens.shape.sm}px`, background: backgroundCss(p), boxShadow: ring(on), "&.Mui-focusVisible": { outline: `2px solid ${c.focus}`, outlineOffset: 3 } }}
+                  sx={{ width: size, height: size, borderRadius: `${tokens.shape.sm}px`, background: backgroundCss(p), boxShadow: ring(on), "&.Mui-focusVisible": { outline: `1.5px solid ${c.focus}`, outlineOffset: 3 } }}
                 >
                   {on && <Icon name="check" size={18} style={{ color: "#fff", filter: "drop-shadow(0 0 2px rgba(0,0,0,.6))" }} />}
                 </ButtonBase>
@@ -168,7 +168,7 @@ export function BackgroundSwatches({ selected, onPick, label = "Colours & gradie
         })}
         <Tooltip title="Custom colour or gradient">
           <ButtonBase onClick={() => setCustom(true)} aria-label="Add a custom colour or gradient" sx={{ width: size, height: size, borderRadius: `${tokens.shape.sm}px`, outline: `1px dashed ${c.border}`, outlineOffset: -1, color: c.onSurfaceVariant, bgcolor: c.ctrl }}>
-            <Icon name="add" size={20} />
+            <Icon name="add" />
           </ButtonBase>
         </Tooltip>
       </Box>

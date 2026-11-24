@@ -38,7 +38,7 @@ export function SideSheet({ open, onClose, onBack, title, subtitle, children, ac
           {onBack && (
             <Tooltip title="Back">
               <IconButton aria-label="Back" onClick={guarded(onBack)}>
-                <Icon name="arrow_back" size={20} />
+                <Icon name="arrow_back" />
               </IconButton>
             </Tooltip>
           )}
@@ -55,7 +55,7 @@ export function SideSheet({ open, onClose, onBack, title, subtitle, children, ac
           {headerActions}
           <Tooltip title="Close">
             <IconButton aria-label="Close" onClick={guarded(onClose)}>
-              <Icon name="close" size={20} />
+              <Icon name="close" />
             </IconButton>
           </Tooltip>
         </Box>
@@ -68,7 +68,8 @@ export function SideSheet({ open, onClose, onBack, title, subtitle, children, ac
           {children}
         </Box>
         {(actions || footerStart) && (
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1, px: 2.5, py: 1.5, borderTop: 1, borderColor: "divider" }}>
+          // A text button at either end sits on the content edge (its 10px padding hangs outside).
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, px: 2.5, py: 1.5, borderTop: 1, borderColor: "divider", "& > .MuiButton-text:first-of-type": { ml: "-10px" } }}>
             {footerStart}
             <Box sx={{ flex: 1 }} />
             {actions}

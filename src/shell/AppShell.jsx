@@ -19,13 +19,16 @@ import { DESTINATIONS, findDestination, findTab, isRecordPage } from "./nav";
 import { radius } from "../theme/tokens";
 import { RailContext } from "./railContext";
 import { useGameModePresets } from "../pages/streams/gameModes";
+import { useCurrentMember } from "../auth/currentMember";
+import { teamRole } from "../pages/users/shared";
 
-const RAIL_WIDTH = 72;
-const EXPANDED_WIDTH = 236;
+const RAIL_WIDTH = 60;
+// Framer's left panel: 240 wide (content 220 inside 10px padding).
+const EXPANDED_WIDTH = 240;
 const RAIL_KEY = "savvy-rail";
 const BAR_HEIGHT = 64;
-// The shell floats on the app ground: rail and workspace are 16px-cornered cards, 8px apart.
-const GAP = 8;
+// Framer style: the rail and the workspace are flush panels split by a 1px divider.
+const GAP = 0;
 
 // Phone bar destination: icon over a small label, the active one on a grey square.
 const DestinationButton = styled(ButtonBase, { shouldForwardProp: (p) => p !== "active" })(({ theme, active }) => {
@@ -49,7 +52,7 @@ const DestinationButton = styled(ButtonBase, { shouldForwardProp: (p) => p !== "
       transition: `background-color ${tokens.motion.effects}`,
     },
     "&:hover .indicator": { backgroundColor: active ? c.secondaryContainer : c.hover },
-    "&.Mui-focusVisible .indicator": { outline: `2px solid ${c.focus}`, outlineOffset: 2 },
+    "&.Mui-focusVisible .indicator": { outline: `1.5px solid ${c.focus}`, outlineOffset: 2 },
     "& .label": theme.typography.labelSmall,
   };
 });
@@ -72,9 +75,10 @@ function Destination({ destination, active, onClick }) {
 }
 
 // The rail is one element that grows and shrinks: icons, the logo and the avatar keep their
-// place (centred in the 72px rail), only the labels fade, so opening and closing is seamless.
-// Rows sit 12px in from the rail's edge; an 18px icon 15px into its row lands on the rail's centre.
-const ROW_INSET = 15;
+// place (centred in the 60px rail), only the labels fade, so opening and closing is seamless.
+// Rows sit 10px in from the rail's edge (panelPadding); a 16px icon 12px into its row lands on
+// the rail's centre.
+const ROW_INSET = 12;
 const RAIL_EASE = "240ms cubic-bezier(0.2, 0, 0, 1)";
 /** Labels that fade out as the rail closes (they stay in the layout, clipped by the row). */
 const fade = (shown) => ({ opacity: shown ? 1 : 0, transition: `opacity ${shown ? "160ms 80ms" : "100ms"} ease` });
@@ -88,8 +92,12 @@ function AccountMenu({ rail = false, expanded = true }) {
   const { mutate: logout } = useLogout();
   const { dark, update } = useThemeSettings();
   const [anchor, setAnchor] = useState(null);
-  const email = identity?.email ?? "";
-  const initial = (email[0] ?? "A").toUpperCase();
+  // The signed-in team member and their role (Settings › Team).
+  const { member, role } = useCurrentMember();
+  const email = member?.email ?? identity?.email ?? "";
+  const name = member?.name ?? "Admin";
+  const roleLabel = role ? teamRole(role).label : "No role";
+  const initial = (name[0] ?? email[0] ?? "A").toUpperCase();
   const { m3: c, tokens } = useTheme();
 
   return (
@@ -99,19 +107,19 @@ function AccountMenu({ rail = false, expanded = true }) {
           onClick={(e) => setAnchor(e.currentTarget)}
           aria-label="Account"
           aria-haspopup="menu"
-          sx={{ width: "100%", justifyContent: "flex-start", gap: 1.25, pl: `${ROW_INSET - 5}px`, pr: 1, py: 0.75, borderRadius: radius("sm"), textAlign: "left", overflow: "hidden", whiteSpace: "nowrap", transition: `background-color ${tokens.motion.effects}`, "&:hover": { bgcolor: c.hover }, "&.Mui-focusVisible": { outline: `2px solid ${c.focus}`, outlineOffset: -2 } }}
+          sx={{ width: "100%", justifyContent: "flex-start", gap: 1.25, pl: `${ROW_INSET - 6}px`, pr: 1, py: 0.75, borderRadius: radius("sm"), textAlign: "left", overflow: "hidden", whiteSpace: "nowrap", transition: `background-color ${tokens.motion.effects}`, "&:hover": { bgcolor: c.hover }, "&.Mui-focusVisible": { outline: `1.5px solid ${c.focus}`, outlineOffset: -1.5 } }}
         >
           <Avatar sx={{ width: 28, height: 28, fontSize: 12, flexShrink: 0 }}>{initial}</Avatar>
           <Box sx={{ flex: 1, minWidth: 0, ...fade(expanded) }}>
-            <Typography variant="labelLarge" component="div">
-              Admin
+            <Typography variant="labelLarge" component="div" noWrap sx={{ color: c.onSurface }}>
+              {name}
             </Typography>
-            <Typography variant="bodySmall" color="text.secondary" component="div" noWrap>
+            <Typography variant="bodySmall" component="div" noWrap sx={{ color: c.textMuted }}>
               {email}
             </Typography>
           </Box>
           <Box sx={{ display: "flex", ...fade(expanded) }}>
-            <Icon name="unfold_more" size={16} style={{ color: c.onSurfaceVariant }} />
+            <Icon name="unfold_more" size={16} style={{ color: c.textMuted }} />
           </Box>
         </ButtonBase>
       ) : (
@@ -129,12 +137,13 @@ function AccountMenu({ rail = false, expanded = true }) {
         transformOrigin={rail && expanded ? { vertical: "bottom", horizontal: "left" } : rail ? { vertical: "bottom", horizontal: "left" } : { vertical: "top", horizontal: "right" }}
         slotProps={{ paper: { sx: rail && expanded ? { mt: -1, width: 220 } : rail ? { ml: 1, minWidth: 240 } : { mt: 1, minWidth: 240 } } }}
       >
-        <Box sx={{ px: 1, py: 1 }}>
-          <Typography variant="titleSmall" component="div">
-            Signed in as admin
+        {/* The menu heading: the same 10px sides as the rows below it. */}
+        <Box sx={{ px: "10px", pt: "6px", pb: "6px" }}>
+          <Typography variant="titleSmall" component="div" color="text.primary" noWrap>
+            {name}
           </Typography>
-          <Typography variant="bodySmall" color="text.secondary" component="div" noWrap>
-            {email}
+          <Typography variant="bodySmall" component="div" noWrap sx={{ color: (t) => t.m3.textMuted }}>
+            {`${roleLabel} · ${email}`}
           </Typography>
         </Box>
         <Divider />
@@ -146,6 +155,10 @@ function AccountMenu({ rail = false, expanded = true }) {
         >
           <Icon name={dark ? "light_mode" : "dark_mode"} size={16} />
           {dark ? "Light theme" : "Dark theme"}
+        </MenuItem>
+        <MenuItem component={Link} to="/team" onClick={() => setAnchor(null)}>
+          <Icon name="manage_accounts" size={16} />
+          Team
         </MenuItem>
         <MenuItem component={Link} to="/settings" onClick={() => setAnchor(null)}>
           <Icon name="settings" size={16} />
@@ -160,7 +173,10 @@ function AccountMenu({ rail = false, expanded = true }) {
   );
 }
 
-/** One page: icon + name in a 32-tall row; the selected one in the accent tint. Collapsed, the name fades and a tooltip says it. */
+/**
+ * One page: icon + name in a 30-tall row (Framer's page row): #666 text and a #888 icon; where
+ * you are is #F3F3F3 with #000 text. Collapsed, the name fades and a tooltip says it.
+ */
 function RailItem({ to, icon, label, active, expanded }) {
   const { m3: c, tokens } = useTheme();
   return (
@@ -172,29 +188,28 @@ function RailItem({ to, icon, label, active, expanded }) {
         aria-current={active ? "page" : undefined}
         sx={{
           width: "100%",
-          minHeight: 32,
+          minHeight: 30,
           flexShrink: 0,
           justifyContent: "flex-start",
-          gap: 1.25,
+          gap: 1,
           pl: `${ROW_INSET}px`,
           pr: 1.25,
           borderRadius: radius("sm"),
-          typography: "bodyMedium",
-          // Savvy Admin: every item in ink at the same weight; where you are is the ghost-2 fill.
-          fontWeight: 400,
+          typography: "labelMedium",
           textAlign: "left",
           overflow: "hidden",
           whiteSpace: "nowrap",
-          color: active ? c.onSecondaryContainer : c.onSurface,
+          color: active ? c.onSecondaryContainer : c.onSurfaceVariant,
           bgcolor: active ? c.secondaryContainer : "transparent",
           transition: `background-color ${tokens.motion.effects}, color ${tokens.motion.effects}`,
-          "& .rail-icon": { color: c.onSurface },
-          "&:hover": { bgcolor: active ? c.secondaryContainer : c.hover },
+          "& .rail-icon": { color: active ? c.onSurface : c.outline, transition: `color ${tokens.motion.effects}` },
+          "&:hover": { bgcolor: active ? c.secondaryContainer : c.hover, color: active ? c.onSecondaryContainer : c.onSurface },
+          "&:hover .rail-icon": { color: c.onSurface },
           "&:active": { bgcolor: c.pressed },
-          "&.Mui-focusVisible": { outline: `2px solid ${c.focus}`, outlineOffset: -2 },
+          "&.Mui-focusVisible": { outline: `1.5px solid ${c.focus}`, outlineOffset: -1.5 },
         }}
       >
-        <Icon name={icon} size={18} className="rail-icon" />
+        <Icon name={icon} size={16} className="rail-icon" />
         <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis", ...fade(expanded) }}>
           {label}
         </Box>
@@ -220,20 +235,20 @@ function NavRail({ pathname, expanded, onToggle }) {
       <Box key={d.id} role="group" aria-label={d.label} sx={{ display: "flex", flexDirection: "column", gap: "2px", mt: 1 }}>
         {/* The label's row keeps its height either way; closed, a short hairline takes its place. */}
         <Box sx={{ position: "relative", height: 28, display: "flex", alignItems: "flex-end", pb: 0.5 }}>
-          <Typography variant="overline" component="div" sx={{ pl: "10px", color: c.onSurfaceVariant, whiteSpace: "nowrap", ...fade(expanded) }}>
+          <Typography variant="overline" component="div" sx={{ pl: `${ROW_INSET}px`, color: c.textMuted, whiteSpace: "nowrap", ...fade(expanded) }}>
             {d.label}
           </Typography>
-          <Box aria-hidden sx={{ position: "absolute", left: 12, width: 24, top: "50%", borderTop: `1px solid ${c.border}`, ...fade(!expanded) }} />
+          <Box aria-hidden sx={{ position: "absolute", left: 10, width: 20, top: "50%", borderTop: `1px solid ${c.border}`, ...fade(!expanded) }} />
         </Box>
         {tabs.map((t, i) => (
           <Fragment key={t.path}>
             {/* A sub-heading where a new section starts; closed, a shorter hairline. */}
             {t.section && t.section !== tabs[i - 1]?.section && (
               <Box sx={{ position: "relative", height: 26, display: "flex", alignItems: "flex-end", pb: 0.5, mt: 0.5 }}>
-                <Typography variant="labelSmall" component="div" sx={{ pl: "10px", color: c.onSurfaceVariant, whiteSpace: "nowrap", ...fade(expanded) }}>
+                <Typography variant="labelSmall" component="div" sx={{ pl: `${ROW_INSET}px`, color: c.textMuted, whiteSpace: "nowrap", ...fade(expanded) }}>
                   {t.section}
                 </Typography>
-                <Box aria-hidden sx={{ position: "absolute", left: 18, width: 12, top: "50%", borderTop: `1px solid ${c.border}`, ...fade(!expanded) }} />
+                <Box aria-hidden sx={{ position: "absolute", left: 14, width: 12, top: "50%", borderTop: `1px solid ${c.border}`, ...fade(!expanded) }} />
               </Box>
             )}
             <RailItem to={t.path} icon={t.icon} label={t.label} active={currentPath === t.path} expanded={expanded} />
@@ -260,15 +275,16 @@ function NavRail({ pathname, expanded, onToggle }) {
         display: "flex",
         flexDirection: "column",
         bgcolor: c.surfaceContainerLowest,
-        borderRadius: radius("lg"),
+        // A flush panel: the 1px panelDivider on its right, no corners or shadow.
+        boxShadow: `inset -1px 0 0 ${c.border}`,
         overflow: "hidden",
         cursor: expanded ? "default" : "e-resize",
         "& a, & button": { cursor: "pointer" },
       }}
     >
       {/* Header: the logo stays centred over the icons; the name and the close button fade. */}
-      <Box sx={{ position: "relative", display: "flex", alignItems: "center", height: 56, px: 1.5, flexShrink: 0 }}>
-        <Box component={Link} to="/" aria-label="Savvy home" sx={{ display: "flex", alignItems: "center", gap: 1.25, pl: `${ROW_INSET - 5}px`, color: "inherit", textDecoration: "none", whiteSpace: "nowrap" }}>
+      <Box sx={{ position: "relative", display: "flex", alignItems: "center", height: 50, px: 1.25, flexShrink: 0 }}>
+        <Box component={Link} to="/" aria-label="Savvy home" sx={{ display: "flex", alignItems: "center", gap: 1.25, pl: `${ROW_INSET - 6}px`, color: c.onSurface, textDecoration: "none", whiteSpace: "nowrap" }}>
           <Box component="img" src={LOGO_URL} alt="" sx={{ width: 28, height: 28, display: "block", flexShrink: 0 }} />
           <Typography variant="titleMedium" component="span" sx={fade(expanded)}>
             Savvy
@@ -282,22 +298,22 @@ function NavRail({ pathname, expanded, onToggle }) {
             tabIndex={0}
             sx={{
               position: "absolute",
-              right: 12,
+              right: 10,
               ...fade(expanded),
               // Closed it's hidden, but a keyboard user tabbing to it still sees it.
               ...(!expanded && { pointerEvents: "none", "&.Mui-focusVisible": { opacity: 1, pointerEvents: "auto", right: 20, bgcolor: c.surfaceContainerLowest } }),
             }}
           >
-            <Icon name={expanded ? "left_panel_close" : "left_panel_open"} size={20} />
+            <Icon name={expanded ? "left_panel_close" : "left_panel_open"} size={16} />
           </IconButton>
         </Tooltip>
       </Box>
       {/* Every page scrolls together (when the window is short); the account stays at the bottom,
           and Settings is in its menu. */}
-      <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", scrollbarWidth: "none", px: 1.5, pb: 1, display: "flex", flexDirection: "column", gap: "2px" }}>
+      <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", scrollbarWidth: "none", px: 1.25, pb: 1.25, display: "flex", flexDirection: "column", gap: 0 }}>
         {DESTINATIONS.slice(0, -1).map(group)}
       </Box>
-      <Box sx={{ px: 1.5, py: 1, borderTop: `1px solid ${c.border}` }}>
+      <Box sx={{ px: 1.25, py: 1.25, borderTop: `1px solid ${c.border}` }}>
         <AccountMenu rail expanded={expanded} />
       </Box>
     </Box>
@@ -405,7 +421,7 @@ export function AppShell({ children }) {
         id="main-scroll"
         // The scrollbar keeps its room even on short pages, so content never shifts sideways when
         // a page grows past the window (or data lands).
-        sx={{ flex: 1, minWidth: 0, bgcolor: c.surface, borderRadius: radius("lg"), overflowY: "auto", overflowX: "hidden", scrollbarGutter: "stable" }}
+        sx={{ flex: 1, minWidth: 0, bgcolor: c.surface, overflowY: "auto", overflowX: "hidden", scrollbarGutter: "stable" }}
       >
         {children}
       </Box>

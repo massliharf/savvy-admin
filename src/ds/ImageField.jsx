@@ -122,13 +122,13 @@ export function ImageField({ label, value, width, height, onChange, onRemove, hi
         outlineOffset: -1,
         transition: `filter ${tokens.motion.effects}`,
         "&:hover": { filter: "brightness(0.95)" },
-        "&:focus-visible": { outline: `2px solid ${c.focus}`, outlineOffset: 2 },
+        "&:focus-visible": { outline: `1.5px solid ${c.focus}`, outlineOffset: 2 },
       }}
     >
       {shown ? (
         <Box component="img" src={preview} alt="" onError={() => setBroken(true)} sx={{ width: "100%", height: "100%", objectFit: fit, display: "block" }} />
       ) : (
-        <Icon name="add_photo_alternate" size={20} />
+        <Icon name="add_photo_alternate" />
       )}
     </Box>
   );
@@ -152,9 +152,9 @@ export function ImageField({ label, value, width, height, onChange, onRemove, hi
             )}
           </Box>
           <Box sx={{ display: "flex", alignItems: "center", gap: 2, mt: 2 }}>
-            <Icon name="zoom_out" size={20} />
+            <Icon name="zoom_out" />
             <Slider value={zoom} min={1} max={5} step={0.05} onChange={(_, v) => setZoom(v)} aria-label="Zoom" sx={{ height: 4 }} />
-            <Icon name="zoom_in" size={20} />
+            <Icon name="zoom_in" />
           </Box>
           <Typography variant="bodySmall" color="text.secondary">
             Saved as a {width} × {height} px image.

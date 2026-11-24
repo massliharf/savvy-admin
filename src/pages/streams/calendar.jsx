@@ -32,7 +32,7 @@ export function StreamLegend() {
   // The same fills as the calendar's streams (useStreamSurface).
   const items = [
     { label: "Scheduled", bg: c.primaryContainer, dot: c.primary },
-    { label: "Needs setup", bg: palette.warning.container, dot: palette.warning.color },
+    { label: "Needs setup", bg: palette.warning.container, dot: palette.warning.main },
     { label: "Live", bg: c.errorContainer, dot: c.error },
     { label: "Ended", bg: c.surface3, dot: c.outline },
   ];
@@ -78,7 +78,7 @@ export function MonthCalendar({ month, streams, timezone, onCreate, selected, on
     <Box>
       <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))" }}>
         {WEEKDAYS.map((d) => (
-          <Typography key={d} variant="labelMedium" color="text.secondary" sx={{ py: 1, textAlign: "center", textTransform: "uppercase" }}>
+          <Typography key={d} variant="labelMedium" sx={{ py: 1, textAlign: "center", color: (t) => t.m3.textMuted }}>
             {compact ? d[0] : d}
           </Typography>
         ))}
@@ -91,7 +91,8 @@ export function MonthCalendar({ month, streams, timezone, onCreate, selected, on
           const isToday = key === todayKey;
           const canCreate = key >= todayKey;
           const isSelected = compact && key === selectedKey;
-          const border = { borderRadius: `${tokens.shape.sm}px` };
+          // Framer card logic: a day in the month is a white tile with a #EEE hairline (no shadow).
+          const border = { borderRadius: `${tokens.shape.sm}px`, boxShadow: inMonth ? `inset 0 0 0 1px ${c.cardBorder}` : "none" };
           const number = (
             <Box
               component="span"
@@ -198,7 +199,7 @@ export function WeekCalendar({ week, streams, timezone, onCreate, onAction }) {
     return (
       // Fits a narrow week column: 24px date circle and add button, 4px apart, none of them shrinking.
       <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, minWidth: 0 }}>
-        <Typography variant="labelMedium" sx={{ textTransform: "uppercase", flexShrink: 0, color: isToday ? c.primaryText : c.onSurfaceVariant }}>
+        <Typography variant="labelMedium" sx={{ flexShrink: 0, color: isToday ? c.primaryText : c.onSurfaceVariant }}>
           {day.format("ddd")}
         </Typography>
         <Box sx={{ width: 24, height: 24, flexShrink: 0, borderRadius: "50%", display: "grid", placeItems: "center", typography: "labelLarge", bgcolor: isToday ? c.primaryText : "transparent", color: isToday ? c.onPrimary : c.onSurface }}>{day.date()}</Box>
@@ -238,7 +239,7 @@ export function WeekCalendar({ week, streams, timezone, onCreate, onAction }) {
         const key = dayKey(day);
         const items = byDay[key] ?? [];
         return (
-          <Box key={key} component="section" aria-label={day.format("dddd, MMMM D")} sx={{ minWidth: 0, minHeight: 480, borderRadius: `${tokens.shape.sm}px`, overflow: "hidden", bgcolor: c.surfaceCard, display: "flex", flexDirection: "column" }}>
+          <Box key={key} component="section" aria-label={day.format("dddd, MMMM D")} sx={{ minWidth: 0, minHeight: 480, borderRadius: `${tokens.shape.sm}px`, overflow: "hidden", bgcolor: c.surfaceCard, boxShadow: `inset 0 0 0 1px ${c.cardBorder}`, display: "flex", flexDirection: "column" }}>
             <Box sx={{ px: 1, py: 0.75 }}>{dayHeader(day, key)}</Box>
             <Box sx={{ p: 0.75, display: "flex", flexDirection: "column", gap: 0.75 }}>
               {items.map((s) => (

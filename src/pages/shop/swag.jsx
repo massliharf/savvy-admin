@@ -200,10 +200,10 @@ function ItemOrders({ item }) {
     <ListGroup label="Orders">
       <ListItem
         onClick={() => navigate(`/swag-orders?status=all&q=${encodeURIComponent(item.title)}`)}
-        leading={<Icon name="local_shipping" style={{ color: c.onSurfaceVariant }} />}
+        leading={<Icon name="local_shipping" style={{ color: c.outline }} />}
         title={isLoading ? "Orders" : `${orders.length} ${orders.length === 1 ? "order" : "orders"}`}
         supporting={isLoading ? null : toShip ? `${toShip} still to ship` : "All shipped"}
-        trailing={<Icon name="chevron_right" style={{ color: c.onSurfaceVariant }} />}
+        trailing={<Icon name="chevron_right" style={{ color: c.chevron }} />}
       />
     </ListGroup>
   );
@@ -380,7 +380,7 @@ function SwagSheet({ sheet }) {
                 tracking ? (
                   <NumberCell key="q" control={control} name={`variants.${i}.quantity`} label={`Size ${v.label} in stock`} rules={stockRule(true)} sx={{ width: 96 }} />
                 ) : (
-                  <Typography key="q" variant="bodyLarge" color="text.secondary" sx={{ px: 1 }}>
+                  <Typography key="q" variant="bodyMedium" color="text.secondary" sx={{ px: 1 }}>
                     Not counted
                   </Typography>
                 ),
@@ -457,7 +457,7 @@ export default function SwagPage() {
       ) : shown.length === 0 ? (
         <EmptyState icon={term ? "search_off" : "checkroom"} title={term ? "No swag matches" : "No swag yet"}>
           {!term && (
-            <Button color="secondary" startIcon={<Icon name="add" />} onClick={sheet.openNew}>
+            <Button startIcon={<Icon name="add" />} onClick={sheet.openNew}>
               New swag item
             </Button>
           )}

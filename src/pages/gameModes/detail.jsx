@@ -64,7 +64,7 @@ function BundlePresets({ kind, control, setValue, name }) {
             trailing={
               <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                 {p.id === fallback?.id && <Pill>Default</Pill>}
-                <Icon name="chevron_right" style={{ color: c.onSurfaceVariant }} />
+                <Icon name="chevron_right" style={{ color: c.chevron }} />
               </Box>
             }
           />
@@ -90,7 +90,9 @@ function Backgrounds({ control, setValue }) {
   const notify = useNotify();
   const values = useWatch({ control, name: BACKGROUNDS.flatMap((b) => [b.list, b.pick]) });
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
+    // Groups 24px apart; inside a group (its gallery, then its colours) 10px, so the colours read
+    // as part of the background above them, not as a peer heading.
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
       {BACKGROUNDS.map((b, i) => {
         const urls = values[i * 2] ?? [];
         const set = (next, sel) => {
@@ -98,7 +100,7 @@ function Backgrounds({ control, setValue }) {
           setValue(b.pick, sel, { shouldDirty: true });
         };
         return (
-          <Box key={b.list} sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+          <Box key={b.list} sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
             <ImageGallery label={b.label} hint={b.hint} width={b.width} height={b.height} max={b.max} urls={urls} selected={values[i * 2 + 1]} onChange={set} />
             {/* A colour or gradient joins the backgrounds (selected); one already there is just selected. */}
             {b.swatches && (

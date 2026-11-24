@@ -252,7 +252,7 @@ function PresetSheet({ state, onClose, onDelete }) {
                     type === "Trivia" ? (
                       <Radio key="c" checked={correct === i} onChange={() => setValue("correctAnswerIndex", i, { shouldDirty: true, shouldValidate: true })} inputProps={{ "aria-label": `Answer ${letter(i)} is correct` }} />
                     ) : (
-                      <Typography key="c" variant="bodyLarge" color="text.secondary">
+                      <Typography key="c" variant="bodyMedium" color="text.secondary">
                         {letter(i)}
                       </Typography>
                     ),
@@ -348,11 +348,13 @@ function ExportDialog({ open, onClose }) {
       <DialogTitle>Export poll results</DialogTitle>
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
         <SearchField dense value={query} onChange={setQuery} placeholder="Search streams" sx={{ flex: "none" }} />
-        <Box sx={{ border: `1px solid ${theme.m3.outlineVariant}`, borderRadius: radius("lg"), overflow: "auto", maxHeight: { sm: 360 } }}>
+        {/* The same rows as every picker list (SelectList): 8px corners, 10px insets lining the text
+            up with the dialog title, a hover fill; the checkbox marks the choice (no row fill). */}
+        <Box sx={{ mx: "-10px", overflow: "auto", maxHeight: { sm: 360 }, display: "flex", flexDirection: "column" }}>
           {isLoading ? (
             <RowsSkeleton count={3} lead={false} height={56} label="Loading streams" />
           ) : streams.length === 0 ? (
-            <Typography variant="bodyMedium" color="text.secondary" sx={{ p: 2 }}>
+            <Typography variant="bodyMedium" color="text.secondary" sx={{ px: "10px", py: 1 }}>
               No stream matches.
             </Typography>
           ) : (
@@ -360,11 +362,11 @@ function ExportDialog({ open, onClose }) {
               <Box
                 key={s.id}
                 component="label"
-                sx={{ display: "flex", alignItems: "center", gap: 1, px: 1, py: 0.5, cursor: "pointer", bgcolor: selected.includes(s.id) ? theme.m3.secondaryContainer : "transparent", "&:not(:last-of-type)": { borderBottom: `1px solid ${theme.m3.outlineVariant}` } }}
+                sx={{ display: "flex", alignItems: "center", gap: "10px", px: "10px", py: 1, borderRadius: radius("sm"), cursor: "pointer", transition: `background-color ${theme.tokens.motion.effectsFast}`, "&:hover": { bgcolor: theme.m3.menuHover } }}
               >
-                <Checkbox checked={selected.includes(s.id)} onChange={() => toggle(s.id)} />
+                <Checkbox checked={selected.includes(s.id)} onChange={() => toggle(s.id)} sx={{ p: 0 }} />
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography variant="bodyMedium" noWrap>
+                  <Typography variant="bodyMedium" color="text.primary" noWrap>
                     {showTitle(s)}
                   </Typography>
                   <Typography variant="bodySmall" color="text.secondary">
@@ -396,6 +398,7 @@ function ExportDialog({ open, onClose }) {
 
 // ---------------------------------------------------------------- page
 export default function PollsPage() {
+  const { m3: c } = useTheme();
   const notify = useNotify();
   const [editing, setEditing] = useState(null); // { type } | { preset }
   const [assigning, setAssigning] = useState(null);
@@ -436,8 +439,8 @@ export default function PollsPage() {
         const items = term ? all.filter((p) => p.question.toLowerCase().includes(term)) : all;
         return (
           <Box component="section" key={type} sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-              <Icon name={meta.icon} />
+            <Box sx={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <Icon name={meta.icon} style={{ color: c.outline }} />
               <Typography variant="titleMedium" component="h2">
                 {meta.plural}
               </Typography>
@@ -449,7 +452,7 @@ export default function PollsPage() {
               <ContainerCard>
                 <EmptyState compact icon={term ? "search_off" : meta.icon} title={term ? `No ${meta.plural.toLowerCase()} match` : `No ${meta.plural.toLowerCase()} yet`}>
                   {!term && (
-                    <Button color="secondary" startIcon={<Icon name="add" />} onClick={() => setEditing({ type })}>
+                    <Button startIcon={<Icon name="add" />} onClick={() => setEditing({ type })}>
                       New {meta.label.toLowerCase()}
                     </Button>
                   )}

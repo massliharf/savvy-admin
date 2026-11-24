@@ -11,6 +11,7 @@ import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { useTheme } from "@mui/material/styles";
 import { Icon } from "./Icon";
+import { MenuCheck } from "./MenuCheck";
 
 // Short lists (rounds, raffle winners, answers, sizes) as a data table, like Points per round:
 // column headers, and every editable value as a field right in its cell, no dialogs. Labels that
@@ -21,7 +22,7 @@ export function cellSx(c, tokens, error) {
   return {
     width: "100%",
     // Every editable cell is exactly a 32px control, whatever it holds (text, number, choice).
-    height: 32,
+    height: 30,
     boxSizing: "border-box",
     typography: "bodyMedium",
     px: 1,
@@ -66,7 +67,7 @@ export function TextCell({ control, name, label, rules, placeholder, inputProps,
             placeholder={placeholder}
             multiline={multiline}
             inputProps={{ "aria-label": label, ...inputProps }}
-            sx={{ ...cellSx(c, tokens, !!fieldState.error), ...(multiline && { height: "auto", minHeight: 32, py: 0.75 }), ...sx }}
+            sx={{ ...cellSx(c, tokens, !!fieldState.error), ...(multiline && { height: "auto", minHeight: 30, py: 0.75 }), ...sx }}
           />
         </ErrorTip>
       )}
@@ -131,7 +132,7 @@ export function SelectCell({ control, name, label, options, extra = [], sx }) {
             <Box component="span" sx={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", textAlign: "left" }}>
               {options.find((o) => o.value === field.value)?.label ?? "Choose"}
             </Box>
-            <Icon name="keyboard_arrow_down" size={16} style={{ color: c.onSurfaceVariant, flexShrink: 0 }} />
+            <Icon name="keyboard_arrow_down" size={16} style={{ color: c.chevron, flexShrink: 0 }} />
           </ButtonBase>
           <Menu anchorEl={anchor} open={!!anchor} onClose={() => setAnchor(null)} slotProps={{ list: { role: "listbox", "aria-label": label } }}>
             {options.map((o) => (
@@ -146,6 +147,7 @@ export function SelectCell({ control, name, label, options, extra = [], sx }) {
                 }}
               >
                 {o.label}
+                {o.value === field.value && <MenuCheck />}
               </MenuItem>
             ))}
             {extra.length > 0 && <Divider />}
@@ -179,7 +181,7 @@ export function ImageCell({ src, label, onPick, error }) {
       <ButtonBase
         onClick={() => input.current?.click()}
         aria-label={src ? `Change ${label.toLowerCase()}` : `Add ${label.toLowerCase()}`}
-        sx={{ width: 32, height: 32, ml: 1, borderRadius: `${tokens.shape.sm}px`, overflow: "hidden", bgcolor: c.surfaceContainerHighest, color: error ? c.error : c.onSurfaceVariant, outline: error ? `2px solid ${c.error}` : "none", "&:hover": { opacity: 0.85 } }}
+        sx={{ width: 32, height: 32, ml: 1, borderRadius: `${tokens.shape.sm}px`, overflow: "hidden", bgcolor: c.surfaceCardInset, color: error ? c.error : c.onSurfaceVariant, outline: error ? `1.5px solid ${c.fieldError}` : "none", "&:hover": { opacity: 0.85 } }}
       >
         {src ? <Box component="img" src={src} alt="" sx={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Icon name="add_photo_alternate" size={16} />}
         <Box component="input" ref={input} type="file" accept="image/*" hidden onChange={(e) => e.target.files?.[0] && onPick(e.target.files[0])} />
@@ -249,7 +251,7 @@ export function EditTable({ label, columns, rows, onAdd, addLabel, addDisabled, 
           <ButtonBase
             onClick={onAdd}
             disabled={addDisabled}
-            sx={{ ...segment(rows.length === 0, true), width: "100%", justifyContent: "flex-start", gap: 1, px: 1.5, minHeight: 44, color: addDisabled ? "text.disabled" : c.onSurface, typography: "labelLarge", "&:hover": { bgcolor: c.surfaceContainerHighest }, "&.Mui-focusVisible": { outline: `2px solid ${c.focus}`, outlineOffset: -2 } }}
+            sx={{ ...segment(rows.length === 0, true), width: "100%", justifyContent: "flex-start", gap: 1, px: 1.5, minHeight: 44, color: addDisabled ? "text.disabled" : c.onSurface, typography: "labelLarge", "&:hover": { bgcolor: c.surfaceContainerHighest }, "&.Mui-focusVisible": { outline: `1.5px solid ${c.focus}`, outlineOffset: -2 } }}
           >
             <Icon name="add" size={16} />
             {addLabel}

@@ -30,8 +30,9 @@ export const logoHidden = (s) => s.status === "Scheduled" && setupIssues(s).leng
 export const isEnded = (s) => s.status === "Completed" || s.status === "Canceled";
 
 /** Status badge. Published scheduled streams show none: upcoming is the normal state. */
+/** A stream's status pill; "Needs setup" is the warning tone, the same as the calendar's legend. */
 export function StatusBadge({ status, draft: needsWords }) {
-  const look = { InProgress: ["live", "Live"], Completed: ["neutral", "Ended"], Canceled: ["error", "Canceled"] }[status] ?? (needsWords ? ["neutral", "Needs setup"] : null);
+  const look = { InProgress: ["live", "Live"], Completed: ["neutral", "Ended"], Canceled: ["error", "Canceled"] }[status] ?? (needsWords ? ["warning", "Needs setup"] : null);
   return look ? <Pill tone={look[0]}>{look[1]}</Pill> : null;
 }
 
@@ -114,11 +115,11 @@ export function useStreamSurface(tinted = false) {
   const look = (bg, fg, sub, dot, border = "1px solid transparent") => ({ bg, fg, sub, dot, border, filled: bg !== "transparent", hover: layer(bg === "transparent" ? c.surface : bg, fg, 0.08) });
   return (stream) => {
     // Missing words: the warning fill (not an outline), everywhere a stream shows.
-    if (logoHidden(stream)) return look(palette.warning.container, palette.warning.onContainer, palette.warning.onContainer, palette.warning.color);
+    if (logoHidden(stream)) return look(palette.warning.container, palette.warning.onContainer, palette.warning.onContainer, palette.warning.main);
     if (!tinted) {
       // Ended: the same card, told apart by its badge; text keeps full contrast.
-      if (isEnded(stream)) return look(c.surfaceCard, c.onSurface, c.onSurfaceVariant, c.outline);
-      return look(c.surfaceCard, c.onSurface, c.onSurfaceVariant, stream.status === "InProgress" ? c.error : c.onSurfaceVariant);
+      if (isEnded(stream)) return look(c.surfaceCard, c.onSurface, c.onSurfaceVariant, c.outline, `1px solid ${c.cardBorder}`);
+      return look(c.surfaceCard, c.onSurface, c.onSurfaceVariant, stream.status === "InProgress" ? c.error : c.onSurfaceVariant, `1px solid ${c.cardBorder}`);
     }
     if (stream.status === "InProgress") return look(c.errorContainer, c.onErrorContainer, c.onErrorContainer, c.error);
     // Ended: a clear grey, a step darker than a day and than the page, so it reads as a block (and
@@ -138,7 +139,7 @@ export const canTakeWords = (s) => s.status === "Scheduled" || s.status === "InP
  * round. Ended streams show their set but can't change it.
  */
 function WordSetChip({ stream, onAction, color }) {
-  const { tokens } = useTheme();
+  const { tokens, m3: c } = useTheme();
   const { sets } = useWordSets();
   const set = sets.find((w) => w.streamId === stream.id);
   const missing = (stream.textSavvyRounds?.rounds ?? []).some((r) => !r.word) || (!!stream.showdownConfiguration && !stream.showdownConfiguration.word);
@@ -180,7 +181,7 @@ function WordSetChip({ stream, onAction, color }) {
           whiteSpace: "nowrap",
           cursor: canPick ? "pointer" : "default",
           transition: `background-color ${tokens.motion.effects}`,
-          ...(canPick ? { "&:hover": { bgcolor: alpha(color, 0.2) }, "&:focus-visible": { outline: `2px solid ${color}`, outlineOffset: 1 } } : {}),
+          ...(canPick ? { "&:hover": { bgcolor: alpha(color, 0.2) }, "&:focus-visible": { outline: `1.5px solid ${c.focus}`, outlineOffset: 1.5 } } : {}),
         }}
       >
         <Icon name={set || !missing ? "spellcheck" : "add"} size={14} />
@@ -302,7 +303,7 @@ export function StreamItem({ stream, variant = "card", onAction, highlight }) {
     outlineOffset: -2,
     transition: `background-color ${tokens.motion.effects}`,
     "&:hover": { bgcolor: surface.hover },
-    "&.Mui-focusVisible": { outline: `2px solid ${c.focus}`, outlineOffset: 2 },
+    "&.Mui-focusVisible": { outline: `1.5px solid ${c.focus}`, outlineOffset: 2 },
   };
   // The ⋮ menu in the card's corner, like every card's actions.
   const menu = onAction && (

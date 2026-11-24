@@ -64,7 +64,7 @@ export function ImageGallery({ label, hideLabel, hint, width, height, urls = [],
                   overflow: "hidden",
                   bgcolor: c.ctrl,
                   boxShadow: on ? `0 0 0 2px ${c.primary}` : "none",
-                  "&.Mui-focusVisible": { outline: `2px solid ${c.focus}`, outlineOffset: 2 },
+                  "&.Mui-focusVisible": { outline: `1.5px solid ${c.focus}`, outlineOffset: 2 },
                 }}
               >
                 <Box component="img" src={url} alt="" sx={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: position, display: "block", opacity: on ? 1 : 0.85 }} />

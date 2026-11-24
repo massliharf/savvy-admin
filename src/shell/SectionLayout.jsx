@@ -23,8 +23,8 @@ export function SectionLayout() {
     <>
       {destination && (
         <Box component="header" sx={{ px: { xs: 2, sm: 3 }, pt: { xs: 2, sm: 3 } }}>
-          {/* Savvy Admin's page title inside its content panel: text-lg, 18/27, 400. */}
-          <Typography variant="titleLarge" component="h1" sx={{ fontSize: 18, lineHeight: "27px", fontWeight: 500, letterSpacing: 0, mb: showTabs ? 2 : 0 }}>
+          {/* Framer style: the page title is the Fresco heading, 16/550. */}
+          <Typography variant="titleLarge" component="h1" color="text.primary" sx={{ mb: showTabs ? 1.5 : 0 }}>
             {title}
           </Typography>
           {showTabs && (
@@ -42,7 +42,10 @@ export function SectionLayout() {
           )}
         </Box>
       )}
-      <Box sx={{ px: { xs: 2, sm: 3 }, py: 3 }}>
+      {/* --page-lift: 1 when the page title is the header's last line (no tabs under it), so a
+          header-like PageToolbar (description and/or "+ New", no search) can join the title like
+          the GUU PageHeader: the description 4px under the title, the action on the title row. */}
+      <Box sx={{ px: { xs: 2, sm: 3 }, py: 3, "--page-lift": destination && !showTabs ? 1 : 0 }}>
         <Outlet />
       </Box>
     </>

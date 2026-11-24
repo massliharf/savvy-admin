@@ -16,7 +16,7 @@ export function CardCorner({ centered = false, children }) {
         display: "flex",
         alignItems: "center",
         gap: 0.5,
-        minHeight: 32,
+        minHeight: 30,
       }}
     >
       {children}

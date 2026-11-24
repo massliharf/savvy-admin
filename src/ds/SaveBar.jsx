@@ -7,7 +7,7 @@ import { radius } from "../theme/tokens";
 import { useUnsavedGuard } from "../shell/unsaved";
 
 /**
- * Floating toast (Savvy Admin's white pill with the overlay shadow) for settings-style pages; appears
+ * Floating toolbar (Framer style: 50 tall, 18px corners, 10px padding, the float shadow) for settings-style pages; appears
  * while there are unsaved changes.
  */
 export function SaveBar({ dirty, saving, onSave, onDiscard, guard = true }) {
@@ -30,15 +30,14 @@ export function SaveBar({ dirty, saving, onSave, onDiscard, guard = true }) {
           maxWidth: "100%",
           display: "flex",
           alignItems: "center",
-          gap: 1,
-          minHeight: 48,
-          pl: 2.5,
-          pr: 1,
-          borderRadius: radius("full"),
-          bgcolor: c.surfaceContainerLowest,
+          gap: 1.25,
+          minHeight: 50,
+          pl: 2,
+          pr: 1.25,
+          borderRadius: radius("xl"),
+          bgcolor: c.overlay,
           color: c.onSurface,
-          border: `1px solid ${c.border}`,
-          boxShadow: tokens.elevation[2],
+          boxShadow: tokens.elevation[3],
         }}
       >
         <Typography variant="bodyMedium" sx={{ mr: 1, whiteSpace: "nowrap" }}>

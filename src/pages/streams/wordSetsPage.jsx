@@ -41,8 +41,8 @@ export default function WordSetsPage() {
   const streamsById = useMemo(() => Object.fromEntries(streams.map((s) => [s.id, s])), [streams]);
   const { assign, release, busy } = useWordSetActions();
   const { validateWord } = useWordValidator();
-  // Words show only after the words password; opening a set (its words) asks for it too.
-  const { hidden, unlock, lock, dialog: unlockDialog } = useWordsLock();
+  // Words show only after the words password (admins see them straight away); opening a set (its words) asks for it too.
+  const { hidden, unlock, lock, canLock, dialog: unlockDialog } = useWordsLock();
   const { mutateAsync: request, isPending: requesting } = useCustomMutation();
 
   const [query, setQuery] = useState("");
@@ -108,7 +108,8 @@ export default function WordSetsPage() {
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
       <PageToolbar
         search={<SearchField value={query} onChange={setQuery} placeholder={hidden ? "Search names" : "Search words or names"} />}
-        secondary={[{ label: hidden ? "Show words" : "Hide words", icon: hidden ? "lock_open" : "visibility_off", onClick: () => (hidden ? unlock() : lock()) }]}
+        // Admins see words without the password, so they get no Show / Hide words button.
+        secondary={canLock ? [{ label: hidden ? "Show words" : "Hide words", icon: hidden ? "lock_open" : "visibility_off", onClick: () => (hidden ? unlock() : lock()) }] : []}
         actionLabel="New word set"
         onAction={() => setSheet({})}
       />
@@ -140,7 +141,7 @@ export default function WordSetsPage() {
           <ContainerCard>
             <EmptyState icon={query ? "search_off" : "spellcheck"} title={query ? "No word sets match" : tab === "available" ? "No ready word sets" : tab === "assigned" ? "No scheduled word sets" : "No used word sets yet"}>
               {tab === "available" && !query && (
-                <Button color="secondary" startIcon={<Icon name="add" />} onClick={() => setSheet({})}>
+                <Button startIcon={<Icon name="add" />} onClick={() => setSheet({})}>
                   New word set
                 </Button>
               )}
@@ -180,7 +181,7 @@ export default function WordSetsPage() {
         title="Assign to a stream"
         header={
           assigning && (
-            <Box sx={{ px: 3, py: 2, borderBottom: `1px solid ${c.outlineVariant}` }}>
+            <Box sx={{ px: 2.5, py: 1.5, borderBottom: `1px solid ${c.outlineVariant}` }}>
               <WordSetSummary set={assigning} hidden={hidden} />
             </Box>
           )

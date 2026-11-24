@@ -38,9 +38,9 @@ export function ColorSwatches({ label, value, onChange, colors, defaultColor, he
           color: fill && HEX.test(fill) ? onColour(fill) : c.onSurfaceVariant,
           border: fill ? "none" : `1px solid ${c.outline}`,
           // Selected: a ring in the gap around the swatch.
-          boxShadow: selected ? `0 0 0 3px ${c.surfaceContainerLow}, 0 0 0 5px ${c.focus}` : "none",
+          boxShadow: selected ? `0 0 0 3px ${c.surfaceCard}, 0 0 0 5px ${c.focus}` : "none",
           transition: `box-shadow ${tokens.motion.effects}`,
-          "&.Mui-focusVisible": { outline: `2px solid ${c.focus}`, outlineOffset: 4 },
+          "&.Mui-focusVisible": { outline: `1.5px solid ${c.focus}`, outlineOffset: 4 },
         }}
       >
         {children}

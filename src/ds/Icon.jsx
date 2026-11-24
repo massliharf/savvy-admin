@@ -21,8 +21,8 @@ const Glyph = styled("span", { shouldForwardProp: (p) => !["fill", "size", "weig
   }),
 );
 
-/** Material Symbols Rounded glyph at weight 400 (line icons a touch heavier than Savvy Admin's 300, to match the text). `name` is the symbol's ligature, e.g. "live_tv". */
-export const Icon = forwardRef(function Icon({ name, fill = false, size = 20, weight = 400, className = "", ...rest }, ref) {
+/** Material Symbols Rounded glyph at weight 400. `name` is the symbol's ligature, e.g. "live_tv". 16px by default (Framer's control and row icons); pass `size` for larger placeholders. */
+export const Icon = forwardRef(function Icon({ name, fill = false, size = 16, weight = 400, className = "", ...rest }, ref) {
   return (
     <Glyph
       ref={ref}

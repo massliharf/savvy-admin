@@ -185,7 +185,7 @@ export function BakedImage({ background, host, w = 900, h = 1200, width = 150 })
   const { url, error, busy } = useBake(background, host, w, h);
   const sample = hasHostInIt(background);
   return (
-    <Box sx={{ width, aspectRatio: `${w} / ${h}`, flexShrink: 0, borderRadius: `${tokens.shape.md}px`, overflow: "hidden", bgcolor: c.surfaceContainerHighest, display: "grid", placeItems: "center", position: "relative" }}>
+    <Box sx={{ width, aspectRatio: `${w} / ${h}`, flexShrink: 0, borderRadius: `${tokens.shape.md}px`, overflow: "hidden", bgcolor: c.surfaceCardInset, display: "grid", placeItems: "center", position: "relative" }}>
       {host && url && <Box component="img" src={url} alt="" sx={{ width: "100%", height: "100%", objectFit: "cover", display: "block", opacity: busy ? 0.5 : 1 }} />}
       {(!host || busy || error) && (
         <Typography variant="bodySmall" color="text.secondary" sx={{ position: "absolute", px: 1, textAlign: "center" }}>

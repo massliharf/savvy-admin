@@ -89,7 +89,7 @@ function AccountPicker({ value, onChange, error, exclude }) {
       renderOption={({ key, ...props }, u) => (
         <li key={key} {...props}>
           <Box sx={{ minWidth: 0 }}>
-            <Typography variant="bodyLarge" noWrap>
+            <Typography variant="bodyMedium" noWrap>
               {u.username}
             </Typography>
             <Typography variant="bodySmall" color="text.secondary" noWrap component="div">
@@ -221,7 +221,7 @@ export function HostSheet({ sheet, stats, existing, onHandOver }) {
         !isNew && (
           <Tooltip title="Open user">
             <IconButton aria-label="Open user" component={Link} to={`/user-management/${encodeURIComponent(sheet.record?.id ?? "")}`}>
-              <Icon name="person" />
+              <Icon name="person" size={20} />
             </IconButton>
           </Tooltip>
         )
@@ -355,7 +355,7 @@ export default function HostsPage() {
       ) : hosts.length === 0 ? (
         <EmptyState icon={query ? "search_off" : "mic"} title={query ? "No hosts match" : "No hosts yet"}>
           {!query && (
-            <Button color="secondary" startIcon={<Icon name="add" />} onClick={sheet.openNew}>
+            <Button startIcon={<Icon name="add" />} onClick={sheet.openNew}>
               New host
             </Button>
           )}

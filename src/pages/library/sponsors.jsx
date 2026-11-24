@@ -39,8 +39,8 @@ export function SponsorPreview({ title, description, cta, imageUrl }) {
     host = cta;
   }
   return (
-    <Box sx={{ display: "flex", gap: 1.5, alignItems: "center", p: 1.5, borderRadius: radius("lg"), bgcolor: c.surfaceContainerHigh, "[role='listitem'] &": { bgcolor: c.nested } }}>
-      <Box sx={{ width: 48, height: 48, borderRadius: `${cornerFor(48)}px`, bgcolor: c.surfaceContainerLow, flexShrink: 0, overflow: "hidden", display: "grid", placeItems: "center", color: c.onSurfaceVariant }}>
+    <Box sx={{ display: "flex", gap: 1.5, alignItems: "center", p: 1.5, borderRadius: radius("md"), bgcolor: c.surfaceCardInset, "[role='listitem'] &": { bgcolor: c.nested } }}>
+      <Box sx={{ width: 48, height: 48, borderRadius: `${cornerFor(48)}px`, bgcolor: c.surfaceCard, flexShrink: 0, overflow: "hidden", display: "grid", placeItems: "center", color: c.onSurfaceVariant }}>
         {imageUrl ? <Box component="img" src={imageUrl} alt="" sx={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Icon name="handshake" />}
       </Box>
       <Box sx={{ minWidth: 0, flex: 1 }}>
@@ -195,7 +195,7 @@ export default function SponsorsPage() {
       ) : sponsors.length === 0 ? (
         <EmptyState icon={q ? "search_off" : "handshake"} title={q ? "No sponsors match" : "No sponsors yet"}>
           {!q && (
-            <Button color="secondary" startIcon={<Icon name="add" />} onClick={sheet.openNew}>
+            <Button startIcon={<Icon name="add" />} onClick={sheet.openNew}>
               New sponsor
             </Button>
           )}

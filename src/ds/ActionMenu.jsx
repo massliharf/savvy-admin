@@ -27,7 +27,7 @@ export function ActionMenu({ items, label = "More actions", edge, color }) {
           }}
           onMouseDown={(e) => e.stopPropagation()}
         >
-          <Icon name="more_vert" size={20} />
+          <Icon name="more_vert" />
         </IconButton>
       </Tooltip>
       <Menu
@@ -46,7 +46,8 @@ export function ActionMenu({ items, label = "More actions", edge, color }) {
               setAnchor(null);
               item.onClick();
             }}
-            sx={{ ...(item.tone === "error" ? { color: "error.main" } : {}), ...item.sx }}
+            // Destructive (GUU data-destructive): red text and icon, the same hover as other rows.
+            sx={{ ...(item.tone === "error" ? { color: "error.main", "&:hover, &.Mui-focusVisible": { color: "error.main" }, "& .material-symbols-rounded": { color: "inherit" } } : {}), ...item.sx }}
           >
             <Icon name={item.icon} size={16} />
             {item.label}

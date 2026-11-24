@@ -218,7 +218,7 @@ export default function PowerupPacksPage() {
       ) : shown.length === 0 ? (
         <EmptyState icon={term ? "search_off" : "bolt"} title={term ? "No power-up packs match" : "No power-up packs yet"}>
           {!term && (
-            <Button color="secondary" startIcon={<Icon name="add" />} onClick={sheet.openNew}>
+            <Button startIcon={<Icon name="add" />} onClick={sheet.openNew}>
               New power-up pack
             </Button>
           )}

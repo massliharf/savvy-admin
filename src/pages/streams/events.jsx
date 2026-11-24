@@ -68,15 +68,16 @@ function DayButtons({ value, onChange }) {
             aria-pressed={on}
             aria-label={d.label}
             sx={{
-              width: 36,
-              height: 36,
-              borderRadius: radius("full"),
+              // Framer day toggle: 30 square, 8px corners (the GUU date picker's day).
+              width: 30,
+              height: 30,
+              borderRadius: radius("sm"),
               typography: "labelLarge",
               color: on ? c.onPrimary : c.onSurface,
               bgcolor: on ? c.primary : c.ctrl,
               transition: `background-color ${tokens.motion.effects}`,
               "&:hover": { bgcolor: on ? c.primaryHover : c.ctrlHover },
-              "&.Mui-focusVisible": { outline: `2px solid ${c.focus}`, outlineOffset: 2 },
+              "&.Mui-focusVisible": { outline: `1.5px solid ${c.focus}`, outlineOffset: 2 },
             }}
           >
             {d.letter}
@@ -140,17 +141,17 @@ function MonthDays({ month, onMonth, value, onChange, timezone }) {
               aria-pressed={on}
               aria-label={d.format("dddd, MMMM D")}
               sx={{
-                width: 40,
-                height: 40,
-                borderRadius: radius("full"),
+                // GUU date picker day: 30 square, 8px corners; today is tint text, the picked day the tint fill.
+                width: 30,
+                height: 30,
+                borderRadius: radius("sm"),
                 typography: "bodyMedium",
-                fontWeight: on ? 600 : 400,
-                color: on ? c.onPrimary : c.onSurface,
+                fontWeight: on || isToday ? 550 : 450,
+                color: on ? c.onPrimary : isToday ? c.primaryText : c.textBody,
                 bgcolor: on ? c.primary : "transparent",
-                boxShadow: isToday && !on ? `inset 0 0 0 1px ${c.primary}` : "none",
                 transition: `background-color ${tokens.motion.effects}`,
                 "&:hover": { bgcolor: on ? c.primaryHover : c.ctrlHover },
-                "&.Mui-focusVisible": { outline: `2px solid ${c.focus}`, outlineOffset: 2 },
+                "&.Mui-focusVisible": { outline: `1.5px solid ${c.focus}`, outlineOffset: 2 },
                 "&.Mui-disabled": { color: c.onSurfaceVariant, opacity: 0.38 },
               }}
             >
@@ -287,7 +288,7 @@ export function CreateEventDialog({ open, date, onClose, streams, hosts, timezon
   };
 
   const thumb = (src, size) => (
-    <Avatar src={src === NONE ? undefined : src ?? undefined} alt="" sx={{ width: size, height: size, borderRadius: `${cornerFor(size)}px`, bgcolor: c.surfaceContainerHighest, color: c.onSurfaceVariant }}>
+    <Avatar src={src === NONE ? undefined : src ?? undefined} alt="" sx={{ width: size, height: size, borderRadius: `${cornerFor(size)}px`, bgcolor: c.surfaceCardInset, color: c.onSurfaceVariant }}>
       <Icon name={src === NONE ? "block" : "handshake"} size={size / 2} />
     </Avatar>
   );

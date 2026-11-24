@@ -17,6 +17,7 @@ import ListItemText from "@mui/material/ListItemText";
 import Divider from "@mui/material/Divider";
 import { useTheme } from "@mui/material/styles";
 import { Icon } from "../../../ds/Icon";
+import { MenuCheck } from "../../../ds/MenuCheck";
 import { FieldGroup, FormSection } from "../../../ds/FormSection";
 import { ImageField, useFilePreview } from "../../../ds/ImageField";
 import { ColorSwatches } from "../../../ds/ColorSwatches";
@@ -140,7 +141,7 @@ function PictureRow({ def, value, source, sourceName, emptyText, editLabel, onEd
   const origin = !current ? emptyText : own ? `${preset ? preset.name : "Uploaded"} · this stream only` : [preset?.name, `From ${sourceName}`].filter(Boolean).join(" · ");
   const ratio = def.width / def.height;
   const thumb = (url, size) => (
-    <Box sx={{ width: Math.round(size * ratio), height: size, flexShrink: 0, borderRadius: `${tokens.shape.sm}px`, overflow: "hidden", bgcolor: c.surfaceContainerHighest, display: "grid", placeItems: "center" }}>
+    <Box sx={{ width: Math.round(size * ratio), height: size, flexShrink: 0, borderRadius: `${tokens.shape.sm}px`, overflow: "hidden", bgcolor: c.surfaceCardInset, display: "grid", placeItems: "center" }}>
       {url ? <Box component="img" src={url} alt="" sx={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: def.source === "host" ? FACE_POSITION : "center", display: "block" }} /> : <Icon name="image" size={16} style={{ color: c.onSurfaceVariant }} />}
     </Box>
   );
@@ -160,7 +161,7 @@ function PictureRow({ def, value, source, sourceName, emptyText, editLabel, onEd
         Change
       </Button>
       <Menu anchorEl={anchor} open={!!anchor} onClose={close}>
-        <ListSubheader sx={{ lineHeight: "32px" }}>{`From ${sourceName}`}</ListSubheader>
+        <ListSubheader>{`From ${sourceName}`}</ListSubheader>
         {urls.length === 0 && <MenuItem disabled>{emptyText}</MenuItem>}
         {urls.map((u, i) => (
           <MenuItem
@@ -170,11 +171,10 @@ function PictureRow({ def, value, source, sourceName, emptyText, editLabel, onEd
               close();
               onPick(u === (source?.[def.pick] ?? null) ? null : u);
             }}
-            sx={{ gap: 1.5 }}
           >
             {thumb(u, 32)}
             <ListItemText primary={urls.length > 1 ? `${def.short} ${i + 1}` : def.short} secondary={u === source?.[def.pick] ? "Selected on it" : undefined} />
-            {u === current && <Icon name="check" size={20} />}
+            {u === current && <MenuCheck />}
           </MenuItem>
         ))}
         <Divider />
@@ -185,7 +185,7 @@ function PictureRow({ def, value, source, sourceName, emptyText, editLabel, onEd
           }}
         >
           <ListItemIcon>
-            <Icon name="upload" size={20} />
+            <Icon name="upload" size={16} />
           </ListItemIcon>
           <ListItemText primary="Upload for this stream" secondary={`${def.width} × ${def.height}`} />
         </MenuItem>
@@ -197,7 +197,7 @@ function PictureRow({ def, value, source, sourceName, emptyText, editLabel, onEd
             }}
           >
             <ListItemIcon>
-              <Icon name="palette" size={20} />
+              <Icon name="palette" size={16} />
             </ListItemIcon>
             <ListItemText primary="Colour or gradient for this stream" secondary="Presets, or add a custom one" />
           </MenuItem>
@@ -210,7 +210,7 @@ function PictureRow({ def, value, source, sourceName, emptyText, editLabel, onEd
             }}
           >
             <ListItemIcon>
-              <Icon name="edit" size={20} />
+              <Icon name="edit" size={16} />
             </ListItemIcon>
             <ListItemText primary={editLabel} />
           </MenuItem>
@@ -383,7 +383,7 @@ export function RoundTimeCell({ control, setValue, getValues, base, label }) {
 function MaskedWord({ control, name }) {
   const word = useWatch({ control, name });
   return (
-    <Typography variant="bodyLarge" color="text.secondary" sx={{ px: 1, letterSpacing: word ? "0.1em" : undefined }}>
+    <Typography variant="bodyMedium" color="text.secondary" sx={{ px: 1, letterSpacing: word ? "0.1em" : undefined }}>
       {word ? "•••••" : "No word yet"}
     </Typography>
   );
@@ -430,7 +430,7 @@ export function RoundsEditor({ form, name, fields, append, remove, validateWord,
           onRemove: fields.length > ROUND_COUNT && i === fields.length - 1 ? () => remove(i) : undefined,
           removeLabel: `Remove round ${i + 1}`,
           cells: [
-            <Typography key="n" variant="bodyLarge" color="text.secondary">
+            <Typography key="n" variant="bodyMedium" color="text.secondary">
               {i + 1}
             </Typography>,
             masked ? <MaskedWord key="w" control={control} name={`${base}.word`} /> : <TextCell key="w" control={control} name={`${base}.word`} label={`Round ${i + 1} word`} placeholder="Add a word" rules={roundWordRules(validateWord, base)} inputProps={{ autoCapitalize: "none", spellCheck: false }} />,
@@ -456,7 +456,7 @@ function WordSetRow({ form }) {
   return (
     <ListGroup label="Word set">
       <ListItem
-        leading={mode ? <ModeLogo mode={gameMode} width={72} height={40} /> : <Icon name="spellcheck" size={20} />}
+        leading={mode ? <ModeLogo mode={gameMode} width={72} height={40} /> : <Icon name="spellcheck" />}
         title={set ? set.title || "Untitled set" : "No word set yet"}
         supporting={mode ? mode.label : "The game mode comes with the word set."}
       />
@@ -474,8 +474,9 @@ export function WordsSection({ form, validateWord, onPickWords, frame }) {
   // A round added here gets its Round Pounder from the game set's reward set (set under Rewards).
   const { byId, rewardsOf } = useBundles();
   const rewards = rewardsOf(byId[bundleId]);
-  // Words stay hidden behind the words password (as in Game modes) once there are any to hide.
-  const { hidden, unlock, lock, dialog } = useWordsLock();
+  // Words stay hidden behind the words password (as in Game modes) once there are any to hide;
+  // admins see them straight away.
+  const { hidden, unlock, lock, canLock, dialog } = useWordsLock();
   const hasWords = (rounds ?? []).some((r) => r?.word) || !!showdown?.word;
   const masked = hidden && hasWords;
   return (
@@ -484,7 +485,7 @@ export function WordsSection({ form, validateWord, onPickWords, frame }) {
       title="Words"
       action={
         <Box sx={{ display: "flex", gap: 1 }}>
-          {hasWords && (
+          {hasWords && canLock && (
             <Button variant="tonal" size="small" startIcon={<Icon name={hidden ? "lock_open" : "visibility_off"} />} onClick={() => (hidden ? unlock() : lock())}>
               {hidden ? "Show words" : "Hide words"}
             </Button>
@@ -742,7 +743,7 @@ export function ShowdownFields({ control, name, validateWord, word = true, prize
         {
           key: "sd",
           cells: [
-            <Icon key="i" name="trophy" size={20} style={{ color: c.onSurfaceVariant }} />,
+            <Icon key="i" name="trophy" style={{ color: c.outline }} />,
             word && masked ? (
               <MaskedWord key="w" control={control} name={`${name}.word`} />
             ) : word ? (
@@ -751,7 +752,7 @@ export function ShowdownFields({ control, name, validateWord, word = true, prize
               // Which showdown it is and its prize, in the one row.
               <SelectCell key="w" control={control} name={`${name}.superSavvyOnly`} label="Showdown" options={SHOWDOWN_TYPES.map((t) => ({ value: t.superSavvyOnly, label: t.label }))} />
             ) : (
-              <Typography key="w" variant="bodyLarge" noWrap sx={{ px: 1 }}>
+              <Typography key="w" variant="bodyMedium" noWrap sx={{ px: 1 }}>
                 {label}
               </Typography>
             ),
@@ -793,10 +794,10 @@ function RaffleWinners({ control, setValue, name }) {
             canRemove: winners.length > 1,
             removeLabel: `Remove winner ${i + 1}`,
             cells: [
-              <Typography key="n" variant="bodyLarge" color="text.secondary">
+              <Typography key="n" variant="bodyMedium" color="text.secondary">
                 {i + 1}
               </Typography>,
-              <Typography key="w" variant="bodyLarge" sx={{ px: 1 }}>
+              <Typography key="w" variant="bodyMedium" sx={{ px: 1 }}>
                 {ordinal(i + 1)} place
               </Typography>,
               <RewardCell key="r" control={control} name={`${name}.${i}`} allowed={RAFFLE_REWARD_OPTIONS} label={`Winner ${i + 1} reward`} />,
@@ -827,7 +828,7 @@ function OptionalRewardCell({ control, path, def }) {
   const value = useWatch({ control, name: path });
   if (!rewardOn(value)) {
     return (
-      <Typography variant="bodyLarge" color="text.secondary" sx={{ px: 1 }}>
+      <Typography variant="bodyMedium" color="text.secondary" sx={{ px: 1 }}>
         Off
       </Typography>
     );
@@ -852,9 +853,9 @@ export function RewardsEditor({ form, prefix = "", keys, stumper }) {
   const raffle = !keys || keys.includes("raffleSystemWinnersConfiguration");
   const toggle = (def, on) => setValue(`${prefix}${def.key}`, on ? structuredClone(def.blank) : def.off, { shouldDirty: true, shouldTouch: true });
   // Icon and name in their own columns, so names line up with the words and winners above.
-  const icon = (name) => <Icon name={name} size={20} style={{ color: c.onSurfaceVariant }} />;
+  const icon = (name) => <Icon name={name} style={{ color: c.outline }} />;
   const name = (text) => (
-    <Typography variant="bodyLarge" noWrap sx={{ px: 1 }}>
+    <Typography variant="bodyMedium" noWrap sx={{ px: 1 }}>
       {text}
     </Typography>
   );
@@ -871,7 +872,7 @@ export function RewardsEditor({ form, prefix = "", keys, stumper }) {
         // The same slots as a reward: the amount, then the unit where a reward's type sits.
         <Box key="v" sx={{ display: "flex", alignItems: "center", gap: 0.75, width: "100%" }}>
           <NumberCell control={control} name="hostStumperBonusXp" label="Host stumper reward XP" placeholder="500" align="left" sx={{ width: 64, flexShrink: 0 }} rules={{ validate: (v) => (v == null || v >= 0 ? true : "Min 0") }} />
-          <Typography variant="bodyLarge" color="text.secondary" sx={{ px: 1 }}>
+          <Typography variant="bodyMedium" color="text.secondary" sx={{ px: 1 }}>
             XP
           </Typography>
         </Box>,
@@ -920,10 +921,10 @@ function RoundRewardsTable({ control, setValue, count, path, onAdd, onRemove }) 
         onRemove: onRemove && count > ROUND_COUNT && i === count - 1 ? () => onRemove(i) : undefined,
         removeLabel: `Remove round ${i + 1}`,
         cells: [
-          <Typography key="n" variant="bodyLarge" color="text.secondary">
+          <Typography key="n" variant="bodyMedium" color="text.secondary">
             {i + 1}
           </Typography>,
-          <Typography key="r" variant="bodyLarge" noWrap sx={{ px: 1 }}>
+          <Typography key="r" variant="bodyMedium" noWrap sx={{ px: 1 }}>
             Round {i + 1}
           </Typography>,
           <BusterCell key="b" control={control} setValue={setValue} name={path(i)} index={i} />,
@@ -952,8 +953,8 @@ function ShowdownPrizeRow({ control, name }) {
         {
           key: "sd",
           cells: [
-            <Icon key="i" name="trophy" size={20} style={{ color: c.onSurfaceVariant }} />,
-            <Typography key="w" variant="bodyLarge" noWrap sx={{ px: 1 }}>
+            <Icon key="i" name="trophy" style={{ color: c.outline }} />,
+            <Typography key="w" variant="bodyMedium" noWrap sx={{ px: 1 }}>
               Showdown winner
             </Typography>,
             <RewardCell key="p" control={control} name={name} allowed={SHOWDOWN_REWARDS} label="Showdown prize" />,
@@ -1088,7 +1089,7 @@ export function SponsorSection({ form, frame }) {
     setValue("sponsorship", { title: sp.title, description: sp.description, cta: sp.cta, imageUrl: sp.imageUrl ?? null, sponsorshipImageFile: null }, { shouldDirty: true, shouldTouch: true });
   };
   const thumb = (src, size) => (
-    <Avatar src={src === NONE ? undefined : src ?? undefined} alt="" sx={{ width: size, height: size, borderRadius: `${cornerFor(size)}px`, bgcolor: c.surfaceContainerHighest, color: c.onSurfaceVariant }}>
+    <Avatar src={src === NONE ? undefined : src ?? undefined} alt="" sx={{ width: size, height: size, borderRadius: `${cornerFor(size)}px`, bgcolor: c.surfaceCardInset, color: c.onSurfaceVariant }}>
       <Icon name={src === NONE ? "block" : "handshake"} size={size / 2} />
     </Avatar>
   );
@@ -1155,7 +1156,7 @@ export function NotificationPreview({ control, title, body }) {
   const b = useWatch({ control, name: body });
   const { m3: c } = useTheme();
   return (
-    <Box sx={{ display: "flex", gap: 1.5, p: 1.5, borderRadius: radius("lg"), bgcolor: c.surfaceContainerHigh, "[role='listitem'] &": { bgcolor: c.nested } }} aria-hidden>
+    <Box sx={{ display: "flex", gap: 1.5, p: 1.5, borderRadius: radius("md"), bgcolor: c.surfaceCardInset, "[role='listitem'] &": { bgcolor: c.nested } }} aria-hidden>
       <Box sx={{ width: 32, height: 32, borderRadius: radius("sm"), bgcolor: c.primary, color: c.onPrimary, display: "grid", placeItems: "center", flexShrink: 0 }}>
         <Icon name="notifications" size={18} fill />
       </Box>
@@ -1258,7 +1259,7 @@ export function ShareCardPreview({ control, path, host = "the host" }) {
   return (
     <Box aria-hidden sx={{ width: "100%", maxWidth: 160, aspectRatio: "4 / 5", borderRadius: radius("lg"), p: 1.5, display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: 0.5, bgcolor: c.primary, color: c.onPrimary, opacity: empty ? 0.4 : 1 }}>
       {v.header && <Typography variant="labelLarge">{v.header}</Typography>}
-      <Typography variant="titleMedium" sx={{ fontWeight: 700, lineHeight: 1.15 }}>
+      <Typography variant="titleMedium" sx={{ lineHeight: 1.15 }}>
         {v.title || (empty ? "Hidden" : "")}
       </Typography>
       {v.subtitle && <Typography variant="bodySmall">{v.subtitle}</Typography>}

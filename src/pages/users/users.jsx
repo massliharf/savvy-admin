@@ -25,7 +25,9 @@ import { ConfirmDialog } from "../../ds/ConfirmDialog";
 import { ContainerCard } from "../../ds/ContainerCard";
 import { RowsSkeleton } from "../../ds/Skeletons";
 
-const COLUMNS = { xs: "40px minmax(0,1fr) 24px", md: "40px minmax(0,2fr) minmax(0,1.2fr) minmax(0,1fr) 90px 120px 24px" };
+// Framer CMS table: the data columns keep their own widths side by side (capped, so related
+// facts stay together on wide screens); the free space goes to the last column, before the chevron.
+const COLUMNS = { xs: "40px minmax(0,1fr) 24px", md: "40px minmax(0,300px) minmax(0,180px) minmax(0,140px) 100px 110px minmax(24px,1fr)" };
 
 function UserRow({ user, selected, onToggle, onOpen }) {
   const { m3: c } = useTheme();
@@ -45,7 +47,7 @@ function UserRow({ user, selected, onToggle, onOpen }) {
         textAlign: "left",
         bgcolor: selected ? c.secondaryContainer : "transparent",
         "&:hover": { bgcolor: selected ? c.secondaryContainer : "action.hover" },
-        "&.Mui-focusVisible": { outline: `2px solid ${c.focus}`, outlineOffset: -2 },
+        "&.Mui-focusVisible": { outline: `1.5px solid ${c.focus}`, outlineOffset: -2 },
         "&:not(:last-of-type)": { borderBottom: `1px solid ${c.outlineVariant}` },
       }}
     >
@@ -86,7 +88,7 @@ function UserRow({ user, selected, onToggle, onOpen }) {
       <Box sx={{ display: { xs: "none", md: "block" } }}>
         <AccountStatusPill value={user.userAccountStatus} />
       </Box>
-      <Icon name="chevron_right" style={{ color: c.onSurfaceVariant }} />
+      <Icon name="chevron_right" style={{ color: c.chevron, justifySelf: "end" }} />
     </ButtonBase>
   );
 }

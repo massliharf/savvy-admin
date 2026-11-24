@@ -75,7 +75,7 @@ function DayMarker({ day, timezone }) {
   const today = day.format("YYYY-MM-DD") === dayjs().tz(timezone).format("YYYY-MM-DD");
   return (
     <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.25, pt: 1 }}>
-      <Typography variant="labelMedium" sx={{ color: today ? c.primaryText : c.onSurfaceVariant, textTransform: "uppercase" }}>
+      <Typography variant="labelMedium" sx={{ color: today ? c.primaryText : c.onSurfaceVariant }}>
         {day.format("ddd")}
       </Typography>
       <Box
@@ -339,7 +339,7 @@ export default function StreamList() {
               Clear filters
             </Button>
           ) : (
-            <Button color="secondary" startIcon={<Icon name="event_repeat" />} onClick={() => createEvent()}>
+            <Button startIcon={<Icon name="event_repeat" />} onClick={() => createEvent()}>
               Create event
             </Button>
           )}
@@ -380,7 +380,7 @@ export default function StreamList() {
         stream={wordsFor}
         header={
           wordsFor && (
-            <Box sx={{ px: 3, py: 2, borderBottom: (t) => `1px solid ${t.m3.outlineVariant}` }}>
+            <Box sx={{ px: 2.5, py: 1.5, borderBottom: (t) => `1px solid ${t.m3.outlineVariant}` }}>
               <StreamSummary stream={wordsFor} />
             </Box>
           )

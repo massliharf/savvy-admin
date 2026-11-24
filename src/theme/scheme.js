@@ -1,112 +1,136 @@
 import { argbFromHex, hexFromArgb, Hct, MaterialDynamicColors as C, SchemeTonalSpot } from "@material/material-color-utilities";
 
-// The colour system: Savvy Admin's own tokens, measured live in its app (light and dark); see
-// /design-system.md. Each role below names the Savvy Admin token it is.
+// The colour system, Framer style: Framer's editor tokens ("Fresco"), read live in light and
+// dark (~/Desktop/MyClaudeProjects/framer/DESIGN_SYSTEM.md §1.2 and Appendix A). Each role
+// below names the Fresco token it is.
 //
-// Shell: background = panel-0 (ground); the workspace, rail, dialogs, sheets and menus are white
-// panels (panel-4); cards and rows inside them are grey blocks; what sits inside a block is white
-// again (nested).
-// Interaction is one ladder for every family: -0 rest, -1 hover, -2 pressed / selected
-// (control = default-0, hover = ghost-1, pressed = ghost-2). Where you are (rail, menus, section
-// nav) is ghost-2 with ink text; a chosen filter is surface-3; the one accent is primary-0 blue.
-// Light and dark are tuned to the same separations (a control or status fill stands apart from
-// its surface by about the same ratio in both). Lines appear only where Savvy Admin has them (design-system.md §5): border = alpha-1, borderSubtle
-// = alpha-0, borderStrong = alpha-2 (hover, focus outline).
-export const ACCENT = "#3F59E4";
-export const BRAND = "#FF57AE";
-// Savvy Admin's app (category) colours: the icon is the colour, its tile 10% of it.
-export const CATEGORY = { violet: "#8566DC", blue: "#4F69F2", green: "#17CB8D", teal: "#00CDC6", rose: "#CC7E80", sand: "#B39581" };
-export const CATEGORY_DARK = { violet: "#9C82E5", blue: "#6F8BF7", green: "#3CD39F", teal: "#29D4CF", rose: "#CC7E80", sand: "#B39581" };
+// Shell: white panels (panelBackground) split by 1px dividers (panelDivider), never shadows.
+// Controls are a 5% black fill (inputBackground / buttonBackground), 7% on hover; no borders.
+// Selected rows are #F3F3F3 with #000 text (panelItemBackgroundActive); a chosen filter is the
+// soft accent (tintDimmed + tint). One accent: #0099FF (tint), for primary actions, selection
+// and active states only. Text: title #222, body #333, label #666, muted #999.
+export const ACCENT = "#0099FF";
+// Framer has a single accent, so the brand action uses it too.
+export const BRAND = "#0099FF";
+// App (category) colours: the icon is the colour, its tile 10% of it. Fresco's insert-panel
+// accents (cyan, green, orange), its component purple and the tint.
+export const CATEGORY = { violet: "#8855FF", blue: "#0099FF", green: "#00BB88", teal: "#28D4D4", rose: "#F24A58", sand: "#FF8822" };
+export const CATEGORY_DARK = CATEGORY;
 
 const NEUTRAL = {
-  // Savvy Admin's tokens exactly (design-system.md §2). Shell: panel-0 ground, panel-2
-  // workspace, panel-4 white panels (rail, cards, sheets, dialogs, menus); surface-1 blocks inside
-  // a panel; a panel again inside a block (nested). Lines only where Savvy Admin draws them (§5).
   light: {
-    // Contrast pass: Savvy Admin blue a step deeper so white text and blue text pass 4.5:1.
-    primary: "#3F59E4", primaryHover: "#2F47D0", onPrimary: "#FFFFFF", primaryText: "#3F59E4",
-    primaryContainer: "#CCD6FB", onPrimaryContainer: "#2B3FAE", inversePrimary: "#90ABFA", inverseError: "#F66951",
-    // secondary: the inverted button (black in light)
-    secondary: "#1A1A1A", secondaryHover: "#424242", secondaryPressed: "#616161", onSecondary: "#FFFFFF",
-    // ghost-2: where you are
-    secondaryContainer: "rgba(115,115,115,.22)", onSecondaryContainer: "#141414",
-    tertiary: "#8566DC", onTertiary: "#FFFFFF", tertiaryContainer: "rgba(133,102,220,.1)", onTertiaryContainer: "#5A3DB0",
-    error: "#BF371F", onError: "#FFFFFF", errorContainer: "#F9C7BE", onErrorContainer: "#8D1B07",
-    // Light layers, each a clear step: page #DEDEDE, panels #EBEBEB (sidebar white), cards white.
-    background: "#DEDEDE", onBackground: "#141414",
-    surface: "#EBEBEB", onSurface: "#141414", surfaceVariant: "#E6E6E6", onSurfaceVariant: "#4D4D4D",
-    surfaceDim: "#E3E3E3", surfaceBright: "#FFFFFF",
+    // tint / buttonBackgroundPrimaryHover / Active
+    primary: "#0099FF", primaryHover: "#0088FF", primaryActive: "#0077FF", onPrimary: "#FFFFFF", primaryText: "#0099FF",
+    // tintDimmed. Text on a tint is a deeper step of the hue so it reads (≥ 4.5:1 on the 10% fill;
+    // #0099FF on it is only 2.7:1); dots, icons and the fills themselves stay #0099FF.
+    primaryContainer: "rgba(0,153,255,.1)", onPrimaryContainer: "#0070CC", inversePrimary: "#0099FF", inverseError: "#F55B5B",
+    // secondary: the raised button (buttonWithDepthBackground / Text)
+    secondary: "#FFFFFF", secondaryHover: "#FAFAFA", secondaryPressed: "#F3F3F3", onSecondary: "#222222",
+    // where you are: panelItemBackgroundActive / panelItemTextActive
+    secondaryContainer: "rgba(0,0,0,.047)", onSecondaryContainer: "#000000",
+    // componentTint
+    tertiary: "#8855FF", onTertiary: "#FFFFFF", tertiaryContainer: "rgba(136,85,255,.1)", onTertiaryContainer: "#8855FF",
+    // buttonTextDestructive / buttonBackgroundDestructive
+    error: "#F24A58", onError: "#FFFFFF", errorContainer: "rgba(242,74,88,.1)", onErrorContainer: "#CC2B3A",
+    // Framer's dashboard / settings (as in the GUU admin the owner approved): a white page
+    // (settingsContainerBackground), white cards with a #EEE hairline, no drop shadows.
+    background: "#FFFFFF", onBackground: "#222222",
+    surface: "#FFFFFF", onSurface: "#222222", surfaceVariant: "#F3F3F3", onSurfaceVariant: "#666666",
+    // canvasBackground
+    surfaceDim: "#EEEEEE", surfaceBright: "#FFFFFF",
+    // Rows inside a white card: settingsEntryBackground (#0000000A on white).
     surfaceContainerLowest: "#FFFFFF", surfaceContainerLow: "#FCFCFC", surfaceContainer: "#F5F5F5",
-    // Rows inside a white card (list groups, tables, pick cards): a clear step down from white.
-    surfaceContainerHigh: "#EBEBEB", surfaceContainerHighest: "#E3E3E3", nested: "#FFFFFF",
-    inverseSurface: "#1A1A1A", inverseOnSurface: "#F5F5F5",
-    outline: "#5E5E5E", outlineVariant: "rgba(16,16,16,.14)", shadow: "#121212", scrim: "#1A1A1A", surfaceTint: "#506BF2",
-    surfaceCard: "#FFFFFF", surfaceCardInset: "#EBEBEB",
-    dialog: "#FFFFFF", overlay: "#FFFFFF", modal: "#FFFFFF",
-    textStrong: "#262626", textBody: "#333333", textMuted: "#5E5E5E",
-    surface2: "#E6E6E6", surface3: "#D9D9D9", surface4: "#C7C7C7",
-    brand: BRAND, onBrand: "#0F0F0F", brandContainer: "rgba(255,88,174,.15)", onBrandContainer: "#FF57AE",
-    brandBlue: "#1CB0F6",
-    // default-0 / ghost-1 / ghost-2
-    control: "rgba(115,115,115,.12)", hover: "rgba(115,115,115,.18)", pressed: "rgba(115,115,115,.24)",
-    // alpha-1 / alpha-0 / alpha-2; outline-border-0 / -1
-    border: "rgba(16,16,16,.14)", borderSubtle: "rgba(16,16,16,.08)", borderStrong: "rgba(16,16,16,.3)",
-    outlineBorder: "rgba(16,16,16,.2)", outlineBorderHover: "rgba(16,16,16,.3)", outlineHover: "rgba(16,16,16,.1)",
-    // focus outline alpha-2; form-0 / form-border-0 / -active / -error
-    focus: "rgba(16,16,16,.3)", field: "rgba(115,115,115,.16)", fieldHover: "rgba(115,115,115,.22)", fieldBorder: "transparent", fieldActive: "#0F0F0F", fieldError: "#F66951",
-    disabledFill: "#E3E3E3",
-    track: "rgba(115,115,115,.2)", trackSelected: "#D9D9D9",
-    backdrop: "rgba(26,26,26,.8)",
-    // Filled controls (select, chips, stepper, grey buttons) are default-0 with no line.
-    ctrl: "rgba(115,115,115,.2)", ctrlHover: "rgba(115,115,115,.26)", ctrlPressed: "rgba(115,115,115,.32)", ctrlBorder: "transparent", ctrlBorderHover: "transparent",
-    // A chosen filter / segment: surface-3.
-    chosen: "#D4D4D4",
-    // The chosen option of a segmented control: a white pill on the grey track.
-    segment: "#FFFFFF",
-    cardBorder: "transparent",
+    surfaceContainerHigh: "#F5F5F5", surfaceContainerHighest: "#EEEEEE", nested: "#FFFFFF",
+    inverseSurface: "#222222", inverseOnSurface: "#FFFFFF",
+    // panelIcon / panelDivider
+    outline: "#888888", outlineVariant: "rgba(0,0,0,.067)", shadow: "#000000", scrim: "#000000", surfaceTint: "#0099FF",
+    // settingsCardBackground
+    surfaceCard: "#FFFFFF", surfaceCardInset: "#F5F5F5", surfaceCardHover: "#FAFAFA",
+    // modalBackground / menuBackground / popoverBackground
+    dialog: "#FFFFFF", overlay: "#FFFFFF", modal: "#FFFFFF", tooltip: "#FFFFFF",
+    // panelTitle / menuText / inputPlaceholder
+    textStrong: "#222222", textBody: "#333333", textMuted: "#767676", textPlaceholder: "#999999", textDisabled: "#BBBBBB",
+    surface2: "#F3F3F3", surface3: "#EEEEEE", surface4: "#DDDDDD",
+    brand: BRAND, onBrand: "#FFFFFF", brandContainer: "rgba(0,153,255,.1)", onBrandContainer: "#0099FF",
+    brandBlue: "#0099FF",
+    // buttonBackground / menuBackgroundActive / buttonBackgroundHover
+    control: "rgba(0,0,0,.05)", hover: "rgba(0,0,0,.05)", pressed: "rgba(0,0,0,.07)",
+    // panelDivider / swatchBorder
+    border: "rgba(0,0,0,.067)", borderSubtle: "rgba(0,0,0,.05)", borderStrong: "rgba(0,0,0,.1)",
+    outlineBorder: "rgba(0,0,0,.1)", outlineBorderHover: "rgba(0,0,0,.15)", outlineHover: "rgba(0,0,0,.05)",
+    // focus outline (tint); inputBackground / inputBorderError
+    focus: "#0099FF", field: "rgba(0,0,0,.05)", fieldHover: "rgba(0,0,0,.07)", fieldBorder: "transparent", fieldActive: "#0099FF", fieldError: "#F55B5B",
+    disabledFill: "#F3F3F3",
+    // toggleBackground (#EEE on a white panel; 10% black so it also reads on a #F5F5F5 row) /
+    // sliderTrack
+    track: "rgba(0,0,0,.1)", trackSelected: "#DDDDDD", sliderRest: "#DDDDDD",
+    // modalBackdrop
+    backdrop: "rgba(0,0,0,.4)",
+    // buttonBackground / Hover; no line
+    ctrl: "rgba(0,0,0,.05)", ctrlHover: "rgba(0,0,0,.07)", ctrlPressed: "rgba(0,0,0,.1)", ctrlBorder: "transparent", ctrlBorderHover: "transparent",
+    // A chosen filter: the soft accent (pillTintBackground / tint).
+    chosen: "rgba(0,153,255,.1)", chosenText: "#0070CC",
+    // segmentedControlItemBackgroundSelected / its text
+    // segmentIdle: an unselected option (Framer #999; #888 here so it reads on the 5% track).
+    segment: "#FFFFFF", segmentText: "#0099FF", segmentIdle: "#888888",
+    // Menu rows (GUU admin): hover #F2F2F2, the checkmark #444, separators #EEE.
+    menuHover: "#F2F2F2", menuCheck: "#444444", menuSeparator: "#EEEEEE", chevron: "#BBBBBB",
+    // checkboxBackground / pillText / selectionBackground / loaderPrimary
+    checkbox: "#F5F5F5", pillText: "#777777", selection: "rgba(0,0,0,.1)", loader: "#F0F0F0", scrollbar: "#CCCCCC",
+    // Framer card logic: a 1px #EEE hairline instead of a shadow (cards, raised buttons, tiles).
+    cardBorder: "#EEEEEE", cardBorderHover: "#E0E0E0",
+    // Toasts: a dark chip in both themes.
+    toast: "#222222", onToast: "#FFFFFF",
   },
   dark: {
-    primary: "#4A64EC", primaryHover: "#3F59E4", onPrimary: "#FFFFFF", primaryText: "#90ABFA",
-    primaryContainer: "rgba(144,171,250,.2)", onPrimaryContainer: "#C7D4FD", inversePrimary: "#506BF2", inverseError: "#F66951",
-    secondary: "#F5F5F5", secondaryHover: "#E3E3E3", secondaryPressed: "#DBDBDB", onSecondary: "#1A1A1A",
-    secondaryContainer: "rgba(255,255,255,.2)", onSecondaryContainer: "#FAFAFA",
-    tertiary: "#9C82E5", onTertiary: "#1E1240", tertiaryContainer: "rgba(156,130,229,.1)", onTertiaryContainer: "#C9B9F5",
-    error: "#F66951", onError: "#1A1A1A", errorContainer: "rgba(246,105,81,.24)", onErrorContainer: "#F9C7BE",
-    background: "#050505", onBackground: "#FAFAFA",
-    surface: "#121212", onSurface: "#FAFAFA", surfaceVariant: "#2B2B2B", onSurfaceVariant: "#C2C2C2",
-    surfaceDim: "#101010", surfaceBright: "#363636",
-    surfaceContainerLowest: "#1F1F1F", surfaceContainerLow: "#242424", surfaceContainer: "#242424",
-    surfaceContainerHigh: "#2A2A2A", surfaceContainerHighest: "#333333", nested: "#1F1F1F",
-    inverseSurface: "#F5F5F5", inverseOnSurface: "#1A1A1A",
-    outline: "#999999", outlineVariant: "rgba(255,255,255,.14)", shadow: "#000000", scrim: "#1A1A1A", surfaceTint: "#506BF2",
-    surfaceCard: "#1F1F1F", surfaceCardInset: "#2A2A2A",
-    dialog: "#1F1F1F", overlay: "#262626", modal: "#262626",
-    textStrong: "#EDEDED", textBody: "#D6D6D6", textMuted: "#999999",
-    surface2: "#333333", surface3: "#424242", surface4: "#525252",
-    brand: BRAND, onBrand: "#0F0F0F", brandContainer: "rgba(255,88,174,.15)", onBrandContainer: "#FF57AE",
-    brandBlue: "#1CB0F6",
-    control: "rgba(255,255,255,.09)", hover: "rgba(255,255,255,.14)", pressed: "rgba(255,255,255,.2)",
-    border: "rgba(255,255,255,.14)", borderSubtle: "rgba(255,255,255,.08)", borderStrong: "rgba(255,255,255,.3)",
-    outlineBorder: "rgba(255,255,255,.2)", outlineBorderHover: "rgba(255,255,255,.3)", outlineHover: "rgba(255,255,255,.1)",
-    focus: "rgba(255,255,255,.3)", field: "rgba(255,255,255,.07)", fieldHover: "rgba(255,255,255,.11)", fieldBorder: "transparent", fieldActive: "#FFFFFF", fieldError: "#F66951",
-    disabledFill: "#363636",
-    track: "rgba(255,255,255,.09)", trackSelected: "#454545",
-    backdrop: "rgba(26,26,26,.8)",
-    ctrl: "rgba(255,255,255,.09)", ctrlHover: "rgba(255,255,255,.14)", ctrlPressed: "rgba(255,255,255,.2)", ctrlBorder: "transparent", ctrlBorderHover: "transparent",
-    chosen: "#4A4A4A",
-    segment: "#4A4A4A",
-    cardBorder: "transparent",
+    primary: "#0099FF", primaryHover: "#0088FF", primaryActive: "#0077FF", onPrimary: "#FFFFFF", primaryText: "#0099FF",
+    // tintTileBackground (tintDimmed /.06 is too faint to read as chosen)
+    primaryContainer: "rgba(0,153,255,.15)", onPrimaryContainer: "#0099FF", inversePrimary: "#0099FF", inverseError: "#F55B5B",
+    secondary: "#262626", secondaryHover: "#2E2E2E", secondaryPressed: "#333333", onSecondary: "#FFFFFF",
+    secondaryContainer: "rgba(255,255,255,.07)", onSecondaryContainer: "#FFFFFF",
+    tertiary: "#8855FF", onTertiary: "#FFFFFF", tertiaryContainer: "rgba(136,85,255,.08)", onTertiaryContainer: "#AA88FF",
+    error: "#F24A58", onError: "#FFFFFF", errorContainer: "rgba(242,74,88,.15)", onErrorContainer: "#F24A58",
+    // settingsContainerBackground #111; cards #111 with a white 8% hairline.
+    background: "#111111", onBackground: "#FFFFFF",
+    surface: "#111111", onSurface: "#FFFFFF", surfaceVariant: "#1F1F1F", onSurfaceVariant: "#CCCCCC",
+    surfaceDim: "#171717", surfaceBright: "#2E2E2E",
+    surfaceContainerLowest: "#111111", surfaceContainerLow: "#161616", surfaceContainer: "#1A1A1A",
+    surfaceContainerHigh: "#1F1F1F", surfaceContainerHighest: "#262626", nested: "#111111",
+    inverseSurface: "#FFFFFF", inverseOnSurface: "#111111",
+    outline: "#999999", outlineVariant: "rgba(255,255,255,.07)", shadow: "#000000", scrim: "#000000", surfaceTint: "#0099FF",
+    surfaceCard: "#111111", surfaceCardInset: "#1F1F1F", surfaceCardHover: "#161616",
+    dialog: "#111111", overlay: "#242424", modal: "#1F1F1F", tooltip: "#242424",
+    textStrong: "#FFFFFF", textBody: "#FFFFFF", textMuted: "#888888", textPlaceholder: "#999999", textDisabled: "#777777",
+    surface2: "#262626", surface3: "#2E2E2E", surface4: "#444444",
+    brand: BRAND, onBrand: "#FFFFFF", brandContainer: "rgba(0,153,255,.15)", onBrandContainer: "#0099FF",
+    brandBlue: "#0099FF",
+    control: "rgba(255,255,255,.06)", hover: "rgba(255,255,255,.06)", pressed: "rgba(255,255,255,.09)",
+    border: "rgba(255,255,255,.07)", borderSubtle: "rgba(255,255,255,.05)", borderStrong: "rgba(255,255,255,.1)",
+    outlineBorder: "rgba(255,255,255,.1)", outlineBorderHover: "rgba(255,255,255,.15)", outlineHover: "rgba(255,255,255,.05)",
+    focus: "#0099FF", field: "rgba(255,255,255,.06)", fieldHover: "rgba(255,255,255,.09)", fieldBorder: "transparent", fieldActive: "#0099FF", fieldError: "#F55B5B",
+    disabledFill: "#333333",
+    track: "#444444", trackSelected: "#555555", sliderRest: "#2B2B2B",
+    backdrop: "rgba(0,0,0,.7)",
+    ctrl: "rgba(255,255,255,.06)", ctrlHover: "rgba(255,255,255,.09)", ctrlPressed: "rgba(255,255,255,.12)", ctrlBorder: "transparent", ctrlBorderHover: "transparent",
+    chosen: "rgba(0,153,255,.15)", chosenText: "#0099FF",
+    segment: "#3B3B3B", segmentText: "#FFFFFF", segmentIdle: "#999999",
+    menuHover: "#2E2E2E", menuCheck: "#999999", menuSeparator: "#333333", chevron: "#666666",
+    checkbox: "rgba(255,255,255,.08)", pillText: "#999999", selection: "rgba(255,255,255,.15)", loader: "#181818", scrollbar: "#555555",
+    cardBorder: "rgba(255,255,255,.08)", cardBorderHover: "rgba(255,255,255,.14)",
+    toast: "#2E2E2E", onToast: "#FFFFFF",
   },
 };
-// Success and warning (not M3 core roles), in the same four roles as a key colour.
+// Success and warning (not M3 core roles), in the same four roles as a key colour:
+// pillSuccess (#0B8 on #00BB881A) and warningTint (#EB9D28, dark #F5BC66). In light, text on the
+// tints is a deeper step (≥ 4.5:1); in dark the base hue already reads on its tint.
 const NEUTRAL_CUSTOM = {
   light: {
-    success: { color: "#0F7A55", onColor: "#FFFFFF", container: "#DCF7EC", onContainer: "#06402C" },
-    warning: { color: "#8A5200", onColor: "#FFFFFF", container: "#FDDA9E", onContainer: "#3B2200" },
+    success: { color: "#00BB88", onColor: "#FFFFFF", container: "rgba(0,187,136,.1)", onContainer: "#00805B" },
+    warning: { color: "#EB9D28", onColor: "#FFFFFF", container: "rgba(235,157,40,.1)", onContainer: "#9E5F00" },
   },
   dark: {
-    success: { color: "#5FD9AA", onColor: "#06402C", container: "#0E3D2D", onContainer: "#C6F5E2" },
-    warning: { color: "#FFBE6B", onColor: "#3B2200", container: "#4A2F05", onContainer: "#FFE2BD" },
+    success: { color: "#00BB88", onColor: "#FFFFFF", container: "rgba(0,187,136,.12)", onContainer: "#00BB88" },
+    warning: { color: "#F5BC66", onColor: "#111111", container: "rgba(245,188,102,.1)", onContainer: "#F5BC66" },
   },
 };
 

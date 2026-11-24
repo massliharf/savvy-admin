@@ -114,7 +114,7 @@ export default function GameModesPage() {
         <CardsSkeleton count={2} label="Loading games" />
       ) : modes.length === 0 ? (
         <EmptyState icon="sports_esports" title="No game modes yet" description="Add one before writing word sets.">
-          <Button color="secondary" startIcon={<Icon name="add" />} onClick={sheet.openNew}>
+          <Button startIcon={<Icon name="add" />} onClick={sheet.openNew}>
             New game mode
           </Button>
         </EmptyState>

@@ -25,7 +25,7 @@ export function Banner({ tone = "info", icon, action, children }) {
     );
   }
   const look = {
-    info: { bgcolor: c.surfaceCard, color: c.onSurface, icon: c.onSurfaceVariant, ".MuiCard-root &, .MuiDrawer-paper &, .MuiDialog-paper &": { bgcolor: c.surfaceContainerHigh } },
+    info: { bgcolor: c.surfaceContainerHigh, color: c.onSurface, icon: c.onSurfaceVariant, ".MuiCard-root &, .MuiDrawer-paper &, .MuiDialog-paper &": { bgcolor: c.surfaceContainerHigh } },
     warning: { bgcolor: palette.warning.container, color: palette.warning.onContainer, icon: "inherit" },
     error: { bgcolor: c.errorContainer, color: c.onErrorContainer, icon: "inherit" },
   }[tone];

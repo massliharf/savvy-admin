@@ -67,10 +67,10 @@ function OrderRow({ order, user, onOpen, onDeliver, onReopen }) {
         width: "100%",
         textAlign: "left",
         "&:hover": { bgcolor: "action.hover" },
-        "&.Mui-focusVisible": { outline: `2px solid ${c.focus}`, outlineOffset: -2 },
+        "&.Mui-focusVisible": { outline: `1.5px solid ${c.focus}`, outlineOffset: -2 },
         // Phones: stacked next to the thumbnail. Medium: item | buyer over address | action.
         // Wide: one column each.
-        gridTemplateColumns: { xs: "56px minmax(0,1fr)", md: "56px minmax(0,1fr) minmax(0,1.2fr) 150px", lg: "56px minmax(0,1.3fr) minmax(0,1fr) minmax(0,1.4fr) 160px" },
+        gridTemplateColumns: { xs: "56px minmax(0,1fr)", md: "56px minmax(0,1fr) minmax(0,1.2fr) 150px", lg: "56px minmax(0,280px) minmax(0,220px) minmax(0,300px) minmax(160px,1fr)" },
         columnGap: 2,
         rowGap: 1.5,
         alignItems: "start",
@@ -136,7 +136,7 @@ function OrderRow({ order, user, onOpen, onDeliver, onReopen }) {
                     await navigator.clipboard?.writeText(order.trackingNumber);
                     notify("Tracking number copied");
                   }}
-                  sx={{ all: "unset", cursor: "pointer", typography: "bodySmall", ...mono, color: (t) => t.m3.primaryText, maxWidth: "100%", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", "&:hover": { textDecoration: "underline" }, "&:focus-visible": { outline: `2px solid ${c.focus}` } }}
+                  sx={{ all: "unset", cursor: "pointer", typography: "bodySmall", ...mono, color: (t) => t.m3.primaryText, maxWidth: "100%", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", "&:hover": { textDecoration: "underline" }, "&:focus-visible": { outline: `1.5px solid ${c.focus}` } }}
                 >
                   {order.trackingNumber}
                 </Box>

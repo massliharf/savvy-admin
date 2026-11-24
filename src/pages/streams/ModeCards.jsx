@@ -29,7 +29,7 @@ export function ModeCards({ value, onChange, onSettings }) {
               alignItems: "center",
               borderRadius: `${theme.tokens.shape.md}px`,
               bgcolor: theme.m3.surfaceCard,
-              boxShadow: on ? `inset 0 0 0 2px ${theme.m3.primary}` : "none",
+              boxShadow: on ? `inset 0 0 0 2px ${theme.m3.primary}` : `inset 0 0 0 1px ${theme.m3.cardBorder}`,
               transition: `background-color ${theme.tokens.motion.effects}`,
               "&:has(> .mode-pick:hover)": { bgcolor: theme.m3.hover },
             }}
@@ -47,7 +47,7 @@ export function ModeCards({ value, onChange, onSettings }) {
               justifyContent: "flex-start",
               textAlign: "left",
               borderRadius: `${theme.tokens.shape.md}px`,
-              "&.Mui-focusVisible": { outline: `2px solid ${theme.m3.focus}`, outlineOffset: 2 },
+              "&.Mui-focusVisible": { outline: `1.5px solid ${theme.m3.focus}`, outlineOffset: 2 },
             }}
           >
             <ModeLogo mode={m.id} width={64} height={40} />
@@ -64,7 +64,7 @@ export function ModeCards({ value, onChange, onSettings }) {
           {onSettings && (
             <Tooltip title={`${name} settings`}>
               <IconButton aria-label={`${name} settings`} onClick={() => onSettings(m.id)} sx={{ mr: 1, flexShrink: 0 }}>
-                <Icon name="settings" size={20} />
+                <Icon name="settings" />
               </IconButton>
             </Tooltip>
           )}

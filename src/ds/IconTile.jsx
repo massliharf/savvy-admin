@@ -17,10 +17,10 @@ export function IconTile({ icon, label, tone = "secondary", size = 40, src, fill
   const { m3: c, palette } = useTheme();
   const cap = tone[0].toUpperCase() + tone.slice(1);
   const dark = palette.mode === "dark";
-  // Savvy Admin's app tiles: the icon in the category colour on a 10% tile of it; neutral tiles are
-  // the "Stock" tile (ink at 10%, ink icon).
+  // App tiles: the icon in the category colour on a 10% tile of it; neutral tiles are the Framer
+  // inset grey (#F5F5F5, #1F1F1F in dark) with an ink icon, the same as card thumbnails.
   const cat = CATEGORY[tone] && (dark ? CATEGORY_DARK[tone] : CATEGORY[tone]);
-  const colors = cat ? { bg: alpha(cat, 0.1), fg: cat } : tone === "surface" || tone === "secondary" ? { bg: dark ? "rgba(250,250,250,.1)" : "rgba(16,16,16,.1)", fg: c.onSurface } : tone === "success" ? { bg: c.success.container, fg: c.success.onContainer } : { bg: c[`${tone}Container`], fg: c[`on${cap}Container`] };
+  const colors = cat ? { bg: alpha(cat, 0.1), fg: cat } : tone === "surface" || tone === "secondary" ? { bg: c.surfaceCardInset, fg: c.onSurface } : tone === "success" ? { bg: c.success.container, fg: c.success.onContainer } : { bg: c[`${tone}Container`], fg: c[`on${cap}Container`] };
   return (
     <Box
       sx={{

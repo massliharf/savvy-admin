@@ -69,6 +69,8 @@ export const DESTINATIONS = [
     icon: "settings",
     tabs: [
       { icon: "palette", label: "Appearance", path: "/settings" },
+      // Who can sign in to the dashboard, and their role.
+      { icon: "manage_accounts", label: "Team", path: "/team" },
       { icon: "code", label: "Developer tools", path: "/developer" },
       // Reached from Developer tools; highlights that tab instead of showing its own.
       { label: "Design system", path: "/design-system", hidden: true, parent: "/developer" },
